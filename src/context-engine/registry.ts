@@ -1,6 +1,7 @@
 import type { ContextEngine } from './interface.js';
+import type { CreateEngineOptions } from './default-engine.js';
 
-type ContextEngineFactory = (agentFolder: string) => Promise<ContextEngine>;
+type ContextEngineFactory = (agentFolder: string, options?: CreateEngineOptions) => Promise<ContextEngine>;
 
 /**
  * ContextEngine 注册表
@@ -12,6 +13,9 @@ export class ContextEngineRegistry {
   private factories: Map<string, ContextEngineFactory> = new Map();
   private defaultEngine: string = 'default';
 
+  // 全局引擎配置
+  private globalOptions: CreateEngineOptions = {};
+
   /**
    * 注册 ContextEngine 工厂
    * @param name - 引擎名称
@@ -22,11 +26,22 @@ export class ContextEngineRegistry {
   }
 
   /**
+   * 设置全局引擎配置
+   * @param options - 配置选项
+   */
+  setGlobalOptions(options: CreateEngineOptions): void {
+    this.globalOptions = options;
+    // 清除已缓存的引擎实例，以便下次获取时应用新配置
+    this.engines.clear();
+  }
+
+  /**
    * 获取或创建 ContextEngine 实例
    * @param agentFolder - Agent 文件夹路径
+   * @param options - 引擎配置选项（会合并全局配置）
    * @returns ContextEngine 实例
    */
-  async getEngine(agentFolder: string): Promise<ContextEngine> {
+  async getEngine(agentFolder: string, options?: CreateEngineOptions): Promise<ContextEngine> {
     // 检查是否已有缓存的引擎实例
     if (this.engines.has(agentFolder)) {
       return this.engines.get(agentFolder)!;
@@ -38,7 +53,8 @@ export class ContextEngineRegistry {
       throw new Error('No default ContextEngine registered');
     }
 
-    const engine = await factory(agentFolder);
+    const mergedOptions = { ...this.globalOptions, ...options };
+    const engine = await factory(agentFolder, mergedOptions);
     this.engines.set(agentFolder, engine);
     return engine;
   }

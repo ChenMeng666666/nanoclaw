@@ -59,6 +59,9 @@ import {
   DefaultContextEngine,
   createDefaultContextEngine,
 } from './context-engine/default-engine.js';
+import {
+  LocalLLMQueryExpansionProvider,
+} from './query-expansion/local-llm-provider.js';
 import { startRuntimeAPI } from './runtime-api.js';
 import { MainEvolutionApplier } from './main-evolution-applier.js';
 
@@ -482,11 +485,57 @@ function ensureContainerSystemRunning(): void {
   cleanupOrphans();
 }
 
+// 本地 LLM 查询扩展提供者实例
+let localLLMProvider: LocalLLMQueryExpansionProvider | null = null;
+
+async function setupLocalLLMQueryExpansion(): Promise<void> {
+  const modelPath = process.env.LOCAL_LLM_MODEL_PATH || './model/Qwen3.5-2B-Q4_K_M.gguf';
+
+  try {
+    localLLMProvider = new LocalLLMQueryExpansionProvider({
+      modelPath,
+      modelType: 'qwen3.5',
+      numVariants: 3,
+      temperature: 0.7,
+      maxTokens: 200,
+    });
+
+    await localLLMProvider.initialize();
+    logger.info({ modelPath }, 'Local LLM query expansion initialized');
+
+    // 设置到 context engine 注册表的全局配置
+    contextEngineRegistry.setGlobalOptions({
+      queryExpansionProvider: localLLMProvider,
+    });
+  } catch (err) {
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err), modelPath },
+      'Failed to initialize local LLM, falling back to keyword query expansion',
+    );
+    localLLMProvider = null;
+  }
+}
+
+/**
+ * 在后台初始化本地 LLM，不阻塞应用启动
+ */
+function setupLocalLLMQueryExpansionInBackground(): void {
+  setupLocalLLMQueryExpansion().catch((err) => {
+    logger.error(
+      { err: err instanceof Error ? err.message : String(err) },
+      'Background local LLM setup failed',
+    );
+  });
+}
+
 async function main(): Promise<void> {
   ensureContainerSystemRunning();
   initDatabase();
   logger.info('Database initialized');
   loadState();
+
+  // 在后台设置本地 LLM 查询扩展，不阻塞启动
+  setupLocalLLMQueryExpansionInBackground();
 
   // 启动反思调度器（多智能体架构）
   reflectionScheduler.start();
@@ -559,6 +608,19 @@ async function main(): Promise<void> {
     await new Promise<void>((resolve) => {
       runtimeAPIServer.close(() => resolve());
     });
+
+    // 清理本地 LLM 资源
+    if (localLLMProvider) {
+      try {
+        await localLLMProvider.destroy();
+        logger.info('Local LLM provider destroyed');
+      } catch (err) {
+        logger.warn(
+          { err: err instanceof Error ? err.message : String(err) },
+          'Failed to destroy local LLM provider',
+        );
+      }
+    }
 
     // 持久化记忆 - ContextEngine 已在运行中持续处理
     logger.info('ContextEngine memories are persisted during runtime');

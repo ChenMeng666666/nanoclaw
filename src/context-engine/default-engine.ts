@@ -372,7 +372,7 @@ export class DefaultContextEngine implements ContextEngine {
     const recentContent = messages.map((m) => m.content).join(' ');
 
     // 查询扩展：生成多个查询变体
-    const queryVariants = this.generateQueryVariants(recentContent);
+    const queryVariants = await this.generateQueryVariants(recentContent);
 
     // 对每个查询变体执行搜索，然后合并结果
     const allBm25Results: string[] = [];
@@ -460,13 +460,17 @@ export class DefaultContextEngine implements ContextEngine {
    * 生成查询变体
    * 如果有 LLM 提供者，优先使用 LLM；否则使用基于关键词的方法
    */
-  private generateQueryVariants(text: string): string[] {
+  private async generateQueryVariants(text: string): Promise<string[]> {
     // 如果有 LLM 提供者，优先使用 LLM
     if (this.queryExpansionProvider) {
       try {
         const llmVariants = this.queryExpansionProvider.generateVariants(text);
-        if (llmVariants && llmVariants.length > 0) {
-          return [text, ...llmVariants].slice(0, 5);
+        const resolvedVariants = llmVariants instanceof Promise
+          ? await llmVariants
+          : llmVariants;
+
+        if (resolvedVariants && resolvedVariants.length > 0) {
+          return [text, ...resolvedVariants].slice(0, 5);
         }
       } catch (err) {
         logger.warn(
@@ -483,7 +487,7 @@ export class DefaultContextEngine implements ContextEngine {
   /**
    * 基于关键词的查询扩展（回退方案）
    */
-  private generateKeywordVariants(text: string): string[] {
+  public generateKeywordVariants(text: string): string[] {
     const variants: string[] = [text]; // 原始查询
 
     // 1. 关键词提取和重组
@@ -522,7 +526,7 @@ export class DefaultContextEngine implements ContextEngine {
   /**
    * 提取关键词
    */
-  private extractKeywords(text: string): string[] {
+  public extractKeywords(text: string): string[] {
     // 简单的关键词提取：去除停用词，保留有意义的词
     const stopWords = new Set([
       'the',
@@ -569,7 +573,7 @@ export class DefaultContextEngine implements ContextEngine {
   /**
    * 简化查询
    */
-  private simplifyQuery(text: string): string {
+  public simplifyQuery(text: string): string {
     // 简单的查询简化：去除冗余短语，保留核心内容
     const redundantPatterns = [
       /\b(i|you|we|they|he|she|it)\s+(think|believe|know|want|need)\s+that\b/gi,
@@ -588,7 +592,7 @@ export class DefaultContextEngine implements ContextEngine {
   /**
    * 同义词替换
    */
-  private replaceSynonyms(text: string): string {
+  public replaceSynonyms(text: string): string {
     // 简单的同义词词典
     const synonyms: Record<string, string[]> = {
       问题: ['疑问', '难题', '困难'],
@@ -733,9 +737,9 @@ export interface QueryExpansionProvider {
   /**
    * 生成查询变体
    * @param query 原始查询
-   * @returns 查询变体数组
+   * @returns 查询变体数组（同步或异步）
    */
-  generateVariants(query: string): string[];
+  generateVariants(query: string): string[] | Promise<string[]>;
 
   /**
    * 初始化提供者
@@ -755,17 +759,35 @@ export class KeywordQueryExpansionProvider implements QueryExpansionProvider {
   constructor(private defaultEngine: DefaultContextEngine) {}
 
   generateVariants(query: string): string[] {
-    return this.defaultEngine['generateKeywordVariants'](query);
+    return this.defaultEngine.generateKeywordVariants(query);
   }
 }
+
+/**
+ * 工厂函数配置选项
+ */
+export interface CreateEngineOptions {
+  queryExpansionProvider?: QueryExpansionProvider;
+}
+
+import { contextEngineRegistry } from './registry.js';
 
 /**
  * 工厂函数：创建默认 ContextEngine 实例
  */
 export async function createDefaultContextEngine(
   agentFolder: string,
+  options?: CreateEngineOptions,
 ): Promise<DefaultContextEngine> {
   const engine = new DefaultContextEngine();
   await engine.bootstrap(agentFolder);
+
+  if (options?.queryExpansionProvider) {
+    engine.setQueryExpansionProvider(options.queryExpansionProvider);
+  }
+
   return engine;
 }
+
+// 自动注册默认引擎
+contextEngineRegistry.register('default', createDefaultContextEngine);

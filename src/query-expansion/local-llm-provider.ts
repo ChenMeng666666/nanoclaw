@@ -1,6 +1,6 @@
 /**
  * 本地 LLM 查询扩展提供者
- * 使用 node-llama-cpp + GGUF 模型进行查询扩展
+ * 使用 node-llama-cpp 3.x + GGUF 模型进行查询扩展
  *
  * 注意：这个模块是可选的，不强制依赖 node-llama-cpp
  * 用户可以选择安装 node-llama-cpp 来启用本地 LLM 查询扩展
@@ -8,13 +8,14 @@
 
 import type { QueryExpansionProvider } from '../context-engine/default-engine.js';
 import { logger } from '../logger.js';
+import fs from 'fs';
 
 /**
  * 本地 LLM 提供者配置
  */
 export interface LocalLLMConfig {
   modelPath: string;
-  modelType?: 'qwen3' | 'llama3' | 'other';
+  modelType?: 'qwen3' | 'qwen3.5' | 'llama3' | 'other';
   temperature?: number;
   maxTokens?: number;
   numVariants?: number;
@@ -25,7 +26,7 @@ export interface LocalLLMConfig {
  *
  * 使用说明：
  * 1. 首先安装 node-llama-cpp: npm install node-llama-cpp
- * 2. 下载 GGUF 格式的模型（如 Qwen3-1.7B-Instruct-GGUF）
+ * 2. 下载 GGUF 格式的模型（如 Qwen3.5-2B-Q4_K_M.gguf）
  * 3. 初始化并设置到 DefaultContextEngine
  *
  * 示例：
@@ -33,7 +34,7 @@ export interface LocalLLMConfig {
  * import { LocalLLMQueryExpansionProvider } from './query-expansion/local-llm-provider.js';
  *
  * const provider = new LocalLLMQueryExpansionProvider({
- *   modelPath: './models/Qwen3-1.7B-Instruct.Q4_K_M.gguf',
+ *   modelPath: './models/Qwen3.5-2B-Q4_K_M.gguf',
  *   numVariants: 3
  * });
  *
@@ -44,6 +45,9 @@ export interface LocalLLMConfig {
 export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
   private config: LocalLLMConfig;
   private llama: any = null; // node-llama-cpp 的实例（延迟加载）
+  private model: any = null; // 加载的模型
+  private context: any = null; // 上下文
+  private chatSession: any = null; // 聊天会话
   private isInitialized = false;
 
   constructor(config: LocalLLMConfig) {
@@ -51,7 +55,7 @@ export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
       numVariants: 3,
       temperature: 0.7,
       maxTokens: 200,
-      modelType: 'qwen3',
+      modelType: 'qwen3.5',
       ...config,
     };
   }
@@ -64,16 +68,32 @@ export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
     try {
       // 动态导入 node-llama-cpp，避免非必需依赖
       // @ts-ignore - node-llama-cpp 是可选依赖
-      const { Llama } = await import('node-llama-cpp');
+      const { getLlama, LlamaChatSession, QwenChatWrapper, Llama3ChatWrapper, GeneralChatWrapper } = await import('node-llama-cpp');
 
       logger.info(
-        { modelPath: this.config.modelPath },
+        { modelPath: this.config.modelPath, modelType: this.config.modelType },
         'Initializing local LLM provider',
       );
 
-      this.llama = new Llama({
+      // 获取 Llama 实例
+      this.llama = await getLlama();
+
+      // 加载模型（直接加载，不预先检查文件存在）
+      this.model = await this.llama.loadModel({
         modelPath: this.config.modelPath,
-        verbose: false,
+      });
+
+      // 创建上下文
+      this.context = await this.model.createContext();
+
+      // 创建聊天会话
+      this.chatSession = new LlamaChatSession({
+        contextSequence: this.context.getSequence(),
+        chatWrapper: this.config.modelType === 'qwen3' || this.config.modelType === 'qwen3.5'
+          ? new QwenChatWrapper()
+          : this.config.modelType === 'llama3'
+          ? new Llama3ChatWrapper()
+          : new GeneralChatWrapper(),
       });
 
       this.isInitialized = true;
@@ -85,6 +105,10 @@ export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
             'Please install it with: npm install node-llama-cpp',
         );
       }
+      logger.warn(
+        { err: err instanceof Error ? err.message : String(err), modelPath: this.config.modelPath },
+        'Failed to initialize local LLM',
+      );
       throw err;
     }
   }
@@ -92,8 +116,8 @@ export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
   /**
    * 生成查询变体
    */
-  generateVariants(query: string): string[] {
-    if (!this.isInitialized || !this.llama) {
+  async generateVariants(query: string): Promise<string[]> {
+    if (!this.context) {
       // 如果没有初始化，返回空数组（会回退到关键词方法）
       return [];
     }
@@ -101,8 +125,20 @@ export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
     try {
       // 使用本地 LLM 生成查询变体
       const prompt = this.buildPrompt(query);
-      const response = this.llama.generate({
-        prompt,
+
+      // 每次都创建新的聊天会话以避免历史增长问题
+      const { LlamaChatSession, QwenChatWrapper, Llama3ChatWrapper, GeneralChatWrapper } = await import('node-llama-cpp');
+      const chatSession = new LlamaChatSession({
+        contextSequence: this.context.getSequence(),
+        chatWrapper: this.config.modelType === 'qwen3' || this.config.modelType === 'qwen3.5'
+          ? new QwenChatWrapper()
+          : this.config.modelType === 'llama3'
+          ? new Llama3ChatWrapper()
+          : new GeneralChatWrapper(),
+      });
+
+      // 发送消息
+      const response = await chatSession.prompt(prompt, {
         temperature: this.config.temperature,
         maxTokens: this.config.maxTokens,
       });
@@ -116,27 +152,37 @@ export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
   }
 
   /**
+   * 辅助方法：清理单个资源
+   */
+  private async disposeResource(resource: any, name: string): Promise<void> {
+    if (!resource) return;
+    try {
+      await resource.dispose();
+    } catch (err) {
+      logger.warn({ err }, `Failed to dispose ${name}`);
+    }
+  }
+
+  /**
    * 清理资源
    */
   async destroy(): Promise<void> {
-    if (this.llama) {
-      try {
-        await this.llama.dispose?.();
-      } catch (err) {
-        logger.warn({ err }, 'Failed to dispose LLM instance');
-      }
-      this.llama = null;
-      this.isInitialized = false;
-    }
+    await this.disposeResource(this.context, 'context');
+    this.context = null;
+    await this.disposeResource(this.model, 'model');
+    this.model = null;
+    await this.disposeResource(this.llama, 'llama');
+    this.llama = null;
+
+    this.isInitialized = false;
+    logger.info('Local LLM provider destroyed');
   }
 
   /**
    * 构建提示词
    */
   private buildPrompt(query: string): string {
-    const modelType = this.config.modelType || 'qwen3';
-
-    const instructions = `You are a query expansion assistant. Your task is to generate ${this.config.numVariants} different query variations for semantic search.
+    return `You are a query expansion assistant. Your task is to generate ${this.config.numVariants} different query variations for semantic search.
 
 Original query: "${query}"
 
@@ -147,15 +193,6 @@ Generate ${this.config.numVariants} alternative queries that capture the same in
 4. Removing redundant words
 
 Return ONLY the queries, one per line, without numbering or extra text.`;
-
-    if (modelType === 'qwen3') {
-      return `<|im_start|>system\n${instructions}<|im_end|>\n<|im_start|>user\n${query}<|im_end|>\n<|im_start|>assistant\n`;
-    } else if (modelType === 'llama3') {
-      return `<|begin_of_solution|><|start_header_id|>system<|end_header_id|>\n\n${instructions}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n${query}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n`;
-    }
-
-    // 默认提示词格式
-    return `${instructions}\n\nQueries:\n`;
   }
 
   /**
@@ -164,8 +201,8 @@ Return ONLY the queries, one per line, without numbering or extra text.`;
   private parseResponse(response: string): string[] {
     const lines = response
       .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
+      .map((line: string) => line.trim())
+      .filter((line: string) => line.length > 0);
 
     return lines.slice(0, this.config.numVariants!);
   }
