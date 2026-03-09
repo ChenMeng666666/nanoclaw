@@ -18,7 +18,11 @@ import {
   deleteMemory,
   getUserMemories,
 } from '../db-agents.js';
-import { BM25Index, reciprocalRankFusion, fusedToIds } from '../hybrid-search.js';
+import {
+  BM25Index,
+  reciprocalRankFusion,
+  fusedToIds,
+} from '../hybrid-search.js';
 import { generateEmbedding as generateEmbeddingFromProvider } from '../embedding-providers/registry.js';
 
 // 嵌入缓存（避免重复计算）
@@ -109,14 +113,22 @@ export class DefaultContextEngine implements ContextEngine {
       };
 
       createMemory(memory);
-      memoriesToStore.push({ ...memory, accessCount: 0, lastAccessedAt: new Date().toISOString() });
+      memoriesToStore.push({
+        ...memory,
+        accessCount: 0,
+        lastAccessedAt: new Date().toISOString(),
+      });
 
       // 更新 BM25 索引
       this.bm25Index.addDocument(memory.id, content);
     }
 
     logger.info(
-      { agentFolder: this.agentFolder, userJid: message.sender, chunkCount: chunks.length },
+      {
+        agentFolder: this.agentFolder,
+        userJid: message.sender,
+        chunkCount: chunks.length,
+      },
       'Memory ingested',
     );
 
@@ -127,12 +139,18 @@ export class DefaultContextEngine implements ContextEngine {
    * 智能分块策略
    * 保护代码块、引用内容和长文本片段的完整性
    */
-  private splitIntoMemoryChunks(content: string): Array<{ content: string; type: 'user' | 'code' | 'document' }> {
-    const chunks: Array<{ content: string; type: 'user' | 'code' | 'document' }> = [];
+  private splitIntoMemoryChunks(
+    content: string,
+  ): Array<{ content: string; type: 'user' | 'code' | 'document' }> {
+    const chunks: Array<{
+      content: string;
+      type: 'user' | 'code' | 'document';
+    }> = [];
 
     // 1. 提取代码块（```代码块```）
     const codeBlockRegex = /```[\s\S]*?```/g;
-    const codeBlocks: Array<{ content: string; start: number; end: number }> = [];
+    const codeBlocks: Array<{ content: string; start: number; end: number }> =
+      [];
     let match;
     while ((match = codeBlockRegex.exec(content)) !== null) {
       codeBlocks.push({
@@ -244,7 +262,7 @@ export class DefaultContextEngine implements ContextEngine {
         text.lastIndexOf('!', end),
         text.lastIndexOf('?', end),
         text.lastIndexOf(' ', end),
-      ].filter(pos => pos > start);
+      ].filter((pos) => pos > start);
 
       if (splitPoints.length > 0) {
         end = Math.max(...splitPoints) + 1;
@@ -353,15 +371,34 @@ export class DefaultContextEngine implements ContextEngine {
     // 构建查询文本
     const recentContent = messages.map((m) => m.content).join(' ');
 
-    // BM25 搜索
-    const bm25Results = this.bm25Index.search(recentContent, limit * 2);
+    // 查询扩展：生成多个查询变体
+    const queryVariants = this.generateQueryVariants(recentContent);
 
-    // 向量搜索
-    const vectorResults = await this.vectorSearch(this.agentFolder, recentContent, limit * 2);
+    // 对每个查询变体执行搜索，然后合并结果
+    const allBm25Results: string[] = [];
+    const allVectorResults: string[] = [];
+
+    for (const query of queryVariants) {
+      // BM25 搜索
+      const bm25Results = this.bm25Index.search(query, limit * 2);
+      allBm25Results.push(...bm25Results);
+
+      // 向量搜索
+      const vectorResults = await this.vectorSearch(
+        this.agentFolder,
+        query,
+        limit * 2,
+      );
+      allVectorResults.push(...vectorResults);
+    }
+
+    // 去重
+    const uniqueBm25Results = [...new Set(allBm25Results)];
+    const uniqueVectorResults = [...new Set(allVectorResults)];
 
     // RRF 融合
-    const fusedResults = reciprocalRankFusion(bm25Results, vectorResults);
-    const memoryIds = fusedToIds(fusedResults, limit);
+    const fusedResults = reciprocalRankFusion(uniqueBm25Results, uniqueVectorResults);
+    const memoryIds = this.reRankResults(fusedResults, recentContent, limit);
 
     // 从数据库加载记忆
     const memories = this.getMemoriesByIds(memoryIds);
@@ -389,7 +426,8 @@ export class DefaultContextEngine implements ContextEngine {
     return {
       summary,
       preservedMemories,
-      discardedCount: (session.memories || []).length - preservedMemories.length,
+      discardedCount:
+        (session.memories || []).length - preservedMemories.length,
     };
   }
 
@@ -408,6 +446,143 @@ export class DefaultContextEngine implements ContextEngine {
         'New memories stored after turn',
       );
     }
+  }
+
+  /**
+   * 生成查询变体（简单但有效的查询扩展）
+   */
+  private generateQueryVariants(text: string): string[] {
+    const variants: string[] = [text]; // 原始查询
+
+    // 1. 关键词提取和重组
+    const keywords = this.extractKeywords(text);
+    if (keywords.length > 1) {
+      // 生成不同长度的关键词组合
+      for (let i = Math.max(1, keywords.length - 1); i < keywords.length; i++) {
+        const combo = keywords.slice(0, i + 1).join(' ');
+        if (combo.length > 10 && !variants.includes(combo)) {
+          variants.push(combo);
+        }
+      }
+    }
+
+    // 2. 简化查询
+    const simplified = this.simplifyQuery(text);
+    if (simplified && simplified.length > 10 && simplified !== text && !variants.includes(simplified)) {
+      variants.push(simplified);
+    }
+
+    // 3. 同义词替换（简单的同义词词典）
+    const synonyms = this.replaceSynonyms(text);
+    if (synonyms !== text && !variants.includes(synonyms)) {
+      variants.push(synonyms);
+    }
+
+    // 限制变体数量
+    return variants.slice(0, 5);
+  }
+
+  /**
+   * 提取关键词
+   */
+  private extractKeywords(text: string): string[] {
+    // 简单的关键词提取：去除停用词，保留有意义的词
+    const stopWords = new Set([
+      'the', 'and', 'for', 'with', 'that', 'this', 'is', 'are', 'was', 'were',
+      'it', 'he', 'she', 'they', 'we', 'you', 'me', 'him', 'her', 'us', 'them',
+      'on', 'in', 'at', 'by', 'to', 'from', 'of', 'about', 'like', 'as',
+    ]);
+
+    return text.toLowerCase()
+      .replace(/[^\w\s\u4e00-\u9fff]/g, ' ') // 保留中文和英文单词
+      .split(/\s+/)
+      .filter(word => word.length > 1 && !stopWords.has(word))
+      .slice(0, 8); // 限制关键词数量
+  }
+
+  /**
+   * 简化查询
+   */
+  private simplifyQuery(text: string): string {
+    // 简单的查询简化：去除冗余短语，保留核心内容
+    const redundantPatterns = [
+      /\b(i|you|we|they|he|she|it)\s+(think|believe|know|want|need)\s+that\b/gi,
+      /\b(in my opinion|in my view|i think|i believe)\b/gi,
+      /\b(please|thank you|thanks|could you|would you|can you)\b/gi,
+    ];
+
+    let simplified = text;
+    for (const pattern of redundantPatterns) {
+      simplified = simplified.replace(pattern, '');
+    }
+
+    return simplified.trim().replace(/\s+/g, ' ');
+  }
+
+  /**
+   * 同义词替换
+   */
+  private replaceSynonyms(text: string): string {
+    // 简单的同义词词典
+    const synonyms: Record<string, string[]> = {
+      '问题': ['疑问', '难题', '困难'],
+      '方法': ['方式', '办法', '途径'],
+      '使用': ['应用', '利用', '采用'],
+      '了解': ['知道', '明白', '理解'],
+      '学习': ['研究', '了解', '掌握'],
+      '功能': ['特性', '作用', '用途'],
+      '系统': ['体系', '平台', '架构'],
+      '数据': ['信息', '资料', '内容'],
+      '代码': ['程序', '脚本', '代码'],
+    };
+
+    let result = text;
+    for (const [word, synList] of Object.entries(synonyms)) {
+      const regex = new RegExp(`\\b${word}\\b`, 'g');
+      // 随机选择一个同义词替换
+      const replacement = synList[Math.floor(Math.random() * synList.length)];
+      result = result.replace(regex, replacement);
+    }
+
+    return result;
+  }
+
+  /**
+   * 结果重排序
+   * 基于内容相关性对 RRF 结果进行二次排序
+   */
+  private reRankResults(results: any[], query: string, limit: number): string[] {
+    // 获取所有记忆内容
+    const allMemories = getMemories(this.agentFolder);
+    const memoryMap = new Map<string, string>();
+    for (const memory of allMemories) {
+      memoryMap.set(memory.id, memory.content);
+    }
+
+    // 对结果进行二次排序：结合 RRF 分数和内容相似度
+    const scoredResults = results.map(result => {
+      const memoryContent = memoryMap.get(result.id);
+      if (!memoryContent) {
+        return { ...result, finalScore: result.fusedScore };
+      }
+
+      // 计算内容相似度（简单的词重叠分数）
+      const queryWords = new Set(query.toLowerCase().split(/\s+/));
+      const contentWords = new Set(memoryContent.toLowerCase().split(/\s+/));
+      const overlap = [...queryWords].filter(word => contentWords.has(word)).length;
+      const overlapScore = overlap / Math.sqrt(queryWords.size * contentWords.size);
+
+      // 结合分数
+      const finalScore = result.fusedScore * (0.7 + 0.3 * overlapScore);
+
+      return { ...result, finalScore };
+    });
+
+    // 按最终分数排序并返回前 N 个
+    return scoredResults
+      .sort((a, b) => b.finalScore - a.finalScore)
+      .slice(0, limit)
+      .map(result => result.id);
   }
 
   // ===== 私有方法 =====
