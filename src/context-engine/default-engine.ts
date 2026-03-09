@@ -397,7 +397,10 @@ export class DefaultContextEngine implements ContextEngine {
     const uniqueVectorResults = [...new Set(allVectorResults)];
 
     // RRF 融合
-    const fusedResults = reciprocalRankFusion(uniqueBm25Results, uniqueVectorResults);
+    const fusedResults = reciprocalRankFusion(
+      uniqueBm25Results,
+      uniqueVectorResults,
+    );
     const memoryIds = this.reRankResults(fusedResults, recentContent, limit);
 
     // 从数据库加载记忆
@@ -449,9 +452,35 @@ export class DefaultContextEngine implements ContextEngine {
   }
 
   /**
-   * 生成查询变体（简单但有效的查询扩展）
+   * 查询扩展提供者接口
+   */
+  private queryExpansionProvider: QueryExpansionProvider | null = null;
+
+  /**
+   * 生成查询变体
+   * 如果有 LLM 提供者，优先使用 LLM；否则使用基于关键词的方法
    */
   private generateQueryVariants(text: string): string[] {
+    // 如果有 LLM 提供者，优先使用 LLM
+    if (this.queryExpansionProvider) {
+      try {
+        const llmVariants = this.queryExpansionProvider.generateVariants(text);
+        if (llmVariants && llmVariants.length > 0) {
+          return [text, ...llmVariants].slice(0, 5);
+        }
+      } catch (err) {
+        logger.warn({ err }, 'LLM query expansion failed, falling back to keyword method');
+      }
+    }
+
+    // 回退到基于关键词的方法
+    return this.generateKeywordVariants(text);
+  }
+
+  /**
+   * 基于关键词的查询扩展（回退方案）
+   */
+  private generateKeywordVariants(text: string): string[] {
     const variants: string[] = [text]; // 原始查询
 
     // 1. 关键词提取和重组
@@ -468,7 +497,12 @@ export class DefaultContextEngine implements ContextEngine {
 
     // 2. 简化查询
     const simplified = this.simplifyQuery(text);
-    if (simplified && simplified.length > 10 && simplified !== text && !variants.includes(simplified)) {
+    if (
+      simplified &&
+      simplified.length > 10 &&
+      simplified !== text &&
+      !variants.includes(simplified)
+    ) {
       variants.push(simplified);
     }
 
@@ -488,15 +522,44 @@ export class DefaultContextEngine implements ContextEngine {
   private extractKeywords(text: string): string[] {
     // 简单的关键词提取：去除停用词，保留有意义的词
     const stopWords = new Set([
-      'the', 'and', 'for', 'with', 'that', 'this', 'is', 'are', 'was', 'were',
-      'it', 'he', 'she', 'they', 'we', 'you', 'me', 'him', 'her', 'us', 'them',
-      'on', 'in', 'at', 'by', 'to', 'from', 'of', 'about', 'like', 'as',
+      'the',
+      'and',
+      'for',
+      'with',
+      'that',
+      'this',
+      'is',
+      'are',
+      'was',
+      'were',
+      'it',
+      'he',
+      'she',
+      'they',
+      'we',
+      'you',
+      'me',
+      'him',
+      'her',
+      'us',
+      'them',
+      'on',
+      'in',
+      'at',
+      'by',
+      'to',
+      'from',
+      'of',
+      'about',
+      'like',
+      'as',
     ]);
 
-    return text.toLowerCase()
+    return text
+      .toLowerCase()
       .replace(/[^\w\s\u4e00-\u9fff]/g, ' ') // 保留中文和英文单词
       .split(/\s+/)
-      .filter(word => word.length > 1 && !stopWords.has(word))
+      .filter((word) => word.length > 1 && !stopWords.has(word))
       .slice(0, 8); // 限制关键词数量
   }
 
@@ -525,15 +588,15 @@ export class DefaultContextEngine implements ContextEngine {
   private replaceSynonyms(text: string): string {
     // 简单的同义词词典
     const synonyms: Record<string, string[]> = {
-      '问题': ['疑问', '难题', '困难'],
-      '方法': ['方式', '办法', '途径'],
-      '使用': ['应用', '利用', '采用'],
-      '了解': ['知道', '明白', '理解'],
-      '学习': ['研究', '了解', '掌握'],
-      '功能': ['特性', '作用', '用途'],
-      '系统': ['体系', '平台', '架构'],
-      '数据': ['信息', '资料', '内容'],
-      '代码': ['程序', '脚本', '代码'],
+      问题: ['疑问', '难题', '困难'],
+      方法: ['方式', '办法', '途径'],
+      使用: ['应用', '利用', '采用'],
+      了解: ['知道', '明白', '理解'],
+      学习: ['研究', '了解', '掌握'],
+      功能: ['特性', '作用', '用途'],
+      系统: ['体系', '平台', '架构'],
+      数据: ['信息', '资料', '内容'],
+      代码: ['程序', '脚本', '代码'],
     };
 
     let result = text;
@@ -551,7 +614,11 @@ export class DefaultContextEngine implements ContextEngine {
    * 结果重排序
    * 基于内容相关性对 RRF 结果进行二次排序
    */
-  private reRankResults(results: any[], query: string, limit: number): string[] {
+  private reRankResults(
+    results: any[],
+    query: string,
+    limit: number,
+  ): string[] {
     // 获取所有记忆内容
     const allMemories = getMemories(this.agentFolder);
     const memoryMap = new Map<string, string>();
@@ -560,7 +627,7 @@ export class DefaultContextEngine implements ContextEngine {
     }
 
     // 对结果进行二次排序：结合 RRF 分数和内容相似度
-    const scoredResults = results.map(result => {
+    const scoredResults = results.map((result) => {
       const memoryContent = memoryMap.get(result.id);
       if (!memoryContent) {
         return { ...result, finalScore: result.fusedScore };
@@ -569,8 +636,11 @@ export class DefaultContextEngine implements ContextEngine {
       // 计算内容相似度（简单的词重叠分数）
       const queryWords = new Set(query.toLowerCase().split(/\s+/));
       const contentWords = new Set(memoryContent.toLowerCase().split(/\s+/));
-      const overlap = [...queryWords].filter(word => contentWords.has(word)).length;
-      const overlapScore = overlap / Math.sqrt(queryWords.size * contentWords.size);
+      const overlap = [...queryWords].filter((word) =>
+        contentWords.has(word),
+      ).length;
+      const overlapScore =
+        overlap / Math.sqrt(queryWords.size * contentWords.size);
 
       // 结合分数
       const finalScore = result.fusedScore * (0.7 + 0.3 * overlapScore);
@@ -582,7 +652,7 @@ export class DefaultContextEngine implements ContextEngine {
     return scoredResults
       .sort((a, b) => b.finalScore - a.finalScore)
       .slice(0, limit)
-      .map(result => result.id);
+      .map((result) => result.id);
   }
 
   // ===== 私有方法 =====
@@ -639,6 +709,50 @@ export class DefaultContextEngine implements ContextEngine {
     if (normA === 0 || normB === 0) return 0;
 
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  }
+
+  /**
+   * 设置查询扩展提供者
+   */
+  setQueryExpansionProvider(provider: QueryExpansionProvider | null): void {
+    this.queryExpansionProvider = provider;
+    if (provider) {
+      logger.info('Query expansion provider set');
+    }
+  }
+}
+
+/**
+ * 查询扩展提供者接口
+ * 允许不同的查询扩展实现（关键词、本地 LLM、远程 API 等）
+ */
+export interface QueryExpansionProvider {
+  /**
+   * 生成查询变体
+   * @param query 原始查询
+   * @returns 查询变体数组
+   */
+  generateVariants(query: string): string[];
+
+  /**
+   * 初始化提供者
+   */
+  initialize?(): Promise<void>;
+
+  /**
+   * 清理资源
+   */
+  destroy?(): Promise<void>;
+}
+
+/**
+ * 关键词查询扩展提供者（默认实现）
+ */
+export class KeywordQueryExpansionProvider implements QueryExpansionProvider {
+  constructor(private defaultEngine: DefaultContextEngine) {}
+
+  generateVariants(query: string): string[] {
+    return this.defaultEngine['generateKeywordVariants'](query);
   }
 }
 
