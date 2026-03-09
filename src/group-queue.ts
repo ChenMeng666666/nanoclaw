@@ -20,11 +20,13 @@ interface GroupState {
   isTaskContainer: boolean;
   runningTaskId: string | null;
   pendingMessages: boolean;
+  lastPipedMessageTimestamp: string | null;
   pendingTasks: QueuedTask[];
   process: ChildProcess | null;
   containerName: string | null;
   groupFolder: string | null;
   retryCount: number;
+  outputSent: boolean;
 }
 
 export class GroupQueue {
@@ -44,11 +46,13 @@ export class GroupQueue {
         isTaskContainer: false,
         runningTaskId: null,
         pendingMessages: false,
+        lastPipedMessageTimestamp: null,
         pendingTasks: [],
         process: null,
         containerName: null,
         groupFolder: null,
         retryCount: 0,
+        outputSent: false,
       };
       this.groups.set(groupJid, state);
     }
@@ -156,12 +160,19 @@ export class GroupQueue {
   /**
    * Send a follow-up message to the active container via IPC file.
    * Returns true if the message was written, false if no active container.
+   * Optionally records the last message timestamp to prevent duplicate processing.
    */
-  sendMessage(groupJid: string, text: string): boolean {
+  sendMessage(
+    groupJid: string,
+    text: string,
+    lastMessageTimestamp?: string,
+  ): boolean {
     const state = this.getGroup(groupJid);
     if (!state.active || !state.groupFolder || state.isTaskContainer)
       return false;
-    state.idleWaiting = false; // Agent is about to receive work, no longer idle
+    state.idleWaiting = false;
+    if (lastMessageTimestamp)
+      state.lastPipedMessageTimestamp = lastMessageTimestamp;
 
     const inputDir = path.join(DATA_DIR, 'ipc', state.groupFolder, 'input');
     try {
@@ -193,6 +204,32 @@ export class GroupQueue {
     }
   }
 
+  /**
+   * Mark that output has been sent to user for this group.
+   * Used to prevent duplicate responses on retry.
+   */
+  markOutputSent(groupJid: string): void {
+    const state = this.getGroup(groupJid);
+    state.outputSent = true;
+  }
+
+  /**
+   * Check if output has been sent to user for this group.
+   * Returns true if output was sent AND the flag hasn't been reset.
+   */
+  hasOutputSent(groupJid: string): boolean {
+    const state = this.getGroup(groupJid);
+    return state.outputSent;
+  }
+
+  /**
+   * Reset the outputSent flag for a group (called when processing completes successfully).
+   */
+  resetOutputSent(groupJid: string): void {
+    const state = this.getGroup(groupJid);
+    state.outputSent = false;
+  }
+
   private async runForGroup(
     groupJid: string,
     reason: 'messages' | 'drain',
@@ -202,6 +239,7 @@ export class GroupQueue {
     state.idleWaiting = false;
     state.isTaskContainer = false;
     state.pendingMessages = false;
+    state.outputSent = false; // Reset outputSent flag for new processing
     this.activeCount++;
 
     logger.debug(
@@ -214,13 +252,33 @@ export class GroupQueue {
         const success = await this.processMessagesFn(groupJid);
         if (success) {
           state.retryCount = 0;
+          state.outputSent = false; // Clear flag on success
         } else {
-          this.scheduleRetry(groupJid, state);
+          // Only retry if output was not sent to user
+          if (state.outputSent) {
+            logger.warn(
+              { groupJid },
+              'Processing failed but output was sent, skipping retry to prevent duplicates',
+            );
+            state.retryCount = 0; // Reset retry count
+            state.outputSent = false; // Clear flag
+          } else {
+            this.scheduleRetry(groupJid, state);
+          }
         }
       }
     } catch (err) {
-      logger.error({ groupJid, err }, 'Error processing messages for group');
-      this.scheduleRetry(groupJid, state);
+      // Only retry if output was not sent to user
+      if (state.outputSent) {
+        logger.warn(
+          { groupJid, err },
+          'Error processing but output was sent, skipping retry to prevent duplicates',
+        );
+        state.outputSent = false; // Clear flag
+      } else {
+        logger.error({ groupJid, err }, 'Error processing messages for group');
+        this.scheduleRetry(groupJid, state);
+      }
     } finally {
       state.active = false;
       state.process = null;

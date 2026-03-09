@@ -5,7 +5,15 @@ import path from 'path';
 import { ASSISTANT_NAME, DATA_DIR, STORE_DIR } from './config.js';
 import { isValidGroupFolder } from './group-folder.js';
 import { logger } from './logger.js';
+import { setDatabase } from './db-agents.js';
 import {
+  AgentConfig,
+  ChannelInstance,
+  UserProfile,
+  EvolutionEntry,
+  Memory,
+  Reflection,
+  LearningTask,
   NewMessage,
   RegisteredGroup,
   ScheduledTask,
@@ -82,6 +90,183 @@ function createSchema(database: Database.Database): void {
       container_config TEXT,
       requires_trigger INTEGER DEFAULT 1
     );
+
+    -- Multi-agent architecture tables
+
+    -- Agents table: core agent configuration
+    CREATE TABLE IF NOT EXISTS agents (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      folder TEXT NOT NULL UNIQUE,
+      user_name TEXT,
+      personality TEXT,
+      "values" TEXT,
+      appearance TEXT,
+      anthropic_token_encrypted TEXT,
+      anthropic_url TEXT,
+      anthropic_model TEXT DEFAULT 'claude-sonnet-4-6',
+      is_active INTEGER DEFAULT 1,
+      deleted_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    -- Channel instances: one-to-one mapping between agents and bots
+    CREATE TABLE IF NOT EXISTS channel_instances (
+      id TEXT PRIMARY KEY,
+      agent_id TEXT NOT NULL,
+      channel_type TEXT NOT NULL,
+      bot_id TEXT NOT NULL,
+      jid TEXT NOT NULL,
+      name TEXT,
+      config TEXT,
+      mode TEXT DEFAULT 'both',
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (agent_id) REFERENCES agents(id)
+    );
+
+    -- User profiles: per-user memory and preferences
+    CREATE TABLE IF NOT EXISTS user_profiles (
+      id TEXT PRIMARY KEY,
+      channel_instance_id TEXT NOT NULL,
+      user_jid TEXT NOT NULL,
+      name TEXT,
+      preferences TEXT,
+      memory_summary TEXT,
+      last_interaction TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (channel_instance_id) REFERENCES channel_instances(id)
+    );
+
+    -- Evolution log: shared experience repository with review status (Gene structure)
+    CREATE TABLE IF NOT EXISTS evolution_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ability_name TEXT NOT NULL,
+      description TEXT,
+      source_agent_id TEXT,
+      content TEXT,
+      content_embedding BLOB,
+      tags TEXT,
+      status TEXT DEFAULT 'pending',
+      reviewed_by TEXT,
+      reviewed_at TEXT,
+      feedback TEXT,
+      -- Gene structure fields
+      category TEXT DEFAULT 'learn',
+      signals_match TEXT DEFAULT '[]',
+      strategy TEXT DEFAULT '[]',
+      constraints TEXT DEFAULT '{}',
+      validation TEXT DEFAULT '[]',
+      created_at TEXT NOT NULL
+    );
+
+    -- Evolution versions: version control for evolution entries
+    CREATE TABLE IF NOT EXISTS evolution_versions (
+      id INTEGER PRIMARY KEY,
+      evolution_id INTEGER NOT NULL,
+      version INTEGER NOT NULL,
+      content TEXT,
+      change_reason TEXT,
+      changed_by TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (evolution_id) REFERENCES evolution_log(id)
+    );
+
+    -- Memories: hierarchical memory architecture (L1/L2/L3)
+    CREATE TABLE IF NOT EXISTS memories (
+      id TEXT PRIMARY KEY,
+      agent_folder TEXT NOT NULL,
+      user_jid TEXT,
+      level TEXT NOT NULL,
+      content TEXT NOT NULL,
+      embedding BLOB,
+      importance REAL DEFAULT 0.5,
+      access_count INTEGER DEFAULT 0,
+      last_accessed_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (agent_folder) REFERENCES agents(folder)
+    );
+
+    -- Reflections: periodic reflection and summary records
+    CREATE TABLE IF NOT EXISTS reflections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      agent_folder TEXT NOT NULL,
+      type TEXT NOT NULL,
+      content TEXT NOT NULL,
+      triggered_by TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (agent_folder) REFERENCES agents(folder)
+    );
+
+    -- Learning tasks: scheduled learning tasks
+    CREATE TABLE IF NOT EXISTS learning_tasks (
+      id TEXT PRIMARY KEY,
+      agent_folder TEXT NOT NULL,
+      description TEXT NOT NULL,
+      status TEXT DEFAULT 'pending',
+      reflection_id INTEGER,
+      resources TEXT,
+      created_at TEXT NOT NULL,
+      completed_at TEXT,
+      FOREIGN KEY (agent_folder) REFERENCES agents(folder)
+    );
+
+    -- Audit log: audit trail for all operations
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      agent_folder TEXT,
+      action TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      entity_id TEXT,
+      details TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    -- Routing bindings: persistent thread/topic to agent bindings (ACP-style)
+    CREATE TABLE IF NOT EXISTS routing_bindings (
+      id TEXT PRIMARY KEY,
+      channel_type TEXT NOT NULL,
+      thread_id TEXT NOT NULL,
+      agent_id TEXT NOT NULL,
+      session_key TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(channel_type, thread_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_routing_bindings_lookup
+      ON routing_bindings(channel_type, thread_id);
+    CREATE INDEX IF NOT EXISTS idx_routing_bindings_agent
+      ON routing_bindings(agent_id);
+
+    -- Indexes for performance
+    CREATE INDEX IF NOT EXISTS idx_memories_agent_level ON memories(agent_folder, level);
+    CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_jid);
+    CREATE INDEX IF NOT EXISTS idx_memories_importance ON memories(importance DESC);
+    CREATE INDEX IF NOT EXISTS idx_evolution_status ON evolution_log(status);
+    CREATE INDEX IF NOT EXISTS idx_channel_instances_agent ON channel_instances(agent_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_agent ON audit_log(agent_folder);
+    CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_log(created_at DESC);
+
+    -- Learning results: track outcomes of learning tasks
+    CREATE TABLE IF NOT EXISTS learning_results (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id TEXT,
+      agent_folder TEXT NOT NULL,
+      metric_before REAL,
+      metric_after REAL,
+      metric_name TEXT,
+      status TEXT NOT NULL,
+      description TEXT,
+      signals TEXT,
+      gene_id TEXT,
+      blast_radius TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_learning_results_agent ON learning_results(agent_folder);
+    CREATE INDEX IF NOT EXISTS idx_learning_results_task ON learning_results(task_id);
+    CREATE INDEX IF NOT EXISTS idx_learning_results_status ON learning_results(status);
   `);
 
   // Add context_mode column if it doesn't exist (migration for existing DBs)
@@ -139,6 +324,25 @@ function createSchema(database: Database.Database): void {
   } catch {
     /* columns already exist */
   }
+
+  // Add Gene structure columns to evolution_log if they don't exist (migration for existing DBs)
+  const geneColumns = [
+    { name: 'category', default: "'learn'" },
+    { name: 'signals_match', default: "'[]'" },
+    { name: 'strategy', default: "'[]'" },
+    { name: 'constraints', default: "'{}'" },
+    { name: 'validation', default: "'[]'" },
+  ];
+
+  for (const col of geneColumns) {
+    try {
+      database.exec(
+        `ALTER TABLE evolution_log ADD COLUMN ${col.name} TEXT DEFAULT ${col.default}`,
+      );
+    } catch {
+      /* column already exists */
+    }
+  }
 }
 
 export function initDatabase(): void {
@@ -147,6 +351,7 @@ export function initDatabase(): void {
 
   db = new Database(dbPath);
   createSchema(db);
+  setDatabase(db); // 初始化 db-agents 模块的数据库引用
 
   // Migrate from JSON files if they exist
   migrateJsonState();

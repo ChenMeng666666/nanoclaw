@@ -39,6 +39,12 @@ export interface ContainerInput {
   isScheduledTask?: boolean;
   assistantName?: string;
   secrets?: Record<string, string>;
+  // Agent-specific config (from keychain)
+  agentConfig?: {
+    anthropicToken?: string;
+    anthropicUrl?: string;
+    anthropicModel?: string;
+  };
 }
 
 export interface ContainerOutput {
@@ -153,6 +159,29 @@ function buildVolumeMounts(
       if (!fs.statSync(srcDir).isDirectory()) continue;
       const dstDir = path.join(skillsDst, skillDir);
       fs.cpSync(srcDir, dstDir, { recursive: true });
+
+      // Execute post-load hook if present
+      const hookScript = path.join(srcDir, 'hooks', 'post-load.sh');
+      if (fs.existsSync(hookScript)) {
+        logger.debug(
+          { skill: skillDir, hook: hookScript },
+          'Executing skill post-load hook',
+        );
+        try {
+          const { execSync } = require('child_process');
+          const env = { ...process.env, SKILL_DIR: srcDir };
+          execSync(`bash "${hookScript}"`, {
+            env,
+            stdio: ['ignore', 'pipe', 'pipe'],
+            timeout: 30000,
+          });
+        } catch (err) {
+          logger.warn(
+            { skill: skillDir, hook: hookScript, error: err },
+            'Skill post-load hook failed',
+          );
+        }
+      }
     }
   }
   mounts.push({
@@ -220,6 +249,7 @@ function readSecrets(): Record<string, string> {
     'ANTHROPIC_API_KEY',
     'ANTHROPIC_BASE_URL',
     'ANTHROPIC_AUTH_TOKEN',
+    'ANTHROPIC_MODEL',
   ]);
 }
 

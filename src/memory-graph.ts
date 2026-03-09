@@ -9,12 +9,12 @@ import { Memory } from './types.js';
  * 记忆关联类型
  */
 export enum MemoryRelationType {
-  REFERENCE = 'reference',    // 引用关系
-  SIMILAR = 'similar',       // 相似关系
+  REFERENCE = 'reference', // 引用关系
+  SIMILAR = 'similar', // 相似关系
   PREDECESSOR = 'predecessor', // 前置关系
-  SUCCESSOR = 'successor',   // 后继关系
-  PART_OF = 'part_of',       // 部分关系
-  CONTEXT = 'context',       // 上下文关系
+  SUCCESSOR = 'successor', // 后继关系
+  PART_OF = 'part_of', // 部分关系
+  CONTEXT = 'context', // 上下文关系
 }
 
 /**
@@ -40,7 +40,12 @@ export class MemoryGraph {
   /**
    * 添加关联
    */
-  addRelation(fromId: string, toId: string, type: MemoryRelationType, strength: number = 0.5): MemoryRelation {
+  addRelation(
+    fromId: string,
+    toId: string,
+    type: MemoryRelationType,
+    strength: number = 0.5,
+  ): MemoryRelation {
     const id = this.generateRelationId(fromId, toId, type);
 
     const relation: MemoryRelation = {
@@ -92,8 +97,11 @@ export class MemoryGraph {
   /**
    * 根据类型获取记忆的关联
    */
-  getRelationsByType(memoryId: string, type: MemoryRelationType): MemoryRelation[] {
-    return this.getRelations(memoryId).filter(r => r.type === type);
+  getRelationsByType(
+    memoryId: string,
+    type: MemoryRelationType,
+  ): MemoryRelation[] {
+    return this.getRelations(memoryId).filter((r) => r.type === type);
   }
 
   /**
@@ -113,7 +121,10 @@ export class MemoryGraph {
   /**
    * 根据内容相似度自动创建关联
    */
-  async createSimilarityRelations(memories: Memory[], minSimilarity: number = 0.7): Promise<void> {
+  async createSimilarityRelations(
+    memories: Memory[],
+    minSimilarity: number = 0.7,
+  ): Promise<void> {
     // 简单实现：比较所有记忆对的向量相似度
     for (let i = 0; i < memories.length; i++) {
       const m1 = memories[i];
@@ -125,7 +136,12 @@ export class MemoryGraph {
 
         const similarity = this.cosineSimilarity(m1.embedding, m2.embedding);
         if (similarity >= minSimilarity) {
-          this.addRelation(m1.id, m2.id, MemoryRelationType.SIMILAR, similarity);
+          this.addRelation(
+            m1.id,
+            m2.id,
+            MemoryRelationType.SIMILAR,
+            similarity,
+          );
         }
       }
     }
@@ -141,7 +157,7 @@ export class MemoryGraph {
     // 从双向索引中删除
     const fromRelations = this.relations.get(relation.fromMemoryId);
     if (fromRelations) {
-      const index = fromRelations.findIndex(r => r.id === id);
+      const index = fromRelations.findIndex((r) => r.id === id);
       if (index !== -1) {
         fromRelations.splice(index, 1);
       }
@@ -149,7 +165,7 @@ export class MemoryGraph {
 
     const toRelations = this.relations.get(relation.toMemoryId);
     if (toRelations) {
-      const index = toRelations.findIndex(r => r.id === id);
+      const index = toRelations.findIndex((r) => r.id === id);
       if (index !== -1) {
         toRelations.splice(index, 1);
       }
@@ -178,7 +194,11 @@ export class MemoryGraph {
 
   // ===== 私有方法 =====
 
-  private generateRelationId(fromId: string, toId: string, type: MemoryRelationType): string {
+  private generateRelationId(
+    fromId: string,
+    toId: string,
+    type: MemoryRelationType,
+  ): string {
     return `${fromId}-${toId}-${type}-${Date.now()}`;
   }
 

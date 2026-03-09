@@ -22,15 +22,19 @@ import {
 } from './db-agents.js';
 import { EvolutionEntry, Gene, MainExperienceInput } from './types.js';
 import { logger } from './logger.js';
-import { extractSignals, getRecommendedGeneCategory, Signal } from './signal-extractor.js';
+import {
+  extractSignals,
+  getRecommendedGeneCategory,
+  Signal,
+} from './signal-extractor.js';
 
 /**
  * 审核配置
  */
 export interface ReviewConfig {
-  autoApproveThreshold: number;  // 自动通过的置信度阈值 (0.9)
-  requireUserReview: boolean;     // 是否需要用户终审
-  seniorAgentIds?: string[];      // 高级 agent ID 列表
+  autoApproveThreshold: number; // 自动通过的置信度阈值 (0.9)
+  requireUserReview: boolean; // 是否需要用户终审
+  seniorAgentIds?: string[]; // 高级 agent ID 列表
 }
 
 /**
@@ -53,188 +57,187 @@ export class EvolutionManager {
   }
 
   /**
-* 上传经验到进化库（带自动初审）
-*/
-async submitExperience(
-  abilityName: string,
-  content: string,
-  sourceAgentId: string,
-  description?: string,
-  tags?: string[],
-): Promise<number> {
-  logger.info(
-    { abilityName, sourceAgentId, contentLength: content.length },
-    'Submitting experience to evolution',
-  );
-
-  // 从内容中提取信号
-  const signals = extractSignals({ content });
-  const category = getRecommendedGeneCategory(signals);
-
-  // 生成向量嵌入
-  const embedding = await generateEmbedding(content);
-
-  // 自动初审：基于规则和内容质量
-  const autoReview = await this.autoReviewEntry({
-    abilityName,
-    content,
-    description: description || '',
-    tags: tags || [],
-  });
-
-  // 决定初始状态
-  let status: 'pending' | 'approved' = 'pending';
-  if (
-    autoReview.confidence > this.config.autoApproveThreshold &&
-    !this.config.requireUserReview
-  ) {
-    status = 'approved';
+   * 上传经验到进化库（带自动初审）
+   */
+  async submitExperience(
+    abilityName: string,
+    content: string,
+    sourceAgentId: string,
+    description?: string,
+    tags?: string[],
+  ): Promise<number> {
     logger.info(
-      { abilityName, confidence: autoReview.confidence },
-      'Experience auto-approved',
+      { abilityName, sourceAgentId, contentLength: content.length },
+      'Submitting experience to evolution',
     );
-  }
 
-  // 创建条目（包含 Gene 结构字段）
-  const id = createEvolutionEntry({
-    abilityName,
-    description,
-    sourceAgentId,
-    content,
-    contentEmbedding: embedding,
-    tags: tags || [],
-    status,
-    category,
-    signalsMatch: signals.map(s => s.type),
-  });
+    // 从内容中提取信号
+    const signals = extractSignals({ content });
+    const category = getRecommendedGeneCategory(signals);
 
-  // 记录审计日志
-  logAudit({
-    agentFolder: sourceAgentId,
-    action: 'create',
-    entityType: 'evolution',
-    entityId: String(id),
-    details: { abilityName, status, category, signalCount: signals.length },
-  });
+    // 生成向量嵌入
+    const embedding = await generateEmbedding(content);
 
-  if (status === 'pending') {
-    logger.info(
-      { id, abilityName },
-      'Experience submitted, awaiting review',
-    );
-  } else {
-    logger.info(
-      { id, abilityName },
-      'Experience auto-approved and added to evolution library',
-    );
-  }
+    // 自动初审：基于规则和内容质量
+    const autoReview = await this.autoReviewEntry({
+      abilityName,
+      content,
+      description: description || '',
+      tags: tags || [],
+    });
 
-  return id;
-}
+    // 决定初始状态
+    let status: 'pending' | 'approved' = 'pending';
+    if (
+      autoReview.confidence > this.config.autoApproveThreshold &&
+      !this.config.requireUserReview
+    ) {
+      status = 'approved';
+      logger.info(
+        { abilityName, confidence: autoReview.confidence },
+        'Experience auto-approved',
+      );
+    }
 
-/**
- * 提交 Gene 到进化库（完整 Gene 结构）
- */
-async submitGene(
-  input: Omit<CreateGeneInput, 'contentEmbedding'>,
-): Promise<number> {
-  logger.info(
-    { abilityName: input.abilityName, category: input.category, sourceAgentId: input.sourceAgentId },
-    'Submitting Gene to evolution',
-  );
-
-  // 生成向量嵌入
-  const embedding = await generateEmbedding(input.content);
-
-  // 自动初审
-  const autoReview = await this.autoReviewEntry({
-    abilityName: input.abilityName,
-    content: input.content,
-    description: input.description || '',
-    tags: input.tags || [],
-  });
-
-  // 决定初始状态
-  let status: 'pending' | 'approved' = 'pending';
-  if (
-    autoReview.confidence > this.config.autoApproveThreshold &&
-    !this.config.requireUserReview
-  ) {
-    status = 'approved';
-  }
-
-  // 创建条目
-  const id = createEvolutionEntry({
-    ...input,
-    contentEmbedding: embedding,
-    status,
-  });
-
-  // 记录审计日志
-  logAudit({
-    agentFolder: input.sourceAgentId,
-    action: 'create',
-    entityType: 'gene',
-    entityId: String(id),
-    details: {
-      abilityName: input.abilityName,
+    // 创建条目（包含 Gene 结构字段）
+    const id = createEvolutionEntry({
+      abilityName,
+      description,
+      sourceAgentId,
+      content,
+      contentEmbedding: embedding,
+      tags: tags || [],
       status,
-      category: input.category,
-      signalCount: input.signalsMatch?.length || 0,
-    },
-  });
+      category,
+      signalsMatch: signals.map((s) => s.type),
+    });
 
-  return id;
-}
+    // 记录审计日志
+    logAudit({
+      agentFolder: sourceAgentId,
+      action: 'create',
+      entityType: 'evolution',
+      entityId: String(id),
+      details: { abilityName, status, category, signalCount: signals.length },
+    });
 
-/**
- * 根据信号选择合适的 Gene
- */
-async selectGene(
-  signals: Signal[],
-): Promise<EvolutionEntry | undefined> {
-  if (signals.length === 0) {
-    logger.debug('No signals provided, returning undefined');
-    return undefined;
+    if (status === 'pending') {
+      logger.info({ id, abilityName }, 'Experience submitted, awaiting review');
+    } else {
+      logger.info(
+        { id, abilityName },
+        'Experience auto-approved and added to evolution library',
+      );
+    }
+
+    return id;
   }
 
-  const category = getRecommendedGeneCategory(signals);
-  logger.debug({ category, signalCount: signals.length }, 'Selecting Gene based on signals');
+  /**
+   * 提交 Gene 到进化库（完整 Gene 结构）
+   */
+  async submitGene(
+    input: Omit<CreateGeneInput, 'contentEmbedding'>,
+  ): Promise<number> {
+    logger.info(
+      {
+        abilityName: input.abilityName,
+        category: input.category,
+        sourceAgentId: input.sourceAgentId,
+      },
+      'Submitting Gene to evolution',
+    );
 
-  const genes = getEvolutionEntriesByCategory(category, 1);
+    // 生成向量嵌入
+    const embedding = await generateEmbedding(input.content);
 
-  if (genes.length === 0) {
-    logger.debug({ category }, 'No approved genes found for category');
-    return undefined;
+    // 自动初审
+    const autoReview = await this.autoReviewEntry({
+      abilityName: input.abilityName,
+      content: input.content,
+      description: input.description || '',
+      tags: input.tags || [],
+    });
+
+    // 决定初始状态
+    let status: 'pending' | 'approved' = 'pending';
+    if (
+      autoReview.confidence > this.config.autoApproveThreshold &&
+      !this.config.requireUserReview
+    ) {
+      status = 'approved';
+    }
+
+    // 创建条目
+    const id = createEvolutionEntry({
+      ...input,
+      contentEmbedding: embedding,
+      status,
+    });
+
+    // 记录审计日志
+    logAudit({
+      agentFolder: input.sourceAgentId,
+      action: 'create',
+      entityType: 'gene',
+      entityId: String(id),
+      details: {
+        abilityName: input.abilityName,
+        status,
+        category: input.category,
+        signalCount: input.signalsMatch?.length || 0,
+      },
+    });
+
+    return id;
   }
 
-  // TODO: 可以基于信号匹配度选择最佳 Gene，目前返回第一个
-  return genes[0];
-}
+  /**
+   * 根据信号选择合适的 Gene
+   */
+  async selectGene(signals: Signal[]): Promise<EvolutionEntry | undefined> {
+    if (signals.length === 0) {
+      logger.debug('No signals provided, returning undefined');
+      return undefined;
+    }
 
-/**
- * 根据内容自动选择 Gene
- */
-async selectGeneForContent(
-  content: string,
-): Promise<EvolutionEntry | undefined> {
-  const signals = extractSignals({ content });
-  return this.selectGene(signals);
-}
+    const category = getRecommendedGeneCategory(signals);
+    logger.debug(
+      { category, signalCount: signals.length },
+      'Selecting Gene based on signals',
+    );
 
-/**
- * 审核经验条目
- */
-async reviewExperience(
+    const genes = getEvolutionEntriesByCategory(category, 1);
+
+    if (genes.length === 0) {
+      logger.debug({ category }, 'No approved genes found for category');
+      return undefined;
+    }
+
+    // TODO: 可以基于信号匹配度选择最佳 Gene，目前返回第一个
+    return genes[0];
+  }
+
+  /**
+   * 根据内容自动选择 Gene
+   */
+  async selectGeneForContent(
+    content: string,
+  ): Promise<EvolutionEntry | undefined> {
+    const signals = extractSignals({ content });
+    return this.selectGene(signals);
+  }
+
+  /**
+   * 审核经验条目
+   */
+  async reviewExperience(
     id: number,
     reviewerId: string,
     approved: boolean,
     feedback?: string,
   ): Promise<void> {
-    logger.info(
-      { id, reviewerId, approved },
-      'Reviewing experience',
-    );
+    logger.info({ id, reviewerId, approved }, 'Reviewing experience');
 
     const entry = getEvolutionEntry(id);
     if (!entry) {
@@ -303,12 +306,9 @@ async reviewExperience(
     id: number,
     agentId: string,
     comment: string,
-    rating: number,  // 1-5 分
+    rating: number, // 1-5 分
   ): Promise<void> {
-    logger.info(
-      { id, agentId, rating },
-      'Submitting evolution feedback',
-    );
+    logger.info({ id, agentId, rating }, 'Submitting evolution feedback');
 
     addEvolutionFeedback(id, agentId, comment, rating);
 
@@ -373,11 +373,12 @@ async reviewExperience(
     }
 
     // 规则 3: 包含代码或结构化内容
-    const hasCode = entry.content.includes('```') ||
-                    entry.content.includes('function') ||
-                    entry.content.includes('class') ||
-                    entry.content.includes('const ') ||
-                    entry.content.includes('export');
+    const hasCode =
+      entry.content.includes('```') ||
+      entry.content.includes('function') ||
+      entry.content.includes('class') ||
+      entry.content.includes('const ') ||
+      entry.content.includes('export');
     if (hasCode) {
       confidence += 0.1; // 代码内容更可能是有效的
     }
@@ -439,10 +440,7 @@ async reviewExperience(
     await this.markForReReview(id, reasons.join('; '));
 
     // 通知审核者（TODO: 实现 IPC 通知）
-    logger.info(
-      { id, avgRating, feedbackCount },
-      'Re-review triggered',
-    );
+    logger.info({ id, avgRating, feedbackCount }, 'Re-review triggered');
   }
 
   private calculateAverageRating(
@@ -477,7 +475,11 @@ async reviewExperience(
    */
   async submitMainExperience(input: MainExperienceInput): Promise<number> {
     logger.info(
-      { abilityName: input.abilityName, component: input.component, contentLength: input.content.length },
+      {
+        abilityName: input.abilityName,
+        component: input.component,
+        contentLength: input.content.length,
+      },
       'Submitting main project experience to evolution',
     );
 
@@ -519,7 +521,7 @@ async reviewExperience(
       tags: input.tags || [],
       status,
       category,
-      signalsMatch: signals.map(s => s.type),
+      signalsMatch: signals.map((s) => s.type),
     });
 
     // 记录审计日志
@@ -533,7 +535,7 @@ async reviewExperience(
         status,
         category,
         signalCount: signals.length,
-        component: input.component
+        component: input.component,
       },
     });
 

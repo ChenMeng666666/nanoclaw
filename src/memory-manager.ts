@@ -274,19 +274,17 @@ export class MemoryManager {
     return crypto.randomBytes(16).toString('hex');
   }
 
-  private calculateImportance(
-    content: string,
-    level: string,
-  ): number {
+  private calculateImportance(content: string, level: string): number {
     // 基于内容长度和层级计算初始重要性
     const baseImportance = level === 'L1' ? 0.5 : level === 'L2' ? 0.7 : 0.9;
     const lengthFactor = Math.min(content.length / 1000, 1) * 0.1;
     return Math.min(baseImportance + lengthFactor, 1.0);
   }
 
-  private shouldMigrateMemory(
-    memory: Memory,
-  ): { should: boolean; targetLevel?: 'L2' | 'L3' } {
+  private shouldMigrateMemory(memory: Memory): {
+    should: boolean;
+    targetLevel?: 'L2' | 'L3';
+  } {
     const now = Date.now();
     const lastAccess = memory.lastAccessedAt
       ? new Date(memory.lastAccessedAt).getTime()

@@ -104,14 +104,14 @@ export type OnChatMetadata = (
 export interface AgentConfig {
   id: string;
   name: string;
-  folder: string;               // 工作区 folder 名
-  userName?: string;            // 用户如何称呼
-  personality?: string;         // 性格描述
-  values?: string;              // 价值观
-  appearance?: string;          // 样貌描述
+  folder: string; // 工作区 folder 名
+  userName?: string; // 用户如何称呼
+  personality?: string; // 性格描述
+  values?: string; // 价值观
+  appearance?: string; // 样貌描述
   isActive: boolean;
   credentials: {
-    anthropicToken?: string;    // 加密存储
+    anthropicToken?: string; // 加密存储
     anthropicUrl?: string;
     anthropicModel: string;
   };
@@ -123,9 +123,9 @@ export interface AgentConfig {
  */
 export interface ChannelInstance {
   id: string;
-  agentId: string;              // 关联的智能体（一对一）
-  channelType: string;          // whatsapp/telegram/slack/discord
-  botId: string;                // Bot ID（如 Telegram bot token 标识）
+  agentId: string; // 关联的智能体（一对一）
+  channelType: string; // whatsapp/telegram/slack/discord
+  botId: string; // Bot ID（如 Telegram bot token 标识）
   jid: string;
   name?: string;
   config?: Record<string, any>;
@@ -155,10 +155,10 @@ export interface UserProfile {
 export interface Memory {
   id: string;
   agentFolder: string;
-  userJid?: string;             // 可选：绑定特定用户
+  userJid?: string; // 可选：绑定特定用户
   level: 'L1' | 'L2' | 'L3';
   content: string;
-  embedding?: number[];         // 向量嵌入
+  embedding?: number[]; // 向量嵌入
   importance: number;
   accessCount: number;
   lastAccessedAt?: string;
@@ -166,9 +166,9 @@ export interface Memory {
   updatedAt: string;
   // 新增元数据字段
   messageType?: 'user' | 'system' | 'bot' | 'code' | 'document'; // 消息类型
-  timestampWeight?: number;     // 时间戳权重（用于排序）
-  sessionId?: string;           // 会话ID，用于关联上下文
-  tags?: string[];              // 标签，用于分类和检索
+  timestampWeight?: number; // 时间戳权重（用于排序）
+  sessionId?: string; // 会话ID，用于关联上下文
+  tags?: string[]; // 标签，用于分类和检索
   sourceType?: 'direct' | 'extracted' | 'summary'; // 来源类型
 }
 
@@ -192,7 +192,7 @@ export interface LearningTask {
   agentFolder: string;
   description: string;
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
-  reflectionId?: number;        // 完成后触发的反思
+  reflectionId?: number; // 完成后触发的反思
   resources?: string[];
   createdAt: string;
   completedAt?: string;
@@ -213,14 +213,14 @@ export interface Gene {
   type: 'Gene';
   id: number;
   category: 'repair' | 'optimize' | 'innovate' | 'learn';
-  signalsMatch: string[];  // 匹配的信号类型
-  strategy: string[];      // 执行策略
+  signalsMatch: string[]; // 匹配的信号类型
+  strategy: string[]; // 执行策略
   constraints: {
     maxFiles?: number;
     forbiddenPaths?: string[];
     applicableScenarios?: string[];
   };
-  validation: string[];    // 验证命令
+  validation: string[]; // 验证命令
 
   // 原有字段
   abilityName: string;
@@ -277,7 +277,15 @@ export interface MainEvolutionConfig {
   signalThreshold: number;
 }
 
-export type EvolutionEntry = Omit<Gene, 'type' | 'category' | 'signalsMatch' | 'strategy' | 'constraints' | 'validation'> & {
+export type EvolutionEntry = Omit<
+  Gene,
+  | 'type'
+  | 'category'
+  | 'signalsMatch'
+  | 'strategy'
+  | 'constraints'
+  | 'validation'
+> & {
   // 保留向后兼容的可选字段
   category?: 'repair' | 'optimize' | 'innovate' | 'learn';
   signalsMatch?: string[];

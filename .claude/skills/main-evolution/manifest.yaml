@@ -1,0 +1,17 @@
+skill: main-evolution
+version: 1.0.0
+description: "Enable main NanoClaw process to use evolution system"
+core_version: 0.1.0
+adds:
+  - src/main-evolution-applier.ts
+modifies:
+  - src/evolution-manager.ts
+  - src/signal-extractor.ts
+  - src/types.ts
+  - src/index.ts
+structured:
+  npm_dependencies: {}
+  env_additions: []
+conflicts: []
+depends: []
+test: "npm run build"

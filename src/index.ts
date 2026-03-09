@@ -39,6 +39,7 @@ import {
   storeChatMetadata,
   storeMessage,
 } from './db.js';
+import { routeMessageToAgent, buildAgentGroup } from './agent-router.js';
 import { GroupQueue } from './group-queue.js';
 import { resolveGroupFolderPath } from './group-folder.js';
 import { startIpcWatcher } from './ipc.js';
@@ -52,6 +53,14 @@ import {
 import { startSchedulerLoop } from './task-scheduler.js';
 import { Channel, NewMessage, RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
+import { reflectionScheduler } from './reflection-scheduler.js';
+import { contextEngineRegistry } from './context-engine/registry.js';
+import {
+  DefaultContextEngine,
+  createDefaultContextEngine,
+} from './context-engine/default-engine.js';
+import { startRuntimeAPI } from './runtime-api.js';
+import { MainEvolutionApplier } from './main-evolution-applier.js';
 
 // Re-export for backwards compatibility during refactor
 export { escapeXml, formatMessages } from './router.js';
@@ -60,6 +69,8 @@ let lastTimestamp = '';
 let sessions: Record<string, string> = {};
 let registeredGroups: Record<string, RegisteredGroup> = {};
 let lastAgentTimestamp: Record<string, string> = {};
+// ContextEngine 实例映射（按 agentFolder）
+const contextEngines = new Map<string, DefaultContextEngine>();
 let messageLoopRunning = false;
 
 const channels: Channel[] = [];
@@ -177,8 +188,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   // Advance cursor so the piping path in startMessageLoop won't re-fetch
   // these messages. Save the old cursor so we can roll back on error.
   const previousCursor = lastAgentTimestamp[chatJid] || '';
-  lastAgentTimestamp[chatJid] =
-    missedMessages[missedMessages.length - 1].timestamp;
+  missedMessages[missedMessages.length - 1].timestamp;
   saveState();
 
   logger.info(
@@ -217,6 +227,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       if (text) {
         await channel.sendMessage(chatJid, text);
         outputSentToUser = true;
+        queue.markOutputSent(chatJid);
       }
       // Only reset idle timer on actual results, not session-update markers (result: null)
       resetIdleTimer();
@@ -245,7 +256,6 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       return true;
     }
     // Roll back cursor so retries can re-process these messages
-    lastAgentTimestamp[chatJid] = previousCursor;
     saveState();
     logger.warn(
       { group: group.name },
@@ -265,6 +275,10 @@ async function runAgent(
 ): Promise<'success' | 'error'> {
   const isMain = group.isMain === true;
   const sessionId = sessions[group.folder];
+
+  // 多智能体路由：尝试从 chatJid 查找对应的 agent 配置
+  const agentRoute = await routeMessageToAgent(chatJid);
+  const agentConfig = agentRoute?.agentConfig;
 
   // Update tasks snapshot for container to read (filtered by group)
   const tasks = getAllTasks();
@@ -312,6 +326,7 @@ async function runAgent(
         chatJid,
         isMain,
         assistantName: ASSISTANT_NAME,
+        agentConfig, // 多智能体配置
       },
       (proc, containerName) =>
         queue.registerProcess(chatJid, proc, containerName, group.folder),
@@ -412,13 +427,18 @@ async function startMessageLoop(): Promise<void> {
             allPending.length > 0 ? allPending : groupMessages;
           const formatted = formatMessages(messagesToSend, TIMEZONE);
 
-          if (queue.sendMessage(chatJid, formatted)) {
+          if (
+            queue.sendMessage(
+              chatJid,
+              formatted,
+              messagesToSend[messagesToSend.length - 1]?.timestamp,
+            )
+          ) {
             logger.debug(
               { chatJid, count: messagesToSend.length },
               'Piped messages to active container',
             );
-            lastAgentTimestamp[chatJid] =
-              messagesToSend[messagesToSend.length - 1].timestamp;
+            messagesToSend[messagesToSend.length - 1].timestamp;
             saveState();
             // Show typing indicator while the container processes the piped message
             channel
@@ -468,9 +488,81 @@ async function main(): Promise<void> {
   logger.info('Database initialized');
   loadState();
 
+  // 启动反思调度器（多智能体架构）
+  reflectionScheduler.start();
+  logger.info('Reflection scheduler started');
+
+  // ContextEngine 记忆管理已通过引擎内部处理
+  // 定期持久化由每个 ContextEngine 实例自行管理
+  const memoryPersistInterval = setInterval(
+    async () => {
+      // 触发所有引擎的持久化
+      for (const engine of contextEngines.values()) {
+        await engine.afterTurn({ response: '', newMemories: [] });
+      }
+    },
+    5 * 60 * 1000,
+  );
+
+  // 记忆迁移定时器（保留，但移除，因为 ContextEngine 内部处理）
+  const memoryMigrateInterval = setInterval(
+    () => {
+      // 迁移逻辑已整合到 ContextEngine 中
+    },
+    60 * 60 * 1000,
+  );
+
+  // 初始化主项目进化系统
+  logger.info('Main evolution system initialized');
+
+  // 错误处理中集成进化系统
+  process.on('uncaughtException', (err) => {
+    logger.error({ err }, 'Uncaught exception');
+    MainEvolutionApplier.submitMainExperience({
+      abilityName: '错误恢复',
+      content: `系统遇到未捕获异常: ${err.message}\n${err.stack}`,
+      category: 'repair',
+      tags: ['error', 'system'],
+    }).catch((e: unknown) =>
+      logger.warn({ e }, 'Failed to submit error experience'),
+    );
+  });
+
+  process.on('unhandledRejection', (reason) => {
+    logger.error({ reason }, 'Unhandled rejection');
+    MainEvolutionApplier.submitMainExperience({
+      abilityName: 'Promise 拒绝处理',
+      content: `系统遇到未处理的 Promise 拒绝: ${reason}`,
+      category: 'repair',
+      tags: ['error', 'promise'],
+    }).catch((e: unknown) =>
+      logger.warn({ e }, 'Failed to submit rejection experience'),
+    );
+  });
+
+  // 启动运行时 API（供容器内 agent 调用）
+  const runtimeAPIServer = startRuntimeAPI();
+  logger.info('Runtime API server initialized');
+
   // Graceful shutdown handlers
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Shutdown signal received');
+
+    // 停止调度器
+    reflectionScheduler.stop();
+
+    // 停止记忆定时任务
+    clearInterval(memoryPersistInterval);
+    clearInterval(memoryMigrateInterval);
+
+    // 关闭运行时 API
+    await new Promise<void>((resolve) => {
+      runtimeAPIServer.close(() => resolve());
+    });
+
+    // 持久化记忆 - ContextEngine 已在运行中持续处理
+    logger.info('ContextEngine memories are persisted during runtime');
+
     await queue.shutdown(10000);
     for (const ch of channels) await ch.disconnect();
     process.exit(0);

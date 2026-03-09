@@ -284,7 +284,7 @@ export function validateMount(
     return {
       allowed: false,
       reason: `Path "${realPath}" is not under any allowed root. Allowed roots: ${allowlist.allowedRoots
-        .map((r) => expandPath(r.path))
+        .map((r: AllowedRoot) => expandPath(r.path))
         .join(', ')}`,
     };
   }

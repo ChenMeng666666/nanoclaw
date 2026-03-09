@@ -469,7 +469,10 @@ export class DefaultContextEngine implements ContextEngine {
           return [text, ...llmVariants].slice(0, 5);
         }
       } catch (err) {
-        logger.warn({ err }, 'LLM query expansion failed, falling back to keyword method');
+        logger.warn(
+          { err },
+          'LLM query expansion failed, falling back to keyword method',
+        );
       }
     }
 

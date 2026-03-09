@@ -66,7 +66,10 @@ export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
       // @ts-ignore - node-llama-cpp 是可选依赖
       const { Llama } = await import('node-llama-cpp');
 
-      logger.info({ modelPath: this.config.modelPath }, 'Initializing local LLM provider');
+      logger.info(
+        { modelPath: this.config.modelPath },
+        'Initializing local LLM provider',
+      );
 
       this.llama = new Llama({
         modelPath: this.config.modelPath,
@@ -79,7 +82,7 @@ export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
       if ((err as NodeJS.ErrnoException).code === 'ERR_MODULE_NOT_FOUND') {
         throw new Error(
           'node-llama-cpp not installed. ' +
-          'Please install it with: npm install node-llama-cpp'
+            'Please install it with: npm install node-llama-cpp',
         );
       }
       throw err;

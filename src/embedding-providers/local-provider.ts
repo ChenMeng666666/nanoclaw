@@ -21,9 +21,14 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
   /**
    * 初始化提供者
    */
-  async initialize(config: EmbeddingConfig = DEFAULT_EMBEDDING_CONFIG): Promise<void> {
+  async initialize(
+    config: EmbeddingConfig = DEFAULT_EMBEDDING_CONFIG,
+  ): Promise<void> {
     this.config = { ...DEFAULT_EMBEDDING_CONFIG, ...config };
-    logger.info({ modelName: this.config.modelName }, 'Initializing local embedding provider');
+    logger.info(
+      { modelName: this.config.modelName },
+      'Initializing local embedding provider',
+    );
     this.embedder = await pipeline('feature-extraction', this.config.modelName);
   }
 
@@ -99,7 +104,10 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
       'Xenova/all-mpnet-base-v2': { dimensions: 768, maxTokens: 256 },
     };
 
-    const modelInfo = models[this.config.modelName] || { dimensions: 384, maxTokens: 256 };
+    const modelInfo = models[this.config.modelName] || {
+      dimensions: 384,
+      maxTokens: 256,
+    };
 
     return {
       name: this.config.modelName,

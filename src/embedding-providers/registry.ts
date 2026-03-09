@@ -2,7 +2,11 @@
  * 嵌入提供者注册表 - 管理和切换不同的嵌入实现
  */
 
-import { EmbeddingProvider, EmbeddingConfig, DEFAULT_EMBEDDING_CONFIG } from './interface.js';
+import {
+  EmbeddingProvider,
+  EmbeddingConfig,
+  DEFAULT_EMBEDDING_CONFIG,
+} from './interface.js';
 import { LocalEmbeddingProvider } from './local-provider.js';
 
 /**
@@ -36,7 +40,8 @@ export const DEFAULT_PROVIDER_CONFIG: EmbeddingProviderConfig = {
  * 嵌入提供者工厂
  */
 class EmbeddingProviderFactory {
-  private providers: Map<EmbeddingProviderType, new () => EmbeddingProvider> = new Map();
+  private providers: Map<EmbeddingProviderType, new () => EmbeddingProvider> =
+    new Map();
   private instance: EmbeddingProvider | null = null;
   private currentConfig: EmbeddingProviderConfig = DEFAULT_PROVIDER_CONFIG;
 
@@ -48,14 +53,19 @@ class EmbeddingProviderFactory {
   /**
    * 注册新的提供者
    */
-  registerProvider(type: EmbeddingProviderType, providerClass: new () => EmbeddingProvider): void {
+  registerProvider(
+    type: EmbeddingProviderType,
+    providerClass: new () => EmbeddingProvider,
+  ): void {
     this.providers.set(type, providerClass);
   }
 
   /**
    * 获取提供者实例
    */
-  async getProvider(config?: Partial<EmbeddingProviderConfig>): Promise<EmbeddingProvider> {
+  async getProvider(
+    config?: Partial<EmbeddingProviderConfig>,
+  ): Promise<EmbeddingProvider> {
     const effectiveConfig: EmbeddingProviderConfig = {
       ...this.currentConfig,
       ...config,
@@ -81,7 +91,9 @@ class EmbeddingProviderFactory {
     // 创建新实例
     const ProviderClass = this.providers.get(effectiveConfig.type);
     if (!ProviderClass) {
-      throw new Error(`Unsupported embedding provider type: ${effectiveConfig.type}`);
+      throw new Error(
+        `Unsupported embedding provider type: ${effectiveConfig.type}`,
+      );
     }
 
     this.instance = new ProviderClass();
