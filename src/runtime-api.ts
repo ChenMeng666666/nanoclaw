@@ -36,6 +36,7 @@ import {
 } from './db-agents.js';
 import { getAllTasks, getTasksForGroup } from './db.js';
 import { logger } from './logger.js';
+import { safeJsonParse } from './security.js';
 import type {
   LearningNeed,
   DailyLearningPlan,
@@ -912,7 +913,7 @@ function readJSON(req: http.IncomingMessage): Promise<Record<string, unknown>> {
     });
     req.on('end', () => {
       try {
-        resolve(JSON.parse(body));
+        resolve(safeJsonParse(body) as Record<string, unknown>);
       } catch (err) {
         reject(err);
       }

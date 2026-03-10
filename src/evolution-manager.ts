@@ -207,15 +207,82 @@ export class EvolutionManager {
       'Selecting Gene based on signals',
     );
 
-    const genes = getEvolutionEntriesByCategory(category, 1);
+    // 获取该类别下的所有 approved Gene
+    const genes = getEvolutionEntriesByCategory(category, 10); // 获取更多候选
 
     if (genes.length === 0) {
       logger.debug({ category }, 'No approved genes found for category');
       return undefined;
     }
 
-    // TODO: 可以基于信号匹配度选择最佳 Gene，目前返回第一个
-    return genes[0];
+    // 基于信号匹配度选择最佳 Gene
+    return this.findBestMatchingGene(genes, signals);
+  }
+
+  /**
+   * 基于信号匹配度找到最佳的 Gene
+   */
+  private findBestMatchingGene(
+    genes: EvolutionEntry[],
+    signals: Signal[],
+  ): EvolutionEntry {
+    // 计算每个 Gene 的匹配分数
+    const scoredGenes = genes.map((gene) => {
+      const score = this.calculateGeneSignalMatchScore(gene, signals);
+      logger.debug(
+        {
+          geneId: gene.id,
+          abilityName: gene.abilityName,
+          score,
+          signalsMatch: gene.signalsMatch,
+        },
+        'Gene signal match score',
+      );
+      return { gene, score };
+    });
+
+    // 按分数降序排序，返回最佳匹配
+    scoredGenes.sort((a, b) => b.score - a.score);
+    return scoredGenes[0].gene;
+  }
+
+  /**
+   * 计算 Gene 与信号的匹配分数
+   */
+  private calculateGeneSignalMatchScore(
+    gene: EvolutionEntry,
+    signals: Signal[],
+  ): number {
+    let score = 0;
+    const geneSignals = gene.signalsMatch || [];
+
+    // 每个信号的权重
+    const signalWeights: Record<string, number> = {};
+    for (const signal of signals) {
+      signalWeights[signal.type] = signal.confidence;
+    }
+
+    // 计算信号匹配度
+    for (const geneSignal of geneSignals) {
+      if (signalWeights[geneSignal]) {
+        // 匹配的信号，按置信度加权
+        score += signalWeights[geneSignal];
+      }
+    }
+
+    // 类别匹配 bonus
+    const geneCategory = gene.category;
+    const recommendedCategory = getRecommendedGeneCategory(signals);
+    if (geneCategory === recommendedCategory) {
+      score += 0.2;
+    }
+
+    // 反馈评分 bonus
+    const avgFeedback = this.calculateAverageRating(gene.feedback);
+    score += avgFeedback / 10; // 最高 0.5 分的反馈 bonus
+
+    // 归一化分数
+    return Math.min(score, 1.0);
   }
 
   /**

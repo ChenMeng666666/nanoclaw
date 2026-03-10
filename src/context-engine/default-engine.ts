@@ -24,13 +24,17 @@ import {
   fusedToIds,
 } from '../hybrid-search.js';
 import { generateEmbedding as generateEmbeddingFromProvider } from '../embedding-providers/registry.js';
+import { sharedStateManager } from './shared-state.js';
 
 // 嵌入缓存（避免重复计算）
-const embeddingCache = new Map<string, {
-  embedding: number[];
-  timestamp: number;
-  usageCount: number;
-}>();
+const embeddingCache = new Map<
+  string,
+  {
+    embedding: number[];
+    timestamp: number;
+    usageCount: number;
+  }
+>();
 
 // 缓存配置
 const EMBEDDING_CACHE_MAX_SIZE = 1000; // 最大缓存条目数
@@ -114,11 +118,11 @@ function evictOldestCacheEntries(): void {
  */
 export class DefaultContextEngine implements ContextEngine {
   private agentFolder: string = '';
-  private bm25Index: BM25Index;
+  private bm25Index!: BM25Index;
   private l1Cache = new Map<string, Memory>();
 
   constructor() {
-    this.bm25Index = new BM25Index();
+    // 不再在这里初始化 BM25 索引，延迟到 bootstrap 时使用共享状态管理器
   }
 
   /**
@@ -128,11 +132,20 @@ export class DefaultContextEngine implements ContextEngine {
     this.agentFolder = agentFolder;
     logger.info({ agentFolder }, 'DefaultContextEngine initialized');
 
-    // 预加载记忆到 BM25 索引
-    const memories = getMemories(agentFolder);
-    for (const mem of memories) {
-      this.bm25Index.addDocument(mem.id, mem.content);
-    }
+    // 使用共享状态管理器获取或创建 BM25 索引
+    this.bm25Index = sharedStateManager.getOrCreateBM25Index(
+      agentFolder,
+      () => {
+        const index = new BM25Index();
+        // 预加载记忆到 BM25 索引
+        const memories = getMemories(agentFolder);
+        for (const mem of memories) {
+          index.addDocument(mem.id, mem.content);
+        }
+        logger.debug({ agentFolder }, 'BM25 index initialized');
+        return index;
+      },
+    );
   }
 
   /**
@@ -379,15 +392,19 @@ export class DefaultContextEngine implements ContextEngine {
     let messageTime: number;
     try {
       if (messageTimestamp) {
-        messageTime = typeof messageTimestamp === 'string'
-          ? new Date(messageTimestamp).getTime()
-          : messageTimestamp.getTime();
+        messageTime =
+          typeof messageTimestamp === 'string'
+            ? new Date(messageTimestamp).getTime()
+            : messageTimestamp.getTime();
       } else {
         // 如果没有提供消息时间戳，使用当前时间
         messageTime = now;
       }
     } catch (err) {
-      logger.warn({ err, messageTimestamp }, 'Invalid message timestamp, using current time');
+      logger.warn(
+        { err, messageTimestamp },
+        'Invalid message timestamp, using current time',
+      );
       messageTime = now;
     }
 

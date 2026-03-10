@@ -22,19 +22,33 @@ function validateConfig<T>(
 }
 
 // 整数验证
-function validateInteger(value: string | number, min: number, max: number): boolean {
+function validateInteger(
+  value: string | number,
+  min: number,
+  max: number,
+): boolean {
   const num = Number(value);
   return Number.isInteger(num) && num >= min && num <= max;
 }
 
 // 字符串验证
-function validateString(value: string, minLength: number = 0, maxLength: number = 100): boolean {
-  return typeof value === 'string' && value.length >= minLength && value.length <= maxLength;
+function validateString(
+  value: string,
+  minLength: number = 0,
+  maxLength: number = 100,
+): boolean {
+  return (
+    typeof value === 'string' &&
+    value.length >= minLength &&
+    value.length <= maxLength
+  );
 }
 
 // 布尔值验证
 function validateBoolean(value: any): boolean {
-  return value === true || value === false || value === 'true' || value === 'false';
+  return (
+    value === true || value === false || value === 'true' || value === 'false'
+  );
 }
 
 // 路径验证
@@ -55,7 +69,8 @@ export const ASSISTANT_NAME = validateConfig(
 );
 
 export const ASSISTANT_HAS_OWN_NUMBER = validateConfig(
-  (process.env.ASSISTANT_HAS_OWN_NUMBER || envConfig.ASSISTANT_HAS_OWN_NUMBER) === 'true',
+  (process.env.ASSISTANT_HAS_OWN_NUMBER ||
+    envConfig.ASSISTANT_HAS_OWN_NUMBER) === 'true',
   validateBoolean,
   false,
   'ASSISTANT_HAS_OWN_NUMBER',

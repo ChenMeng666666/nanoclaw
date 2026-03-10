@@ -1,5 +1,7 @@
 import type { ContextEngine } from './interface.js';
 import type { CreateEngineOptions } from './default-engine.js';
+import { sharedStateManager } from './shared-state.js';
+import { logger } from '../logger.js';
 
 type ContextEngineFactory = (
   agentFolder: string,
@@ -10,13 +12,14 @@ type ContextEngineFactory = (
  * ContextEngine 注册表
  *
  * 支持注册多个 ContextEngine 实现，每个 agent 文件夹使用独立的引擎实例
+ * 使用共享状态管理来减少内存占用
  */
 export class ContextEngineRegistry {
   private engines: Map<string, ContextEngine> = new Map();
   private factories: Map<string, ContextEngineFactory> = new Map();
   private defaultEngine: string = 'default';
 
-  // 全局引擎配置
+  // 全局引擎配置（使用共享状态管理）
   private globalOptions: CreateEngineOptions = {};
 
   /**
@@ -34,8 +37,14 @@ export class ContextEngineRegistry {
    */
   setGlobalOptions(options: CreateEngineOptions): void {
     this.globalOptions = options;
+    // 缓存全局配置
+    sharedStateManager.getOrCreateConfig('global', options);
     // 清除已缓存的引擎实例，以便下次获取时应用新配置
     this.engines.clear();
+    // 同时清除 BM25 索引缓存，因为配置可能影响索引行为
+    sharedStateManager.clearBM25Index();
+
+    logger.debug('Global context engine config updated and caches cleared');
   }
 
   /**
@@ -60,9 +69,28 @@ export class ContextEngineRegistry {
     }
 
     const mergedOptions = { ...this.globalOptions, ...options };
-    const engine = await factory(agentFolder, mergedOptions);
+
+    // 共享配置
+    const configId = options ? this.generateConfigId(options) : 'global';
+    const sharedOptions = sharedStateManager.getOrCreateConfig(
+      configId,
+      mergedOptions,
+    );
+
+    const engine = await factory(agentFolder, sharedOptions);
     this.engines.set(agentFolder, engine);
+
+    logger.debug({ agentFolder }, 'ContextEngine created and cached');
     return engine;
+  }
+
+  /**
+   * 生成配置的唯一标识符
+   * @param options - 配置选项
+   * @returns 配置ID
+   */
+  private generateConfigId(options: CreateEngineOptions): string {
+    return JSON.stringify(options);
   }
 
   /**

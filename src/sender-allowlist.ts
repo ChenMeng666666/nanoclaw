@@ -2,6 +2,7 @@ import fs from 'fs';
 
 import { SENDER_ALLOWLIST_PATH } from './config.js';
 import { logger } from './logger.js';
+import { safeJsonParse, sanitizeObject } from './security.js';
 
 export interface ChatAllowlistEntry {
   allow: '*' | string[];
@@ -49,7 +50,8 @@ export function loadSenderAllowlist(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = safeJsonParse(raw);
+    parsed = sanitizeObject(parsed);
   } catch {
     logger.warn({ path: filePath }, 'sender-allowlist: invalid JSON');
     return DEFAULT_CONFIG;

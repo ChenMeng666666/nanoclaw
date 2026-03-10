@@ -44,14 +44,16 @@ export function preloadRoutingCache(): void {
   try {
     const db = getDatabase();
     const rows = db
-      .prepare('SELECT channel_type, thread_id, agent_id, session_key, updated_at FROM routing_bindings')
+      .prepare(
+        'SELECT channel_type, thread_id, agent_id, session_key, updated_at FROM routing_bindings',
+      )
       .all() as Array<{
-        channel_type: string;
-        thread_id: string;
-        agent_id: string;
-        session_key: string | null;
-        updated_at: string;
-      }>;
+      channel_type: string;
+      thread_id: string;
+      agent_id: string;
+      session_key: string | null;
+      updated_at: string;
+    }>;
 
     routingCache.clear();
     for (const row of rows) {
@@ -138,7 +140,11 @@ export function createRoutingBinding(binding: {
   });
 
   logger.debug(
-    { channelType: binding.channelType, threadId: binding.threadId, agentId: binding.agentId },
+    {
+      channelType: binding.channelType,
+      threadId: binding.threadId,
+      agentId: binding.agentId,
+    },
     'Routing binding created/updated',
   );
 }
@@ -170,7 +176,10 @@ export function getRoutingBinding(
     };
   }
 
-  logger.debug({ channelType, threadId }, 'Route binding not in cache, querying DB');
+  logger.debug(
+    { channelType, threadId },
+    'Route binding not in cache, querying DB',
+  );
 
   const db = getDatabase();
   const row = db
@@ -217,10 +226,7 @@ export function deleteRoutingBinding(
   const cacheKey = getCacheKey(channelType, threadId);
   routingCache.delete(cacheKey);
 
-  logger.debug(
-    { channelType, threadId },
-    'Routing binding deleted from cache',
-  );
+  logger.debug({ channelType, threadId }, 'Routing binding deleted from cache');
 }
 
 /**

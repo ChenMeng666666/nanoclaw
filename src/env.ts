@@ -73,5 +73,5 @@ function validateEnvValue(key: string, value: string): boolean {
     /`.*`/,
   ];
 
-  return !invalidPatterns.some(pattern => pattern.test(value));
+  return !invalidPatterns.some((pattern) => pattern.test(value));
 }

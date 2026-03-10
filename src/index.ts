@@ -64,6 +64,7 @@ import {
 import { LocalLLMQueryExpansionProvider } from './query-expansion/local-llm-provider.js';
 import { startRuntimeAPI } from './runtime-api.js';
 import { MainEvolutionApplier } from './main-evolution-applier.js';
+import { validateUserInput, sanitizeObject, safeJsonParse } from './security.js';
 
 // Re-export for backwards compatibility during refactor
 export { escapeXml, formatMessages } from './router.js';
@@ -77,10 +78,13 @@ const contextEngines = new Map<string, DefaultContextEngine>();
 let messageLoopRunning = false;
 
 // 消息去重缓存
-const messageDeduplicationCache = new Map<string, {
-  timestamp: number;
-  hash: string;
-}>();
+const messageDeduplicationCache = new Map<
+  string,
+  {
+    timestamp: number;
+    hash: string;
+  }
+>();
 const MESSAGE_DEDUPLICATION_WINDOW = 5 * 60 * 1000; // 消息去重窗口（5分钟）
 const MESSAGE_DEDUPLICATION_MAX_SIZE = 500; // 最大缓存条目数
 
@@ -91,7 +95,7 @@ function loadState(): void {
   lastTimestamp = getRouterState('last_timestamp') || '';
   const agentTs = getRouterState('last_agent_timestamp');
   try {
-    lastAgentTimestamp = agentTs ? JSON.parse(agentTs) : {};
+    lastAgentTimestamp = agentTs ? (safeJsonParse(agentTs) as Record<string, string>) : {};
   } catch {
     logger.warn('Corrupted last_agent_timestamp in DB, resetting');
     lastAgentTimestamp = {};
@@ -467,8 +471,23 @@ async function startMessageLoop(): Promise<void> {
         const messagesByGroup = new Map<string, NewMessage[]>();
         for (const msg of messages) {
           // 检查消息是否重复
-          if (isDuplicateMessage(msg.chat_jid, msg.id, msg.content, msg.timestamp)) {
-            logger.debug({ chatJid: msg.chat_jid, messageId: msg.id }, 'Skipping duplicate message');
+          if (
+            isDuplicateMessage(msg.chat_jid, msg.id, msg.content, msg.timestamp)
+          ) {
+            logger.debug(
+              { chatJid: msg.chat_jid, messageId: msg.id },
+              'Skipping duplicate message',
+            );
+            continue;
+          }
+
+          // 安全检查：验证用户输入是否包含潜在恶意内容
+          const inputValidation = validateUserInput(msg.content);
+          if (!inputValidation.valid) {
+            logger.warn(
+              { chatJid: msg.chat_jid, messageId: msg.id, issues: inputValidation.issues },
+              'Blocking potentially malicious message',
+            );
             continue;
           }
 
@@ -555,7 +574,10 @@ async function startMessageLoop(): Promise<void> {
  */
 function calculateMessageHash(content: string): string {
   const crypto = require('crypto');
-  return crypto.createHash('md5').update(content.trim().toLowerCase()).digest('hex');
+  return crypto
+    .createHash('md5')
+    .update(content.trim().toLowerCase())
+    .digest('hex');
 }
 
 /**
@@ -580,9 +602,9 @@ function isDuplicateMessage(
   // 检查缓存大小
   if (messageDeduplicationCache.size >= MESSAGE_DEDUPLICATION_MAX_SIZE) {
     // 清理最旧的条目
-    const oldest = [...messageDeduplicationCache.entries()].sort(
-      (a, b) => a[1].timestamp - b[1].timestamp
-    ).slice(0, Math.ceil(MESSAGE_DEDUPLICATION_MAX_SIZE * 0.1));
+    const oldest = [...messageDeduplicationCache.entries()]
+      .sort((a, b) => a[1].timestamp - b[1].timestamp)
+      .slice(0, Math.ceil(MESSAGE_DEDUPLICATION_MAX_SIZE * 0.1));
     for (const [key] of oldest) {
       messageDeduplicationCache.delete(key);
     }
@@ -596,7 +618,10 @@ function isDuplicateMessage(
     if (key.startsWith(chatJid) && value.hash === contentHash) {
       const timeDiff = Math.abs(now - value.timestamp);
       if (timeDiff < MESSAGE_DEDUPLICATION_WINDOW) {
-        logger.debug({ chatJid, messageId }, 'Duplicate message detected (same content)');
+        logger.debug(
+          { chatJid, messageId },
+          'Duplicate message detected (same content)',
+        );
         return true;
       }
     }
@@ -605,7 +630,10 @@ function isDuplicateMessage(
   // 检查完全相同的消息（ID + 时间戳 + 内容）
   const uniqueKey = `${chatJid}:${messageId}`;
   if (messageDeduplicationCache.has(uniqueKey)) {
-    logger.debug({ chatJid, messageId }, 'Duplicate message detected (same ID)');
+    logger.debug(
+      { chatJid, messageId },
+      'Duplicate message detected (same ID)',
+    );
     return true;
   }
 
