@@ -40,3 +40,7 @@ agents-sdk-docs
 # Local LLM models
 model/
 *.gguf
+
+# Backups
+backups/
+*.db.backup
