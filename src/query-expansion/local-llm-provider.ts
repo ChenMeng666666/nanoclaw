@@ -68,7 +68,13 @@ export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
     try {
       // 动态导入 node-llama-cpp，避免非必需依赖
       // @ts-ignore - node-llama-cpp 是可选依赖
-      const { getLlama, LlamaChatSession, QwenChatWrapper, Llama3ChatWrapper, GeneralChatWrapper } = await import('node-llama-cpp');
+      const {
+        getLlama,
+        LlamaChatSession,
+        QwenChatWrapper,
+        Llama3ChatWrapper,
+        GeneralChatWrapper,
+      } = await import('node-llama-cpp');
 
       logger.info(
         { modelPath: this.config.modelPath, modelType: this.config.modelType },
@@ -89,11 +95,13 @@ export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
       // 创建聊天会话
       this.chatSession = new LlamaChatSession({
         contextSequence: this.context.getSequence(),
-        chatWrapper: this.config.modelType === 'qwen3' || this.config.modelType === 'qwen3.5'
-          ? new QwenChatWrapper()
-          : this.config.modelType === 'llama3'
-          ? new Llama3ChatWrapper()
-          : new GeneralChatWrapper(),
+        chatWrapper:
+          this.config.modelType === 'qwen3' ||
+          this.config.modelType === 'qwen3.5'
+            ? new QwenChatWrapper()
+            : this.config.modelType === 'llama3'
+              ? new Llama3ChatWrapper()
+              : new GeneralChatWrapper(),
       });
 
       this.isInitialized = true;
@@ -106,7 +114,10 @@ export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
         );
       }
       logger.warn(
-        { err: err instanceof Error ? err.message : String(err), modelPath: this.config.modelPath },
+        {
+          err: err instanceof Error ? err.message : String(err),
+          modelPath: this.config.modelPath,
+        },
         'Failed to initialize local LLM',
       );
       throw err;
@@ -127,14 +138,21 @@ export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
       const prompt = this.buildPrompt(query);
 
       // 每次都创建新的聊天会话以避免历史增长问题
-      const { LlamaChatSession, QwenChatWrapper, Llama3ChatWrapper, GeneralChatWrapper } = await import('node-llama-cpp');
+      const {
+        LlamaChatSession,
+        QwenChatWrapper,
+        Llama3ChatWrapper,
+        GeneralChatWrapper,
+      } = await import('node-llama-cpp');
       const chatSession = new LlamaChatSession({
         contextSequence: this.context.getSequence(),
-        chatWrapper: this.config.modelType === 'qwen3' || this.config.modelType === 'qwen3.5'
-          ? new QwenChatWrapper()
-          : this.config.modelType === 'llama3'
-          ? new Llama3ChatWrapper()
-          : new GeneralChatWrapper(),
+        chatWrapper:
+          this.config.modelType === 'qwen3' ||
+          this.config.modelType === 'qwen3.5'
+            ? new QwenChatWrapper()
+            : this.config.modelType === 'llama3'
+              ? new Llama3ChatWrapper()
+              : new GeneralChatWrapper(),
       });
 
       // 发送消息

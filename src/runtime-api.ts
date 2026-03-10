@@ -216,26 +216,29 @@ export function startRuntimeAPI(
         // 模拟学习需求分析（实际需要更智能的分析）
         const needs: LearningNeed[] = [
           {
-            topic: "提升情绪化对话处理能力",
-            level: "intermediate",
-            urgency: "high",
+            topic: '提升情绪化对话处理能力',
+            level: 'intermediate',
+            urgency: 'high',
             estimatedTime: 2,
-            resources: ["https://example.com/emotional-intelligence"]
+            resources: ['https://example.com/emotional-intelligence'],
           },
           {
-            topic: "学习Python数据分析",
-            level: "beginner",
-            urgency: "medium",
+            topic: '学习Python数据分析',
+            level: 'beginner',
+            urgency: 'medium',
             estimatedTime: 3,
-            resources: ["https://example.com/python-data-analysis"]
-          }
+            resources: ['https://example.com/python-data-analysis'],
+          },
         ];
 
         writeJSON(res, 200, { needs });
         return;
       }
 
-      if (path === '/api/learning/generate-daily-plan' && req.method === 'POST') {
+      if (
+        path === '/api/learning/generate-daily-plan' &&
+        req.method === 'POST'
+      ) {
         const body = await readJSON(req);
         const { agentFolder, learningNeeds, scheduleConfig } = body;
 
@@ -244,21 +247,27 @@ export function startRuntimeAPI(
           return;
         }
 
+        const needs = Array.isArray(learningNeeds) ? learningNeeds : [];
+        const agentFolderStr = String(agentFolder);
+
         // 模拟生成每日学习计划
         const plan: DailyLearningPlan = {
           id: `plan-${Date.now()}`,
           date: new Date().toISOString().split('T')[0],
-          agentFolder,
-          tasks: learningNeeds.map((need: LearningNeed, index: number) => ({
+          agentFolder: agentFolderStr,
+          tasks: needs.map((need: any, index: number) => ({
             id: `task-${Date.now()}-${index}`,
-            agentFolder,
-            description: need.topic,
-            status: 'pending',
+            agentFolder: agentFolderStr,
+            description: need.topic || '',
+            status: 'pending' as const,
             resources: need.resources,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
           })),
-          estimatedTime: learningNeeds.reduce((sum: number, need: LearningNeed) => sum + need.estimatedTime, 0),
-          priority: 'medium'
+          estimatedTime: needs.reduce(
+            (sum: number, need: any) => sum + (need.estimatedTime || 0),
+            0,
+          ),
+          priority: 'medium' as const,
         };
 
         writeJSON(res, 200, plan);
@@ -277,10 +286,10 @@ export function startRuntimeAPI(
         // 模拟学习成果分析
         const analysis = {
           taskId,
-          knowledgeGained: ["情绪识别的关键信号", "用户表达模式的观察方法"],
-          difficulties: ["文字交流中难以捕捉语调"],
-          solutions: ["多观察用户的表达模式"],
-          suggestions: ["继续练习共情回应方法"]
+          knowledgeGained: ['情绪识别的关键信号', '用户表达模式的观察方法'],
+          difficulties: ['文字交流中难以捕捉语调'],
+          solutions: ['多观察用户的表达模式'],
+          suggestions: ['继续练习共情回应方法'],
         };
 
         writeJSON(res, 200, analysis);
@@ -298,9 +307,9 @@ export function startRuntimeAPI(
 
         // 模拟知识提取
         const knowledge = [
-          "掌握了情绪识别的关键信号",
-          "学会了如何观察用户的表达模式",
-          "理解了文字交流中语调捕捉的困难"
+          '掌握了情绪识别的关键信号',
+          '学会了如何观察用户的表达模式',
+          '理解了文字交流中语调捕捉的困难',
         ];
 
         writeJSON(res, 200, { knowledgePoints: knowledge });
@@ -345,7 +354,10 @@ export function startRuntimeAPI(
         return;
       }
 
-      if (path === '/api/learning/reflection/generate' && req.method === 'POST') {
+      if (
+        path === '/api/learning/reflection/generate' &&
+        req.method === 'POST'
+      ) {
         const body = await readJSON(req);
         const { agentFolder, type, startTime, endTime } = body;
 
@@ -354,30 +366,36 @@ export function startRuntimeAPI(
           return;
         }
 
+        const agentFolderStr = String(agentFolder);
+
         // 模拟生成反思
         const reflection: DetailedReflection = {
           id: Date.now(),
-          agentFolder,
+          agentFolder: agentFolderStr,
           type: type as any,
-          content: "今日学习了情绪识别技巧，掌握了关键信号，但文字交流中难以捕捉语调",
+          content:
+            '今日学习了情绪识别技巧，掌握了关键信号，但文字交流中难以捕捉语调',
           taskId: `task-${Date.now()}`,
           completionTime: new Date().toISOString(),
           actualDuration: 60,
-          knowledgeGained: ["情绪识别的关键信号"],
-          difficulties: ["文字交流中难以捕捉语调"],
-          solutions: ["多观察用户的表达模式"],
-          suggestions: ["继续练习共情回应方法"],
+          knowledgeGained: ['情绪识别的关键信号'],
+          difficulties: ['文字交流中难以捕捉语调'],
+          solutions: ['多观察用户的表达模式'],
+          suggestions: ['继续练习共情回应方法'],
           keyInsights: ["用户说'真的吗'多次可能表示怀疑"],
-          nextSteps: ["需要多观察用户的表达模式"],
+          nextSteps: ['需要多观察用户的表达模式'],
           rating: 4,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
         };
 
         writeJSON(res, 200, reflection);
         return;
       }
 
-      if (path === '/api/learning/generate-daily-summary' && req.method === 'POST') {
+      if (
+        path === '/api/learning/generate-daily-summary' &&
+        req.method === 'POST'
+      ) {
         const body = await readJSON(req);
         const { agentFolder, tasks } = body;
 
@@ -386,20 +404,23 @@ export function startRuntimeAPI(
           return;
         }
 
+        const agentFolderStr = String(agentFolder);
+        const taskList = Array.isArray(tasks) ? tasks : [];
+
         // 模拟生成每日总结
         const summary: DailyLearningSummary = {
           id: `summary-${Date.now()}`,
           date: new Date().toISOString().split('T')[0],
-          agentFolder,
-          tasksCompleted: tasks?.length || 2,
+          agentFolder: agentFolderStr,
+          tasksCompleted: taskList.length || 2,
           totalTimeSpent: 120,
-          knowledgePoints: ["情绪识别的关键信号", "用户表达模式的观察方法"],
-          achievements: ["掌握了情绪识别技巧"],
-          challenges: ["文字交流中难以捕捉语调"],
-          improvements: ["需要多练习共情回应方法"],
-          tomorrowPlan: ["学习共情回应方法"],
+          knowledgePoints: ['情绪识别的关键信号', '用户表达模式的观察方法'],
+          achievements: ['掌握了情绪识别技巧'],
+          challenges: ['文字交流中难以捕捉语调'],
+          improvements: ['需要多练习共情回应方法'],
+          tomorrowPlan: ['学习共情回应方法'],
           mood: 'good',
-          notes: "今日学习效果良好，但需要继续练习"
+          notes: '今日学习效果良好，但需要继续练习',
         };
 
         writeJSON(res, 200, summary);
@@ -830,7 +851,7 @@ function readJSON(req: http.IncomingMessage): Promise<Record<string, unknown>> {
 function writeJSON(
   res: http.ServerResponse,
   status: number,
-  data: Record<string, unknown>,
+  data: unknown,
 ): void {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));

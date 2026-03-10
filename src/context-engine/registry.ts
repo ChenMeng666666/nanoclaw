@@ -1,7 +1,10 @@
 import type { ContextEngine } from './interface.js';
 import type { CreateEngineOptions } from './default-engine.js';
 
-type ContextEngineFactory = (agentFolder: string, options?: CreateEngineOptions) => Promise<ContextEngine>;
+type ContextEngineFactory = (
+  agentFolder: string,
+  options?: CreateEngineOptions,
+) => Promise<ContextEngine>;
 
 /**
  * ContextEngine 注册表
@@ -41,7 +44,10 @@ export class ContextEngineRegistry {
    * @param options - 引擎配置选项（会合并全局配置）
    * @returns ContextEngine 实例
    */
-  async getEngine(agentFolder: string, options?: CreateEngineOptions): Promise<ContextEngine> {
+  async getEngine(
+    agentFolder: string,
+    options?: CreateEngineOptions,
+  ): Promise<ContextEngine> {
     // 检查是否已有缓存的引擎实例
     if (this.engines.has(agentFolder)) {
       return this.engines.get(agentFolder)!;

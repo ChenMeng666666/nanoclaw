@@ -465,9 +465,8 @@ export class DefaultContextEngine implements ContextEngine {
     if (this.queryExpansionProvider) {
       try {
         const llmVariants = this.queryExpansionProvider.generateVariants(text);
-        const resolvedVariants = llmVariants instanceof Promise
-          ? await llmVariants
-          : llmVariants;
+        const resolvedVariants =
+          llmVariants instanceof Promise ? await llmVariants : llmVariants;
 
         if (resolvedVariants && resolvedVariants.length > 0) {
           return [text, ...resolvedVariants].slice(0, 5);
