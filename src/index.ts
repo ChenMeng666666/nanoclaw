@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
 import {
   ASSISTANT_NAME,
@@ -283,7 +284,8 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   // Advance cursor so the piping path in startMessageLoop won't re-fetch
   // these messages. Save the old cursor so we can roll back on error.
   const previousCursor = lastAgentTimestamp[chatJid] || '';
-  lastAgentTimestamp[chatJid] = missedMessages[missedMessages.length - 1].timestamp;
+  lastAgentTimestamp[chatJid] =
+    missedMessages[missedMessages.length - 1].timestamp;
   saveState();
 
   logger.info(
@@ -510,9 +512,15 @@ async function startMessageLoop(): Promise<void> {
           }
         }
 
-        logger.debug({ groupCount: messagesByGroup.size }, '=== Processing groups ===');
+        logger.debug(
+          { groupCount: messagesByGroup.size },
+          '=== Processing groups ===',
+        );
         for (const [chatJid, groupMessages] of messagesByGroup) {
-          logger.debug({ chatJid, messageCount: groupMessages.length }, '=== Processing chat ===');
+          logger.debug(
+            { chatJid, messageCount: groupMessages.length },
+            '=== Processing chat ===',
+          );
 
           const group = registeredGroups[chatJid];
           if (!group) {
@@ -537,21 +545,24 @@ async function startMessageLoop(): Promise<void> {
           if (needsTrigger) {
             logger.debug({ chatJid }, '=== Checking trigger ===');
             const allowlistCfg = loadSenderAllowlist();
-            const hasTrigger = groupMessages.some(
-              (m) => {
-                const hasPattern = TRIGGER_PATTERN.test(m.content.trim());
-                const isAllowed = m.is_from_me || isTriggerAllowed(chatJid, m.sender, allowlistCfg);
-                logger.debug({
+            const hasTrigger = groupMessages.some((m) => {
+              const hasPattern = TRIGGER_PATTERN.test(m.content.trim());
+              const isAllowed =
+                m.is_from_me ||
+                isTriggerAllowed(chatJid, m.sender, allowlistCfg);
+              logger.debug(
+                {
                   chatJid,
                   messageId: m.id,
                   content: m.content,
                   hasPattern,
                   isAllowed,
                   triggerPattern: TRIGGER_PATTERN,
-                }, '=== Trigger check ===');
-                return hasPattern && isAllowed;
-              },
-            );
+                },
+                '=== Trigger check ===',
+              );
+              return hasPattern && isAllowed;
+            });
             if (!hasTrigger) {
               logger.warn({ chatJid }, 'No trigger message found, skipping');
               continue;
@@ -571,15 +582,10 @@ async function startMessageLoop(): Promise<void> {
 
           // 在处理消息前先保存旧的 cursor，以便失败时可以回滚
           const previousCursor = lastAgentTimestamp[chatJid] || '';
-          const newCursor = messagesToSend[messagesToSend.length - 1]?.timestamp;
+          const newCursor =
+            messagesToSend[messagesToSend.length - 1]?.timestamp;
 
-          if (
-            queue.sendMessage(
-              chatJid,
-              formatted,
-              newCursor,
-            )
-          ) {
+          if (queue.sendMessage(chatJid, formatted, newCursor)) {
             logger.debug(
               { chatJid, count: messagesToSend.length },
               'Piped messages to active container',
@@ -599,7 +605,12 @@ async function startMessageLoop(): Promise<void> {
             lastAgentTimestamp[chatJid] = newCursor;
             saveState();
             logger.debug(
-              { chatJid, count: messagesToSend.length, previousCursor, newCursor },
+              {
+                chatJid,
+                count: messagesToSend.length,
+                previousCursor,
+                newCursor,
+              },
               'Enqueuing message check for new container',
             );
             queue.enqueueMessageCheck(chatJid);
@@ -617,7 +628,6 @@ async function startMessageLoop(): Promise<void> {
  * 计算消息的哈希值（用于去重）
  */
 function calculateMessageHash(content: string): string {
-  const crypto = require('crypto');
   return crypto
     .createHash('md5')
     .update(content.trim().toLowerCase())
