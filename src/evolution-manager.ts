@@ -576,12 +576,12 @@ export class EvolutionManager {
       // 目前记录到日志中
       logger.info(
         { id, avgRating, feedbackCount, notification },
-        'Re-review notification sent'
+        'Re-review notification sent',
       );
     } catch (error) {
       logger.error(
         { id, avgRating, feedbackCount, error },
-        'Failed to send re-review notification'
+        'Failed to send re-review notification',
       );
     }
   }

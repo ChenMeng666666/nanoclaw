@@ -12,25 +12,31 @@ export class ExternalSkillsSearcher {
     try {
       // 实现 clawhub API 搜索
       const encodedQuery = encodeURIComponent(query);
-      const response = await fetch(`https://clawhub.ai/api/search?q=${encodedQuery}`);
+      const response = await fetch(
+        `https://clawhub.ai/api/search?q=${encodedQuery}`,
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json() as any;
+      const data = (await response.json()) as any;
 
       // 解析返回的搜索结果
-      return data.results?.map((item: any) => ({
-        title: item.title || item.name,
-        description: item.description || item.content?.slice(0, 150) || '',
-        url: item.url || `https://clawhub.ai/search?q=${encodedQuery}`,
-      })) || [];
-
+      return (
+        data.results?.map((item: any) => ({
+          title: item.title || item.name,
+          description: item.description || item.content?.slice(0, 150) || '',
+          url: item.url || `https://clawhub.ai/search?q=${encodedQuery}`,
+        })) || []
+      );
     } catch (error) {
       logger.warn(
-        { query, error: error instanceof Error ? error.message : String(error) },
-        'Failed to search clawhub, returning mock data'
+        {
+          query,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Failed to search clawhub, returning mock data',
       );
 
       // 失败时返回模拟数据
@@ -56,25 +62,31 @@ export class ExternalSkillsSearcher {
     try {
       // 实现 skills.sh API 搜索
       const encodedQuery = encodeURIComponent(query);
-      const response = await fetch(`https://skills.sh/api/search?q=${encodedQuery}`);
+      const response = await fetch(
+        `https://skills.sh/api/search?q=${encodedQuery}`,
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json() as any;
+      const data = (await response.json()) as any;
 
       // 解析返回的技能包结果
-      return data.skills?.map((item: any) => ({
-        name: item.name || item.title,
-        description: item.description || item.summary || '',
-        url: item.url || `https://skills.sh/${item.name}`,
-      })) || [];
-
+      return (
+        data.skills?.map((item: any) => ({
+          name: item.name || item.title,
+          description: item.description || item.summary || '',
+          url: item.url || `https://skills.sh/${item.name}`,
+        })) || []
+      );
     } catch (error) {
       logger.warn(
-        { query, error: error instanceof Error ? error.message : String(error) },
-        'Failed to search skills.sh, returning mock data'
+        {
+          query,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Failed to search skills.sh, returning mock data',
       );
 
       // 失败时返回模拟数据

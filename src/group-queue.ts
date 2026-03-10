@@ -168,8 +168,10 @@ export class GroupQueue {
 
         // 使用 docker inspect 检查容器状态
         const inspectOutput = execSync(
-          `docker inspect ${state.containerName} --format='{{.State.Running}}'`
-        ).toString().trim();
+          `docker inspect ${state.containerName} --format='{{.State.Running}}'`,
+        )
+          .toString()
+          .trim();
 
         if (inspectOutput !== 'true') {
           throw new Error('Container not running');
@@ -177,7 +179,7 @@ export class GroupQueue {
       } catch (error) {
         logger.error(
           { groupJid, containerName: state.containerName, error },
-          'Container health check failed'
+          'Container health check failed',
         );
 
         // 容器不健康，停止监控并尝试重新启动
@@ -215,7 +217,10 @@ export class GroupQueue {
     }
 
     // 尝试重新启动
-    logger.info({ groupJid }, 'Attempting to restart container after health check failure');
+    logger.info(
+      { groupJid },
+      'Attempting to restart container after health check failure',
+    );
     this.scheduleRetry(groupJid, state);
   }
 
@@ -342,7 +347,7 @@ export class GroupQueue {
           if (state.outputSent) {
             logger.warn(
               { groupJid },
-              'Processing failed but output was sent, will retry after delay'
+              'Processing failed but output was sent, will retry after delay',
             );
             state.outputSent = false; // Clear flag
           }
