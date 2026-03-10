@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { execSync } from 'child_process';
 
 import {
   ASSISTANT_NAME,
@@ -9,6 +10,7 @@ import {
   TIMEZONE,
   TRIGGER_PATTERN,
   validateAllConfig,
+  RUNTIME_API_CONFIG,
 } from './config.js';
 import { preloadRoutingCache } from './db-routing.js';
 import './channels/index.js';
@@ -64,6 +66,46 @@ import {
 } from './context-engine/default-engine.js';
 import { LocalLLMQueryExpansionProvider } from './query-expansion/local-llm-provider.js';
 import { startRuntimeAPI } from './runtime-api.js';
+import net from 'net';
+
+// 检查端口是否可用
+async function checkPortAvailable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const tester = net.createServer()
+      .once('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE') {
+          resolve(false);
+        } else {
+          resolve(false);
+        }
+      })
+      .once('listening', () => {
+        tester.close(() => resolve(true));
+      })
+      .listen(port);
+  });
+}
+
+// 检查系统依赖
+async function checkSystemDependencies() {
+  logger.info('Checking system dependencies...');
+
+  // 检查 Docker
+  try {
+    execSync('docker --version');
+    logger.info('Docker available');
+  } catch (err) {
+    logger.error('Docker not available');
+    process.exit(1);
+  }
+
+  // 检查端口
+  const portAvailable = await checkPortAvailable(RUNTIME_API_CONFIG.port);
+  if (!portAvailable) {
+    logger.error(`Port ${RUNTIME_API_CONFIG.port} is already in use`);
+    process.exit(1);
+  }
+}
 import { MainEvolutionApplier } from './main-evolution-applier.js';
 import {
   validateUserInput,
@@ -770,6 +812,9 @@ async function main(): Promise<void> {
   }
   logger.info('Configuration validation passed');
 
+  // 检查系统依赖
+  await checkSystemDependencies();
+
   ensureContainerSystemRunning();
   initDatabase();
   logger.info('Database initialized');
@@ -834,9 +879,15 @@ async function main(): Promise<void> {
     );
   });
 
-  // 启动运行时 API（供容器内 agent 调用）
-  const runtimeAPIServer = startRuntimeAPI();
-  logger.info('Runtime API server initialized');
+  // 启动运行时 API（必须成功）
+  let runtimeAPIServer;
+  try {
+    runtimeAPIServer = await startRuntimeAPI();
+    logger.info('Runtime API started');
+  } catch (err) {
+    logger.error({ err }, 'Failed to start Runtime API');
+    process.exit(1);
+  }
 
   // Graceful shutdown handlers
   const shutdown = async (signal: string) => {

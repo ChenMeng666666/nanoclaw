@@ -195,6 +195,13 @@ export const TIMEZONE = validateConfig(
   'TIMEZONE',
 );
 
+// Runtime API 配置
+export const RUNTIME_API_CONFIG = {
+  port: parseInt(process.env.RUNTIME_API_PORT || '3456', 10),
+  fallbackPorts: [3457, 3458, 3459],
+  portCheckTimeout: 5000,
+};
+
 // 配置完整性检查
 export function validateAllConfig(): boolean {
   const requiredConfigs = [

@@ -158,7 +158,7 @@ export class GroupQueue {
       clearInterval(state.healthMonitor);
     }
 
-    // 每30秒检查一次容器健康状态
+    // 每10秒检查一次容器健康状态
     state.healthMonitor = setInterval(async () => {
       try {
         if (!state.containerName) {
@@ -186,7 +186,7 @@ export class GroupQueue {
         this.stopHealthMonitor(groupJid);
         this.handleContainerFailure(groupJid);
       }
-    }, 30000); // 每30秒检查一次
+    }, 10000); // 每10秒检查一次
   }
 
   /**
@@ -216,12 +216,14 @@ export class GroupQueue {
       this.activeCount--;
     }
 
-    // 尝试重新启动
+    // 立即重试（不等待）
     logger.info(
       { groupJid },
-      'Attempting to restart container after health check failure',
+      'Container failure detected, attempting immediate restart',
     );
-    this.scheduleRetry(groupJid, state);
+    setTimeout(() => {
+      this.scheduleRetry(groupJid, state);
+    }, 2000); // 2秒后立即重试
   }
 
   /**

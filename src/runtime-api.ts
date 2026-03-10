@@ -17,6 +17,8 @@
  * ```
  */
 import http from 'http';
+import net from 'net';
+import { exec } from 'child_process';
 import { URL } from 'url';
 
 import { memoryManager } from './memory-manager.js';
@@ -54,18 +56,90 @@ const DEFAULT_OPTIONS: RuntimeAPIOptions = {
   enabled: process.env.RUNTIME_API_ENABLED !== 'false',
 };
 
+// 检查端口是否可用
+function checkPortAvailable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const tester = net.createServer()
+      .once('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE') {
+          resolve(false);
+        } else {
+          resolve(false);
+        }
+      })
+      .once('listening', () => {
+        tester.close(() => resolve(true));
+      })
+      .listen(port);
+  });
+}
+
+// 获取使用指定端口的进程 PID
+async function getPIDUsingPort(port: number): Promise<number | null> {
+  try {
+    const result = await new Promise<string>((resolve, reject) => {
+      exec(`lsof -t -i :${port}`, (error, stdout) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(stdout.trim());
+        }
+      });
+    });
+    const pid = parseInt(result, 10);
+    return isNaN(pid) ? null : pid;
+  } catch (err) {
+    return null;
+  }
+}
+
 /**
  * 启动运行时 API 服务器
  */
-export function startRuntimeAPI(
+export async function startRuntimeAPI(
   options: Partial<RuntimeAPIOptions> = {},
-): http.Server {
+): Promise<http.Server> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
   if (!opts.enabled) {
     logger.info('Runtime API disabled');
     // 返回一个空的 server 用于接口兼容
     return http.createServer(() => {});
+  }
+
+  // 检查端口可用性
+  const portAvailable = await checkPortAvailable(opts.port);
+  if (!portAvailable) {
+    logger.error(
+      { port: opts.port },
+      'Runtime API port is already in use. This will cause container communication failures.',
+    );
+
+    // 尝试杀死占用端口的进程（仅在开发环境）
+    if (process.env.NODE_ENV !== 'production') {
+      try {
+        const pid = await getPIDUsingPort(opts.port);
+        if (pid) {
+          logger.warn({ port: opts.port, pid }, 'Killing process using port');
+          process.kill(pid, 'SIGTERM');
+          // 等待进程终止
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          // 再次检查端口是否可用
+          const recheck = await checkPortAvailable(opts.port);
+          if (recheck) {
+            logger.info({ port: opts.port }, 'Port freed after killing process');
+          } else {
+            logger.error({ port: opts.port }, 'Failed to free port');
+            throw new Error(`Port ${opts.port} is already in use`);
+          }
+        }
+      } catch (err) {
+        logger.error({ port: opts.port, err }, 'Failed to kill process using port');
+        throw err;
+      }
+    } else {
+      throw new Error(`Port ${opts.port} is already in use`);
+    }
   }
 
   // 简单的 API Key 认证
@@ -918,10 +992,12 @@ export function startRuntimeAPI(
 
   server.on('error', (err) => {
     if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {
-      logger.warn(
+      logger.error(
         { port: opts.port },
-        'Runtime API port already in use, continuing without Runtime API',
+        'Runtime API port already in use - server failed to start',
       );
+      // 直接抛出错误，终止进程
+      process.exit(1);
     } else {
       logger.error({ err }, 'Runtime API server error');
     }
