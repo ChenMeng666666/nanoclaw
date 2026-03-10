@@ -2,7 +2,7 @@
  * Container Runner for NanoClaw
  * Spawns agent execution in containers and handles IPC
  */
-import { ChildProcess, exec, spawn } from 'child_process';
+import { ChildProcess, exec, spawn, execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -168,7 +168,6 @@ function buildVolumeMounts(
           'Executing skill post-load hook',
         );
         try {
-          const { execSync } = require('child_process');
           const env = { ...process.env, SKILL_DIR: srcDir };
           execSync(`bash "${hookScript}"`, {
             env,

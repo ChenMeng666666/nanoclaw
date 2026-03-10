@@ -637,6 +637,9 @@ function calculateMessageHash(content: string): string {
 /**
  * 检查消息是否重复
  */
+let lastCacheCleanupTime = 0;
+const CACHE_CLEANUP_INTERVAL = 10 * 1000; // 每 10 秒清理一次缓存
+
 function isDuplicateMessage(
   chatJid: string,
   messageId: string,
@@ -646,21 +649,24 @@ function isDuplicateMessage(
   const now = Date.now();
   const messageTime = new Date(timestamp).getTime();
 
-  // 清理过期的缓存条目
-  for (const [key, value] of messageDeduplicationCache.entries()) {
-    if (now - value.timestamp > MESSAGE_DEDUPLICATION_WINDOW) {
-      messageDeduplicationCache.delete(key);
+  // 周期性清理过期缓存，而不是每次都清理
+  if (now - lastCacheCleanupTime > CACHE_CLEANUP_INTERVAL) {
+    for (const [key, value] of messageDeduplicationCache.entries()) {
+      if (now - value.timestamp > MESSAGE_DEDUPLICATION_WINDOW) {
+        messageDeduplicationCache.delete(key);
+      }
     }
-  }
+    lastCacheCleanupTime = now;
 
-  // 检查缓存大小
-  if (messageDeduplicationCache.size >= MESSAGE_DEDUPLICATION_MAX_SIZE) {
-    // 清理最旧的条目
-    const oldest = [...messageDeduplicationCache.entries()]
-      .sort((a, b) => a[1].timestamp - b[1].timestamp)
-      .slice(0, Math.ceil(MESSAGE_DEDUPLICATION_MAX_SIZE * 0.1));
-    for (const [key] of oldest) {
-      messageDeduplicationCache.delete(key);
+    // 同时检查缓存大小
+    if (messageDeduplicationCache.size >= MESSAGE_DEDUPLICATION_MAX_SIZE) {
+      // 清理最旧的 10% 条目
+      const oldest = [...messageDeduplicationCache.entries()]
+        .sort((a, b) => a[1].timestamp - b[1].timestamp)
+        .slice(0, Math.ceil(MESSAGE_DEDUPLICATION_MAX_SIZE * 0.1));
+      for (const [key] of oldest) {
+        messageDeduplicationCache.delete(key);
+      }
     }
   }
 

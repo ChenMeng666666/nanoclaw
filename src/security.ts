@@ -96,6 +96,47 @@ export function validateUserInput(input: string): {
     }
   }
 
+  // 检查 SQL 注入模式
+  const sqlPatterns = [
+    /\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE)\b/i,
+    /\b(UNION|JOIN|WHERE|FROM|GROUP|ORDER|HAVING| LIMIT| OFFSET)\b/i,
+    /['";-]/, // 使用单个 -
+  ];
+
+  for (const pattern of sqlPatterns) {
+    if (pattern.test(input)) {
+      issues.push(`Potential SQL injection detected: ${pattern}`);
+    }
+  }
+
+  // 检查 XSS 攻击模式
+  const xssPatterns = [
+    /<script[^>]*>[\s\S]*?<\/script>/i,
+    /on\w+="[^"]*"/i,
+    /javascript:/i,
+    /data:/i,
+  ];
+
+  for (const pattern of xssPatterns) {
+    if (pattern.test(input)) {
+      issues.push(`Potential XSS attack detected: ${pattern}`);
+    }
+  }
+
+  // 检查路径遍历模式
+  const pathPatterns = [
+    /\.\.\//,
+    /\.\.\\/,
+    /\/\.\.\//,
+    /\\\.\.\\/,
+  ];
+
+  for (const pattern of pathPatterns) {
+    if (pattern.test(input)) {
+      issues.push(`Potential path traversal detected: ${pattern}`);
+    }
+  }
+
   return {
     valid: issues.length === 0,
     issues,

@@ -68,11 +68,28 @@ export function startRuntimeAPI(
     return http.createServer(() => {});
   }
 
+  // 简单的 API Key 认证
+  const API_KEY = process.env.RUNTIME_API_KEY || 'nanoclaw-default-key';
+
   const server = http.createServer(async (req, res) => {
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key');
+
+    // 认证检查
+    if (req.method !== 'OPTIONS') {
+      const apiKey = req.headers['x-api-key'] as string;
+      if (!apiKey || apiKey !== API_KEY) {
+        logger.warn({
+          method: req.method,
+          url: req.url,
+          ip: req.socket.remoteAddress,
+        }, 'Runtime API access denied: invalid API key');
+        writeJSON(res, 401, { error: 'Unauthorized: Invalid API key' });
+        return;
+      }
+    }
 
     if (req.method === 'OPTIONS') {
       res.writeHead(200);
