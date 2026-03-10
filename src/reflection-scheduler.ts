@@ -173,9 +173,12 @@ export class ReflectionScheduler {
         reflectionContent,
         task.agentFolder,
         `任务完成反思：${task.description}`,
-        ['learning', 'task-reflection']
+        ['learning', 'task-reflection'],
       );
-      logger.info({ taskId, evolutionId: id }, 'Task experience submitted to evolution library');
+      logger.info(
+        { taskId, evolutionId: id },
+        'Task experience submitted to evolution library',
+      );
     }
 
     logger.info(
@@ -519,8 +522,14 @@ ${analysis.rating} / 5
       const shouldConsolidate = this.evaluateMemoryForL3(memory);
       if (shouldConsolidate) {
         // 迁移到 L3
-        updateMemory(memory.id, { level: 'L3', importance: Math.min(memory.importance + 0.1, 1.0) });
-        logger.info({ memoryId: memory.id, agent: agent.name }, 'Memory consolidated to L3');
+        updateMemory(memory.id, {
+          level: 'L3',
+          importance: Math.min(memory.importance + 0.1, 1.0),
+        });
+        logger.info(
+          { memoryId: memory.id, agent: agent.name },
+          'Memory consolidated to L3',
+        );
       }
     }
   }
@@ -534,10 +543,22 @@ ${analysis.rating} / 5
     // 2. 访问次数 > 2
     // 3. 内容长度 > 100
     // 4. 包含知识/经验关键词
-    if (memory.importance > 0.7 && memory.accessCount > 2 && memory.content.length > 100) {
-      const knowledgeKeywords = ['学会', '掌握', '发现', '经验', '方法', '技巧', '最佳实践'];
+    if (
+      memory.importance > 0.7 &&
+      memory.accessCount > 2 &&
+      memory.content.length > 100
+    ) {
+      const knowledgeKeywords = [
+        '学会',
+        '掌握',
+        '发现',
+        '经验',
+        '方法',
+        '技巧',
+        '最佳实践',
+      ];
       const lowerContent = memory.content.toLowerCase();
-      return knowledgeKeywords.some(kw => lowerContent.includes(kw));
+      return knowledgeKeywords.some((kw) => lowerContent.includes(kw));
     }
     return false;
   }

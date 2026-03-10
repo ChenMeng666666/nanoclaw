@@ -1,4 +1,4 @@
-import { ChildProcess } from 'child_process';
+import { ChildProcess, exec, execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -27,6 +27,7 @@ interface GroupState {
   groupFolder: string | null;
   retryCount: number;
   outputSent: boolean;
+  healthMonitor?: NodeJS.Timeout; // 健康监控定时器
 }
 
 export class GroupQueue {
@@ -143,6 +144,79 @@ export class GroupQueue {
     state.process = proc;
     state.containerName = containerName;
     if (groupFolder) state.groupFolder = groupFolder;
+
+    // 添加容器健康监控
+    this.startHealthMonitor(groupJid);
+  }
+
+  /**
+   * 启动容器健康监控
+   */
+  private startHealthMonitor(groupJid: string): void {
+    const state = this.getGroup(groupJid);
+    if (state.healthMonitor) {
+      clearInterval(state.healthMonitor);
+    }
+
+    // 每30秒检查一次容器健康状态
+    state.healthMonitor = setInterval(async () => {
+      try {
+        if (!state.containerName) {
+          this.stopHealthMonitor(groupJid);
+          return;
+        }
+
+        // 使用 docker inspect 检查容器状态
+        const inspectOutput = execSync(
+          `docker inspect ${state.containerName} --format='{{.State.Running}}'`
+        ).toString().trim();
+
+        if (inspectOutput !== 'true') {
+          throw new Error('Container not running');
+        }
+      } catch (error) {
+        logger.error(
+          { groupJid, containerName: state.containerName, error },
+          'Container health check failed'
+        );
+
+        // 容器不健康，停止监控并尝试重新启动
+        this.stopHealthMonitor(groupJid);
+        this.handleContainerFailure(groupJid);
+      }
+    }, 30000); // 每30秒检查一次
+  }
+
+  /**
+   * 停止容器健康监控
+   */
+  private stopHealthMonitor(groupJid: string): void {
+    const state = this.getGroup(groupJid);
+    if (state.healthMonitor) {
+      clearInterval(state.healthMonitor);
+      state.healthMonitor = undefined;
+    }
+  }
+
+  /**
+   * 处理容器失败
+   */
+  private handleContainerFailure(groupJid: string): void {
+    const state = this.getGroup(groupJid);
+
+    // 清理资源
+    state.active = false;
+    state.process = null;
+    state.containerName = null;
+    state.groupFolder = null;
+
+    if (this.activeCount > 0) {
+      this.activeCount--;
+    }
+
+    // 尝试重新启动
+    logger.info({ groupJid }, 'Attempting to restart container after health check failure');
+    this.scheduleRetry(groupJid, state);
   }
 
   /**
@@ -264,17 +338,15 @@ export class GroupQueue {
           state.retryCount = 0;
           state.outputSent = false; // Clear flag on success
         } else {
-          // Only retry if output was not sent to user
+          // 修复：即使有输出发送，也应该允许重试
           if (state.outputSent) {
             logger.warn(
               { groupJid },
-              'Processing failed but output was sent, skipping retry to prevent duplicates',
+              'Processing failed but output was sent, will retry after delay'
             );
-            state.retryCount = 0; // Reset retry count
             state.outputSent = false; // Clear flag
-          } else {
-            this.scheduleRetry(groupJid, state);
           }
+          this.scheduleRetry(groupJid, state);
         }
       }
     } catch (err) {
@@ -295,6 +367,7 @@ export class GroupQueue {
       state.containerName = null;
       state.groupFolder = null;
       this.activeCount--;
+      this.stopHealthMonitor(groupJid); // 停止健康监控
       this.drainGroup(groupJid);
     }
   }
@@ -324,6 +397,7 @@ export class GroupQueue {
       state.containerName = null;
       state.groupFolder = null;
       this.activeCount--;
+      this.stopHealthMonitor(groupJid); // 停止健康监控
       this.drainGroup(groupJid);
     }
   }

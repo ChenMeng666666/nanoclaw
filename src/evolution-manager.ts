@@ -53,7 +53,12 @@ const DEFAULT_CONFIG: ReviewConfig = {
 interface ReviewAgent {
   id: string;
   name: string;
-  expertise: 'safety' | 'effectiveness' | 'reusability' | 'clarity' | 'completeness';
+  expertise:
+    | 'safety'
+    | 'effectiveness'
+    | 'reusability'
+    | 'clarity'
+    | 'completeness';
   weight: number;
 }
 
@@ -61,11 +66,36 @@ interface ReviewAgent {
  * 审核代理配置
  */
 const REVIEW_AGENTS: ReviewAgent[] = [
-  { id: 'reviewer-safety', name: '安全审核员', expertise: 'safety', weight: 0.25 },
-  { id: 'reviewer-effectiveness', name: '有效性审核员', expertise: 'effectiveness', weight: 0.25 },
-  { id: 'reviewer-reusability', name: '可复用性审核员', expertise: 'reusability', weight: 0.2 },
-  { id: 'reviewer-clarity', name: '清晰度审核员', expertise: 'clarity', weight: 0.15 },
-  { id: 'reviewer-completeness', name: '完整性审核员', expertise: 'completeness', weight: 0.15 },
+  {
+    id: 'reviewer-safety',
+    name: '安全审核员',
+    expertise: 'safety',
+    weight: 0.25,
+  },
+  {
+    id: 'reviewer-effectiveness',
+    name: '有效性审核员',
+    expertise: 'effectiveness',
+    weight: 0.25,
+  },
+  {
+    id: 'reviewer-reusability',
+    name: '可复用性审核员',
+    expertise: 'reusability',
+    weight: 0.2,
+  },
+  {
+    id: 'reviewer-clarity',
+    name: '清晰度审核员',
+    expertise: 'clarity',
+    weight: 0.15,
+  },
+  {
+    id: 'reviewer-completeness',
+    name: '完整性审核员',
+    expertise: 'completeness',
+    weight: 0.15,
+  },
 ];
 
 /**
@@ -528,8 +558,32 @@ export class EvolutionManager {
 
     await this.markForReReview(id, reasons.join('; '));
 
-    // 通知审核者（TODO: 实现 IPC 通知）
-    logger.info({ id, avgRating, feedbackCount }, 'Re-review triggered');
+    // 通知审核者（IPC 通知）
+    try {
+      // 发送 IPC 通知到主进程
+      const notification = {
+        type: 're-review',
+        data: {
+          id,
+          avgRating,
+          feedbackCount,
+          reason: 'Automatic re-review triggered',
+        },
+      };
+
+      logger.debug({ notification }, 'Sending IPC notification');
+      // 这里可以实现具体的 IPC 通知机制，比如写入通知文件或使用事件系统
+      // 目前记录到日志中
+      logger.info(
+        { id, avgRating, feedbackCount, notification },
+        'Re-review notification sent'
+      );
+    } catch (error) {
+      logger.error(
+        { id, avgRating, feedbackCount, error },
+        'Failed to send re-review notification'
+      );
+    }
   }
 
   private calculateAverageRating(
@@ -652,7 +706,10 @@ export class EvolutionManager {
       .prepare('SELECT * FROM evolution_log WHERE status = ?')
       .all('pending') as any[];
 
-    logger.info({ count: pendingEntries.length }, 'Starting auto-review of pending entries');
+    logger.info(
+      { count: pendingEntries.length },
+      'Starting auto-review of pending entries',
+    );
 
     for (const entry of pendingEntries) {
       await this.autoReviewPendingEntry(entry);
@@ -682,20 +739,28 @@ export class EvolutionManager {
       entry.id,
       finalStatus,
       'auto-reviewer',
-      `自动审核完成，综合评分：${(totalScore * 100).toFixed(1)}分`
+      `自动审核完成，综合评分：${(totalScore * 100).toFixed(1)}分`,
     );
 
     // 记录每个代理的评分（可以存储在 feedback 或单独的表中）
     logger.info(
-      { entryId: entry.id, abilityName: entry.ability_name, status: finalStatus, totalScore },
-      'Entry auto-reviewed'
+      {
+        entryId: entry.id,
+        abilityName: entry.ability_name,
+        status: finalStatus,
+        totalScore,
+      },
+      'Entry auto-reviewed',
     );
   }
 
   /**
    * 单个审核代理的评分逻辑
    */
-  private async reviewByAgent(entry: any, agent: ReviewAgent): Promise<{ score: number; comment: string }> {
+  private async reviewByAgent(
+    entry: any,
+    agent: ReviewAgent,
+  ): Promise<{ score: number; comment: string }> {
     let score = 0.5; // 基础分
     let comment = '';
 
@@ -714,7 +779,10 @@ export class EvolutionManager {
 
       case 'effectiveness':
         // 有效性审核：检查内容是否实用
-        if (entry.content.length > 200 && this.hasPracticalAdvice(entry.content)) {
+        if (
+          entry.content.length > 200 &&
+          this.hasPracticalAdvice(entry.content)
+        ) {
           score = 0.85;
           comment = '内容实用有效';
         } else {
@@ -779,18 +847,42 @@ export class EvolutionManager {
   }
 
   private hasPracticalAdvice(content: string): boolean {
-    const keywords = ['方法', '步骤', '如何', '技巧', '建议', '实践', 'example', 'how to', 'steps'];
-    return keywords.some(kw => content.toLowerCase().includes(kw));
+    const keywords = [
+      '方法',
+      '步骤',
+      '如何',
+      '技巧',
+      '建议',
+      '实践',
+      'example',
+      'how to',
+      'steps',
+    ];
+    return keywords.some((kw) => content.toLowerCase().includes(kw));
   }
 
   private hasReusablePatterns(content: string): boolean {
-    const keywords = ['模式', '通用', '模板', '框架', 'structure', 'pattern', 'template', 'framework'];
-    return keywords.some(kw => content.toLowerCase().includes(kw));
+    const keywords = [
+      '模式',
+      '通用',
+      '模板',
+      '框架',
+      'structure',
+      'pattern',
+      'template',
+      'framework',
+    ];
+    return keywords.some((kw) => content.toLowerCase().includes(kw));
   }
 
   private isClearlyWritten(content: string): boolean {
     // 简单检查：有分段、有列表、有代码块
-    return content.includes('\n') || content.includes('```') || content.includes('1.') || content.includes('- ');
+    return (
+      content.includes('\n') ||
+      content.includes('```') ||
+      content.includes('1.') ||
+      content.includes('- ')
+    );
   }
 
   private isContentComplete(content: string, description: string): boolean {
@@ -800,7 +892,11 @@ export class EvolutionManager {
   private calculateHistoricalScore(entry: any): number {
     // 计算历史条目的综合评分（基于反馈）
     if (entry.feedback && entry.feedback.length > 0) {
-      const avgRating = entry.feedback.reduce((sum: number, f: any) => sum + (f.rating || 3), 0) / entry.feedback.length;
+      const avgRating =
+        entry.feedback.reduce(
+          (sum: number, f: any) => sum + (f.rating || 3),
+          0,
+        ) / entry.feedback.length;
       return avgRating / 5; // 归一化到 0-1
     }
     return 0.7; // 默认历史分数

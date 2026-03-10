@@ -540,7 +540,9 @@ export function getUserMemories(
 
 export function updateMemory(
   id: string,
-  updates: Partial<Pick<Memory, 'content' | 'importance' | 'embedding' | 'level'>>,
+  updates: Partial<
+    Pick<Memory, 'content' | 'importance' | 'embedding' | 'level'>
+  >,
 ): void {
   const fields: string[] = [];
   const values: unknown[] = [];
