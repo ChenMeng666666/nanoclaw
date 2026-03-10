@@ -27,6 +27,7 @@ import {
   getRecommendedGeneCategory,
   Signal,
 } from './signal-extractor.js';
+import { getDatabase } from './db-agents.js';
 
 /**
  * 审核配置
@@ -45,6 +46,27 @@ const DEFAULT_CONFIG: ReviewConfig = {
   requireUserReview: false,
   seniorAgentIds: [],
 };
+
+/**
+ * 审核代理类型
+ */
+interface ReviewAgent {
+  id: string;
+  name: string;
+  expertise: 'safety' | 'effectiveness' | 'reusability' | 'clarity' | 'completeness';
+  weight: number;
+}
+
+/**
+ * 审核代理配置
+ */
+const REVIEW_AGENTS: ReviewAgent[] = [
+  { id: 'reviewer-safety', name: '安全审核员', expertise: 'safety', weight: 0.25 },
+  { id: 'reviewer-effectiveness', name: '有效性审核员', expertise: 'effectiveness', weight: 0.25 },
+  { id: 'reviewer-reusability', name: '可复用性审核员', expertise: 'reusability', weight: 0.2 },
+  { id: 'reviewer-clarity', name: '清晰度审核员', expertise: 'clarity', weight: 0.15 },
+  { id: 'reviewer-completeness', name: '完整性审核员', expertise: 'completeness', weight: 0.15 },
+];
 
 /**
  * 进化系统类
@@ -619,6 +641,169 @@ export class EvolutionManager {
     }
 
     return id;
+  }
+
+  /**
+   * 自动审核所有 pending 条目
+   */
+  async autoReviewPendingEntries(): Promise<void> {
+    const db = getDatabase();
+    const pendingEntries = db
+      .prepare('SELECT * FROM evolution_log WHERE status = ?')
+      .all('pending') as any[];
+
+    logger.info({ count: pendingEntries.length }, 'Starting auto-review of pending entries');
+
+    for (const entry of pendingEntries) {
+      await this.autoReviewPendingEntry(entry);
+    }
+  }
+
+  /**
+   * 自动审核单个待审核条目
+   */
+  private async autoReviewPendingEntry(entry: any): Promise<void> {
+    const scores: Record<string, { score: number; comment: string }> = {};
+    let totalScore = 0;
+
+    // 每个审核代理独立评分
+    for (const agent of REVIEW_AGENTS) {
+      const review = await this.reviewByAgent(entry, agent);
+      scores[agent.id] = review;
+      totalScore += review.score * agent.weight;
+    }
+
+    // 确定审核结果
+    const passed = totalScore >= 0.7; // 70 分通过
+    const finalStatus = passed ? 'approved' : 'rejected';
+
+    // 更新状态
+    updateEvolutionStatus(
+      entry.id,
+      finalStatus,
+      'auto-reviewer',
+      `自动审核完成，综合评分：${(totalScore * 100).toFixed(1)}分`
+    );
+
+    // 记录每个代理的评分（可以存储在 feedback 或单独的表中）
+    logger.info(
+      { entryId: entry.id, abilityName: entry.ability_name, status: finalStatus, totalScore },
+      'Entry auto-reviewed'
+    );
+  }
+
+  /**
+   * 单个审核代理的评分逻辑
+   */
+  private async reviewByAgent(entry: any, agent: ReviewAgent): Promise<{ score: number; comment: string }> {
+    let score = 0.5; // 基础分
+    let comment = '';
+
+    switch (agent.expertise) {
+      case 'safety':
+        // 安全审核：检查是否包含危险内容
+        const safetyIssues = this.checkSafety(entry.content);
+        if (safetyIssues.length === 0) {
+          score = 0.9;
+          comment = '无安全问题';
+        } else {
+          score = 0.3;
+          comment = `发现安全问题：${safetyIssues.join(', ')}`;
+        }
+        break;
+
+      case 'effectiveness':
+        // 有效性审核：检查内容是否实用
+        if (entry.content.length > 200 && this.hasPracticalAdvice(entry.content)) {
+          score = 0.85;
+          comment = '内容实用有效';
+        } else {
+          score = 0.4;
+          comment = '内容可能不够实用';
+        }
+        break;
+
+      case 'reusability':
+        // 可复用性审核：检查是否可推广
+        if (this.hasReusablePatterns(entry.content)) {
+          score = 0.8;
+          comment = '包含可复用的模式';
+        } else {
+          score = 0.5;
+          comment = '通用性一般';
+        }
+        break;
+
+      case 'clarity':
+        // 清晰度审核：检查表达是否清晰
+        if (this.isClearlyWritten(entry.content)) {
+          score = 0.85;
+          comment = '表达清晰易懂';
+        } else {
+          score = 0.45;
+          comment = '表达可能需要改进';
+        }
+        break;
+
+      case 'completeness':
+        // 完整性审核：检查内容是否完整
+        if (this.isContentComplete(entry.content, entry.description || '')) {
+          score = 0.8;
+          comment = '内容完整';
+        } else {
+          score = 0.5;
+          comment = '内容可能不够完整';
+        }
+        break;
+    }
+
+    return { score, comment };
+  }
+
+  // 辅助审核方法
+  private checkSafety(content: string): string[] {
+    const issues: string[] = [];
+    // 检查是否包含危险模式
+    const dangerousPatterns = [
+      /rm\s+-rf/,
+      /eval\s*\(/,
+      /exec\s*\(/,
+      /child_process/,
+    ];
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(content)) {
+        issues.push('包含潜在危险的命令');
+      }
+    }
+    return issues;
+  }
+
+  private hasPracticalAdvice(content: string): boolean {
+    const keywords = ['方法', '步骤', '如何', '技巧', '建议', '实践', 'example', 'how to', 'steps'];
+    return keywords.some(kw => content.toLowerCase().includes(kw));
+  }
+
+  private hasReusablePatterns(content: string): boolean {
+    const keywords = ['模式', '通用', '模板', '框架', 'structure', 'pattern', 'template', 'framework'];
+    return keywords.some(kw => content.toLowerCase().includes(kw));
+  }
+
+  private isClearlyWritten(content: string): boolean {
+    // 简单检查：有分段、有列表、有代码块
+    return content.includes('\n') || content.includes('```') || content.includes('1.') || content.includes('- ');
+  }
+
+  private isContentComplete(content: string, description: string): boolean {
+    return content.length > 150 && description.length > 20;
+  }
+
+  private calculateHistoricalScore(entry: any): number {
+    // 计算历史条目的综合评分（基于反馈）
+    if (entry.feedback && entry.feedback.length > 0) {
+      const avgRating = entry.feedback.reduce((sum: number, f: any) => sum + (f.rating || 3), 0) / entry.feedback.length;
+      return avgRating / 5; // 归一化到 0-1
+    }
+    return 0.7; // 默认历史分数
   }
 }
 

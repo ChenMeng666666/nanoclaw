@@ -540,7 +540,7 @@ export function getUserMemories(
 
 export function updateMemory(
   id: string,
-  updates: Partial<Pick<Memory, 'content' | 'importance' | 'embedding'>>,
+  updates: Partial<Pick<Memory, 'content' | 'importance' | 'embedding' | 'level'>>,
 ): void {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -556,6 +556,10 @@ export function updateMemory(
   if (updates.embedding !== undefined) {
     fields.push('embedding = ?');
     values.push(JSON.stringify(updates.embedding));
+  }
+  if (updates.level !== undefined) {
+    fields.push('level = ?');
+    values.push(updates.level);
   }
 
   if (fields.length === 0) return;

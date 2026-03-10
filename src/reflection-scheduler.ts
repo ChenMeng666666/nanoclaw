@@ -12,11 +12,14 @@ import {
   updateLearningTask,
   createLearningTask,
   getDatabase,
+  getMemories,
+  updateMemory,
 } from './db-agents.js';
 import { getAllActiveAgents } from './db-agents.js';
 import { AgentConfig, LearningTask, DetailedReflection } from './types.js';
 import { logger } from './logger.js';
 import { memoryManager } from './memory-manager.js';
+import { evolutionManager } from './evolution-manager.js';
 
 /**
  * 反思调度器类
@@ -44,6 +47,20 @@ export class ReflectionScheduler {
     // 每天 23:00 反思
     cron.schedule('0 23 * * *', () => {
       this.triggerReflectionsForAllAgents('daily');
+    });
+
+    // 每天 23:00 执行记忆固化（在反思之后）
+    cron.schedule('30 23 * * *', async () => {
+      logger.info('Starting scheduled memory consolidation');
+      await this.consolidateMemoriesForAllAgents();
+      logger.info('Scheduled memory consolidation completed');
+    });
+
+    // 每天 0:00 执行进化库自动审核
+    cron.schedule('0 0 * * *', async () => {
+      logger.info('Starting scheduled evolution library auto-review');
+      await evolutionManager.autoReviewPendingEntries();
+      logger.info('Scheduled evolution library auto-review completed');
     });
 
     // 每周日 23:00 反思
@@ -147,9 +164,18 @@ export class ReflectionScheduler {
     if (evolutionWorthy) {
       logger.info(
         { taskId, taskName: task.description },
-        'Task experience worthy of evolution, TODO: submit to evolution system',
+        'Task experience worthy of evolution, submitting to evolution system',
       );
-      // TODO: 调用进化系统 API
+      // 调用进化系统 API 提交经验
+      const abilityName = `学习：${task.description.slice(0, 50)}`;
+      const id = await evolutionManager.submitExperience(
+        abilityName,
+        reflectionContent,
+        task.agentFolder,
+        `任务完成反思：${task.description}`,
+        ['learning', 'task-reflection']
+      );
+      logger.info({ taskId, evolutionId: id }, 'Task experience submitted to evolution library');
     }
 
     logger.info(
@@ -471,6 +497,51 @@ ${analysis.rating} / 5
   /**
    * 检查所有智能体的学习进度并触发反思
    */
+  /**
+   * 对所有智能体执行记忆固化
+   */
+  private async consolidateMemoriesForAllAgents(): Promise<void> {
+    const agents = getAllActiveAgents();
+    for (const agent of agents) {
+      await this.consolidateAgentMemories(agent);
+    }
+  }
+
+  /**
+   * 对单个智能体执行记忆固化
+   */
+  private async consolidateAgentMemories(agent: AgentConfig): Promise<void> {
+    // 获取该 agent 的所有 L2 记忆
+    const l2Memories = getMemories(agent.folder, 'L2');
+
+    for (const memory of l2Memories) {
+      // 评估记忆价值
+      const shouldConsolidate = this.evaluateMemoryForL3(memory);
+      if (shouldConsolidate) {
+        // 迁移到 L3
+        updateMemory(memory.id, { level: 'L3', importance: Math.min(memory.importance + 0.1, 1.0) });
+        logger.info({ memoryId: memory.id, agent: agent.name }, 'Memory consolidated to L3');
+      }
+    }
+  }
+
+  /**
+   * 评估记忆是否应该迁移到 L3
+   */
+  private evaluateMemoryForL3(memory: any): boolean {
+    // 评估标准：
+    // 1. 重要性 > 0.7
+    // 2. 访问次数 > 2
+    // 3. 内容长度 > 100
+    // 4. 包含知识/经验关键词
+    if (memory.importance > 0.7 && memory.accessCount > 2 && memory.content.length > 100) {
+      const knowledgeKeywords = ['学会', '掌握', '发现', '经验', '方法', '技巧', '最佳实践'];
+      const lowerContent = memory.content.toLowerCase();
+      return knowledgeKeywords.some(kw => lowerContent.includes(kw));
+    }
+    return false;
+  }
+
   private async checkLearningProgressForAllAgents(): Promise<void> {
     const agents = getAllActiveAgents();
 

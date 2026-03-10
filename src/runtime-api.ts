@@ -918,7 +918,10 @@ export function startRuntimeAPI(
 
   server.on('error', (err) => {
     if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {
-      logger.warn({ port: opts.port }, 'Runtime API port already in use, continuing without Runtime API');
+      logger.warn(
+        { port: opts.port },
+        'Runtime API port already in use, continuing without Runtime API',
+      );
     } else {
       logger.error({ err }, 'Runtime API server error');
     }
