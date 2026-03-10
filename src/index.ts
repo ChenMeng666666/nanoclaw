@@ -490,19 +490,19 @@ async function startMessageLoop(): Promise<void> {
             continue;
           }
 
-          // 安全检查：验证用户输入是否包含潜在恶意内容（暂时禁用，调试中）
-          // const inputValidation = validateUserInput(msg.content);
-          // if (!inputValidation.valid) {
-          //   logger.warn(
-          //     {
-          //       chatJid: msg.chat_jid,
-          //       messageId: msg.id,
-          //       issues: inputValidation.issues,
-          //     },
-          //     'Blocking potentially malicious message',
-          //   );
-          //   continue;
-          // }
+          // 安全检查：验证用户输入是否包含潜在恶意内容
+          const inputValidation = validateUserInput(msg.content);
+          if (!inputValidation.valid) {
+            logger.warn(
+              {
+                chatJid: msg.chat_jid,
+                messageId: msg.id,
+                issues: inputValidation.issues,
+              },
+              'Blocking potentially malicious message',
+            );
+            continue;
+          }
 
           const existing = messagesByGroup.get(msg.chat_jid);
           if (existing) {
