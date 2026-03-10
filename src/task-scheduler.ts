@@ -85,7 +85,9 @@ async function runTask(
 
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
-      reject(new Error(`Task timed out after ${TASK_TIMEOUT_MS / 1000} seconds`));
+      reject(
+        new Error(`Task timed out after ${TASK_TIMEOUT_MS / 1000} seconds`),
+      );
     }, TASK_TIMEOUT_MS);
   });
 
@@ -164,7 +166,9 @@ async function runTask(
         // For group context mode, use the group's current session
         const sessions = deps.getSessions();
         const sessionId =
-          task.context_mode === 'group' ? sessions[task.group_folder] : undefined;
+          task.context_mode === 'group'
+            ? sessions[task.group_folder]
+            : undefined;
 
         // After the task produces a result, close the container promptly.
         // Tasks are single-turn — no need to wait IDLE_TIMEOUT (30 min) for the
@@ -175,7 +179,10 @@ async function runTask(
         const scheduleClose = () => {
           if (closeTimer) return; // already scheduled
           closeTimer = setTimeout(() => {
-            logger.debug({ taskId: task.id }, 'Closing task container after result');
+            logger.debug(
+              { taskId: task.id },
+              'Closing task container after result',
+            );
             deps.queue.closeStdin(task.chat_jid);
           }, TASK_CLOSE_DELAY_MS);
         };
@@ -193,7 +200,12 @@ async function runTask(
               assistantName: ASSISTANT_NAME,
             },
             (proc, containerName) =>
-              deps.onProcess(task.chat_jid, proc, containerName, task.group_folder),
+              deps.onProcess(
+                task.chat_jid,
+                proc,
+                containerName,
+                task.group_folder,
+              ),
             async (streamedOutput: ContainerOutput) => {
               if (streamedOutput.result) {
                 result = streamedOutput.result;
@@ -253,7 +265,10 @@ async function runTask(
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
     const durationMs = Date.now() - startTime;
-    logger.error({ taskId: task.id, error, durationMs }, 'Task execution failed');
+    logger.error(
+      { taskId: task.id, error, durationMs },
+      'Task execution failed',
+    );
     logTaskRun({
       task_id: task.id,
       run_at: new Date().toISOString(),

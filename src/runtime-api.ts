@@ -81,11 +81,14 @@ export function startRuntimeAPI(
     if (req.method !== 'OPTIONS') {
       const apiKey = req.headers['x-api-key'] as string;
       if (!apiKey || apiKey !== API_KEY) {
-        logger.warn({
-          method: req.method,
-          url: req.url,
-          ip: req.socket.remoteAddress,
-        }, 'Runtime API access denied: invalid API key');
+        logger.warn(
+          {
+            method: req.method,
+            url: req.url,
+            ip: req.socket.remoteAddress,
+          },
+          'Runtime API access denied: invalid API key',
+        );
         writeJSON(res, 401, { error: 'Unauthorized: Invalid API key' });
         return;
       }

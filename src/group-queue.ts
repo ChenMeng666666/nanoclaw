@@ -168,12 +168,14 @@ export class GroupQueue {
     lastMessageTimestamp?: string,
   ): boolean {
     const state = this.getGroup(groupJid);
-    if (!state.active || !state.groupFolder)
-      return false;
+    if (!state.active || !state.groupFolder) return false;
 
     // 对于任务容器，我们仍然允许发送消息，但需要谨慎处理
     if (state.isTaskContainer) {
-      logger.debug({ groupJid }, 'Task container active, marking message as pending instead of sending directly');
+      logger.debug(
+        { groupJid },
+        'Task container active, marking message as pending instead of sending directly',
+      );
       state.pendingMessages = true; // 标记有消息待处理
       return false; // 对于任务容器，我们选择不直接发送消息，而是让它在任务完成后处理
     }

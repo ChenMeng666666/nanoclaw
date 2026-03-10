@@ -124,12 +124,7 @@ export function validateUserInput(input: string): {
   }
 
   // 检查路径遍历模式
-  const pathPatterns = [
-    /\.\.\//,
-    /\.\.\\/,
-    /\/\.\.\//,
-    /\\\.\.\\/,
-  ];
+  const pathPatterns = [/\.\.\//, /\.\.\\/, /\/\.\.\//, /\\\.\.\\/];
 
   for (const pattern of pathPatterns) {
     if (pattern.test(input)) {
