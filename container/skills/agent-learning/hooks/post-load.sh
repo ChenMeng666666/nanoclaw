@@ -60,10 +60,10 @@ if [ -f "$INIT_SCRIPT_SRC" ]; then
 
     # 同步所有脚本文件
     if [ -d "$SCRIPTS_DIR" ]; then
-        cp -r "$SCRIPTS_DIR"/* "$LEARNING_DIR/" 2>/dev/null || true
-        chmod +x "$LEARNING_DIR"/*.sh 2>/dev/null || true
+        mkdir -p "$LEARNING_DIR/scripts"
+        cp -r "$SCRIPTS_DIR"/* "$LEARNING_DIR/scripts/" 2>/dev/null || true
         chmod +x "$LEARNING_DIR"/scripts/*.sh 2>/dev/null || true
-        log_info "已同步脚本文件到：$LEARNING_DIR/"
+        log_info "已同步脚本文件到：$LEARNING_DIR/scripts/"
     fi
 else
     log_warn "初始化脚本不存在：$INIT_SCRIPT_SRC"
