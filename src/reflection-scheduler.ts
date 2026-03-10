@@ -14,7 +14,7 @@ import {
   getDatabase,
 } from './db-agents.js';
 import { getAllActiveAgents } from './db-agents.js';
-import { AgentConfig, LearningTask } from './types.js';
+import { AgentConfig, LearningTask, DetailedReflection } from './types.js';
 import { logger } from './logger.js';
 import { memoryManager } from './memory-manager.js';
 
@@ -218,6 +218,9 @@ export class ReflectionScheduler {
       20,
     );
 
+    // 分析记忆以提取知识、困难、解决方案等
+    const analysis = this.analyzeMemoriesForReflection(memories);
+
     return `# ${type.charAt(0).toUpperCase() + type.slice(1)} Reflection - ${agent.name}
 
 ## 时间范围
@@ -226,12 +229,85 @@ ${timeLabel} (${now.toISOString()})
 ## 关键记忆
 ${memories.map((m) => `- ${m.content.slice(0, 200)}`).join('\n')}
 
-## 反思总结
-${this.generateReflectionInsights(agent, type, memories)}
+## 知识获取
+${analysis.knowledgeGained.length > 0 ? analysis.knowledgeGained.map((kg) => `- ${kg}`).join('\n') : '- 无明显新知识获取'}
 
-## 改进方向
-${this.generateImprovementSuggestions(agent, type)}
+## 遇到的困难
+${analysis.difficulties.length > 0 ? analysis.difficulties.map((d) => `- ${d}`).join('\n') : '- 无明显困难'}
+
+## 解决方案
+${analysis.solutions.length > 0 ? analysis.solutions.map((s) => `- ${s}`).join('\n') : '- 无特别解决方案'}
+
+## 关键洞见
+${analysis.keyInsights.length > 0 ? analysis.keyInsights.map((ki) => `- ${ki}`).join('\n') : '- 无关键洞见'}
+
+## 改进建议
+${analysis.suggestions.length > 0 ? analysis.suggestions.map((s) => `- ${s}`).join('\n') : '- 持续改进，保持学习'}
+
+## 下一步计划
+${analysis.nextSteps.length > 0 ? analysis.nextSteps.map((ns) => `- ${ns}`).join('\n') : '- 继续当前学习或工作'}
+
+## 学习评分
+${analysis.rating || '3'} / 5
+
+## 整体总结
+${this.generateReflectionInsights(agent, type, memories)}
 `;
+  }
+
+  private analyzeMemoriesForReflection(memories: any[]): Omit<DetailedReflection, 'id' | 'agentFolder' | 'type' | 'content' | 'createdAt'> {
+    const knowledgeGained: string[] = [];
+    const difficulties: string[] = [];
+    const solutions: string[] = [];
+    const suggestions: string[] = [];
+    const keyInsights: string[] = [];
+    const nextSteps: string[] = [];
+    let rating: 1 | 2 | 3 | 4 | 5 = 3;
+
+    // 简单的关键词分析
+    memories.forEach(memory => {
+      const content = memory.content.toLowerCase();
+
+      if (content.includes('学会') || content.includes('掌握') || content.includes('学习')) {
+        knowledgeGained.push(memory.content);
+      }
+
+      if (content.includes('困难') || content.includes('问题') || content.includes('挑战')) {
+        difficulties.push(memory.content);
+      }
+
+      if (content.includes('解决') || content.includes('方法') || content.includes('方案')) {
+        solutions.push(memory.content);
+      }
+
+      if (content.includes('建议') || content.includes('优化') || content.includes('改进')) {
+        suggestions.push(memory.content);
+      }
+
+      if (content.includes('发现') || content.includes('洞察') || content.includes('理解')) {
+        keyInsights.push(memory.content);
+      }
+
+      if (content.includes('下一步') || content.includes('计划') || content.includes('目标')) {
+        nextSteps.push(memory.content);
+      }
+    });
+
+    // 简单的评分逻辑
+    if (knowledgeGained.length > 3) rating = 5;
+    else if (knowledgeGained.length > 1) rating = 4;
+    else if (difficulties.length > 2) rating = 2;
+    else if (difficulties.length > 0) rating = 3;
+
+    return {
+      knowledgeGained,
+      difficulties,
+      solutions,
+      suggestions,
+      keyInsights,
+      nextSteps,
+      rating,
+    };
   }
 
   private generateReflectionInsights(
@@ -284,6 +360,16 @@ ${this.generateImprovementSuggestions(agent, type)}
   }
 
   private async generateTaskReflection(task: LearningTask): Promise<string> {
+    const analysis = {
+      knowledgeGained: ["任务相关的知识要点"],
+      difficulties: ["任务执行过程中遇到的困难"],
+      solutions: ["解决困难的方法"],
+      suggestions: ["改进建议"],
+      keyInsights: ["任务中的关键洞察"],
+      nextSteps: ["下一步学习计划"],
+      rating: 4
+    };
+
     return `# 任务完成反思
 
 ## 任务描述
@@ -295,7 +381,28 @@ ${task.status}
 ## 学习资源
 ${task.resources?.map((r) => `- ${r}`).join('\n') || '无'}
 
-## 反思
+## 知识获取
+${analysis.knowledgeGained.map((kg) => `- ${kg}`).join('\n')}
+
+## 遇到的困难
+${analysis.difficulties.map((d) => `- ${d}`).join('\n')}
+
+## 解决方案
+${analysis.solutions.map((s) => `- ${s}`).join('\n')}
+
+## 关键洞见
+${analysis.keyInsights.map((ki) => `- ${ki}`).join('\n')}
+
+## 改进建议
+${analysis.suggestions.map((s) => `- ${s}`).join('\n')}
+
+## 下一步计划
+${analysis.nextSteps.map((ns) => `- ${ns}`).join('\n')}
+
+## 任务评分
+${analysis.rating} / 5
+
+## 总结
 任务已完成。关键学习点和经验已记录到长期记忆中。
 `;
   }

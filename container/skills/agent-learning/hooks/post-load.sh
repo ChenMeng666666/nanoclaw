@@ -16,6 +16,8 @@ set -e
 
 LEARNING_DIR="/workspace/group/.learning-system"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPTS_DIR="$SKILL_DIR/scripts"
+CONFIG_DIR="$SKILL_DIR/config"
 INIT_SCRIPT_SRC="$SKILL_DIR/scripts/init.sh"
 INIT_SCRIPT_DEST="$LEARNING_DIR/init.sh"
 
@@ -49,6 +51,20 @@ if [ -f "$INIT_SCRIPT_SRC" ]; then
     cp "$INIT_SCRIPT_SRC" "$INIT_SCRIPT_DEST"
     chmod +x "$INIT_SCRIPT_DEST"
     log_info "已同步初始化脚本到：$INIT_SCRIPT_DEST"
+
+    # 同步所有配置文件
+    if [ -d "$CONFIG_DIR" ]; then
+        cp -r "$CONFIG_DIR"/* "$LEARNING_DIR/config/" 2>/dev/null || true
+        log_info "已同步配置文件到：$LEARNING_DIR/config/"
+    fi
+
+    # 同步所有脚本文件
+    if [ -d "$SCRIPTS_DIR" ]; then
+        cp -r "$SCRIPTS_DIR"/* "$LEARNING_DIR/" 2>/dev/null || true
+        chmod +x "$LEARNING_DIR"/*.sh 2>/dev/null || true
+        chmod +x "$LEARNING_DIR"/scripts/*.sh 2>/dev/null || true
+        log_info "已同步脚本文件到：$LEARNING_DIR/"
+    fi
 else
     log_warn "初始化脚本不存在：$INIT_SCRIPT_SRC"
     exit 1

@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "hourlyRotation": true,
+  "timeSlots": [
+    {
+      "time": "08:00-10:00",
+      "focus": "技能学习",
+      "types": ["technical_skill", "soft_skill"],
+      "priority": "high"
+    },
+    {
+      "time": "10:00-12:00",
+      "focus": "任务实践",
+      "types": ["task_execution", "problem_solving"],
+      "priority": "high"
+    },
+    {
+      "time": "14:00-16:00",
+      "focus": "知识整理",
+      "types": ["knowledge_extraction", "documentation"],
+      "priority": "medium"
+    },
+    {
+      "time": "16:00-18:00",
+      "focus": "反思总结",
+      "types": ["reflection", "improvement"],
+      "priority": "medium"
+    },
+    {
+      "time": "19:00-21:00",
+      "focus": "深度学习",
+      "types": ["deep_learning", "research"],
+      "priority": "low"
+    }
+  ],
+  "dailyGoals": {
+    "minimumLearningTime": 2,
+    "minimumTasks": 3,
+    "skillDiversity": 2
+  }
+}

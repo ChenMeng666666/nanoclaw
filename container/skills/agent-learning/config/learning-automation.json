@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "enabled": true,
+  "dailyPlanTime": "08:00",
+  "dailySummaryTime": "23:00",
+  "reflections": {
+    "hourly": true,
+    "daily": true,
+    "weekly": true,
+    "monthly": true,
+    "yearly": true
+  },
+  "notifications": {
+    "enabled": false,
+    "channel": "telegram",
+    "userId": "tg:1043758083"
+  }
+}

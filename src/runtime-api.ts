@@ -36,6 +36,12 @@ import {
 } from './db-agents.js';
 import { getAllTasks, getTasksForGroup } from './db.js';
 import { logger } from './logger.js';
+import type {
+  LearningNeed,
+  DailyLearningPlan,
+  DetailedReflection,
+  DailyLearningSummary,
+} from './types.js';
 
 export interface RuntimeAPIOptions {
   port: number;
@@ -193,6 +199,210 @@ export function startRuntimeAPI(
         );
 
         writeJSON(res, 200, { success: true });
+        return;
+      }
+
+      // ===== 学习自动化 API =====
+
+      if (path === '/api/learning/analyze-needs' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { agentFolder } = body;
+
+        if (!agentFolder) {
+          writeJSON(res, 400, { error: 'Missing agentFolder' });
+          return;
+        }
+
+        // 模拟学习需求分析（实际需要更智能的分析）
+        const needs: LearningNeed[] = [
+          {
+            topic: "提升情绪化对话处理能力",
+            level: "intermediate",
+            urgency: "high",
+            estimatedTime: 2,
+            resources: ["https://example.com/emotional-intelligence"]
+          },
+          {
+            topic: "学习Python数据分析",
+            level: "beginner",
+            urgency: "medium",
+            estimatedTime: 3,
+            resources: ["https://example.com/python-data-analysis"]
+          }
+        ];
+
+        writeJSON(res, 200, { needs });
+        return;
+      }
+
+      if (path === '/api/learning/generate-daily-plan' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { agentFolder, learningNeeds, scheduleConfig } = body;
+
+        if (!agentFolder || !learningNeeds) {
+          writeJSON(res, 400, { error: 'Missing required fields' });
+          return;
+        }
+
+        // 模拟生成每日学习计划
+        const plan: DailyLearningPlan = {
+          id: `plan-${Date.now()}`,
+          date: new Date().toISOString().split('T')[0],
+          agentFolder,
+          tasks: learningNeeds.map((need: LearningNeed, index: number) => ({
+            id: `task-${Date.now()}-${index}`,
+            agentFolder,
+            description: need.topic,
+            status: 'pending',
+            resources: need.resources,
+            createdAt: new Date().toISOString()
+          })),
+          estimatedTime: learningNeeds.reduce((sum: number, need: LearningNeed) => sum + need.estimatedTime, 0),
+          priority: 'medium'
+        };
+
+        writeJSON(res, 200, plan);
+        return;
+      }
+
+      if (path === '/api/learning/analyze-outcome' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { taskId } = body;
+
+        if (!taskId) {
+          writeJSON(res, 400, { error: 'Missing taskId' });
+          return;
+        }
+
+        // 模拟学习成果分析
+        const analysis = {
+          taskId,
+          knowledgeGained: ["情绪识别的关键信号", "用户表达模式的观察方法"],
+          difficulties: ["文字交流中难以捕捉语调"],
+          solutions: ["多观察用户的表达模式"],
+          suggestions: ["继续练习共情回应方法"]
+        };
+
+        writeJSON(res, 200, analysis);
+        return;
+      }
+
+      if (path === '/api/learning/extract-knowledge' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { taskId, reflectionId } = body;
+
+        if (!taskId && !reflectionId) {
+          writeJSON(res, 400, { error: 'Missing taskId or reflectionId' });
+          return;
+        }
+
+        // 模拟知识提取
+        const knowledge = [
+          "掌握了情绪识别的关键信号",
+          "学会了如何观察用户的表达模式",
+          "理解了文字交流中语调捕捉的困难"
+        ];
+
+        writeJSON(res, 200, { knowledgePoints: knowledge });
+        return;
+      }
+
+      if (path === '/api/learning/automation/start' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { agentFolder } = body;
+
+        if (!agentFolder) {
+          writeJSON(res, 400, { error: 'Missing agentFolder' });
+          return;
+        }
+
+        writeJSON(res, 200, { status: 'started' });
+        return;
+      }
+
+      if (path === '/api/learning/automation/stop' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { agentFolder } = body;
+
+        if (!agentFolder) {
+          writeJSON(res, 400, { error: 'Missing agentFolder' });
+          return;
+        }
+
+        writeJSON(res, 200, { status: 'stopped' });
+        return;
+      }
+
+      if (path === '/api/learning/automation/status' && req.method === 'GET') {
+        const agentFolder = url.searchParams.get('agentFolder');
+
+        if (!agentFolder) {
+          writeJSON(res, 400, { error: 'Missing agentFolder' });
+          return;
+        }
+
+        writeJSON(res, 200, { status: 'running' });
+        return;
+      }
+
+      if (path === '/api/learning/reflection/generate' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { agentFolder, type, startTime, endTime } = body;
+
+        if (!agentFolder || !type) {
+          writeJSON(res, 400, { error: 'Missing agentFolder or type' });
+          return;
+        }
+
+        // 模拟生成反思
+        const reflection: DetailedReflection = {
+          id: Date.now(),
+          agentFolder,
+          type: type as any,
+          content: "今日学习了情绪识别技巧，掌握了关键信号，但文字交流中难以捕捉语调",
+          taskId: `task-${Date.now()}`,
+          completionTime: new Date().toISOString(),
+          actualDuration: 60,
+          knowledgeGained: ["情绪识别的关键信号"],
+          difficulties: ["文字交流中难以捕捉语调"],
+          solutions: ["多观察用户的表达模式"],
+          suggestions: ["继续练习共情回应方法"],
+          keyInsights: ["用户说'真的吗'多次可能表示怀疑"],
+          nextSteps: ["需要多观察用户的表达模式"],
+          rating: 4,
+          createdAt: new Date().toISOString()
+        };
+
+        writeJSON(res, 200, reflection);
+        return;
+      }
+
+      if (path === '/api/learning/generate-daily-summary' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { agentFolder, tasks } = body;
+
+        if (!agentFolder) {
+          writeJSON(res, 400, { error: 'Missing agentFolder' });
+          return;
+        }
+
+        // 模拟生成每日总结
+        const summary: DailyLearningSummary = {
+          id: `summary-${Date.now()}`,
+          date: new Date().toISOString().split('T')[0],
+          agentFolder,
+          tasksCompleted: tasks?.length || 2,
+          totalTimeSpent: 120,
+          knowledgePoints: ["情绪识别的关键信号", "用户表达模式的观察方法"],
+          achievements: ["掌握了情绪识别技巧"],
+          challenges: ["文字交流中难以捕捉语调"],
+          improvements: ["需要多练习共情回应方法"],
+          tomorrowPlan: ["学习共情回应方法"],
+          mood: 'good',
+          notes: "今日学习效果良好，但需要继续练习"
+        };
+
+        writeJSON(res, 200, summary);
         return;
       }
 

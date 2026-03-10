@@ -185,6 +185,29 @@ export interface Reflection {
 }
 
 /**
+ * 学习需求
+ */
+export interface LearningNeed {
+  topic: string;
+  level: 'beginner' | 'intermediate' | 'advanced';
+  urgency: 'high' | 'medium' | 'low';
+  estimatedTime: number; // 小时
+  resources?: string[];
+}
+
+/**
+ * 每日学习计划
+ */
+export interface DailyLearningPlan {
+  id: string;
+  date: string;
+  agentFolder: string;
+  tasks: LearningTask[];
+  estimatedTime: number;
+  priority: 'high' | 'medium' | 'low';
+}
+
+/**
  * 学习任务
  */
 export interface LearningTask {
@@ -196,6 +219,56 @@ export interface LearningTask {
   resources?: string[];
   createdAt: string;
   completedAt?: string;
+}
+
+/**
+ * 详细反思（扩展现有 Reflection 类型）
+ */
+export interface DetailedReflection extends Reflection {
+  taskId?: string;
+  completionTime?: string;
+  actualDuration?: number; // 分钟
+  knowledgeGained?: string[];
+  difficulties?: string[];
+  solutions?: string[];
+  suggestions?: string[];
+  keyInsights?: string[];
+  nextSteps?: string[];
+  rating?: 1 | 2 | 3 | 4 | 5;
+}
+
+/**
+ * 每日学习总结
+ */
+export interface DailyLearningSummary {
+  id: string;
+  date: string;
+  agentFolder: string;
+  tasksCompleted: number;
+  totalTimeSpent: number; // 分钟
+  knowledgePoints: string[];
+  achievements: string[];
+  challenges: string[];
+  improvements: string[];
+  tomorrowPlan: string[];
+  mood: 'great' | 'good' | 'average' | 'bad';
+  notes?: string;
+}
+
+/**
+ * 学习自动化配置
+ */
+export interface LearningAutomationConfig {
+  enabled: boolean;
+  dailyPlanTime: string;
+  dailySummaryTime: string;
+  reflections: {
+    hourly: boolean;
+    daily: boolean;
+    weekly: boolean;
+    monthly: boolean;
+    yearly: boolean;
+  };
 }
 
 /**

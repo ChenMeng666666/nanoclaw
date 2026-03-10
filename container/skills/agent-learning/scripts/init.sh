@@ -59,6 +59,9 @@ EOF
     mkdir -p "$LEARNING_DIR/plans"
     mkdir -p "$LEARNING_DIR/logs"
     mkdir -p "$LEARNING_DIR/reflections"
+    mkdir -p "$LEARNING_DIR/config"
+    mkdir -p "$LEARNING_DIR/cron"
+    mkdir -p "$LEARNING_DIR/status"
 
     log_info "学习体系就绪"
 }

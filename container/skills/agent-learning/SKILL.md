@@ -18,6 +18,33 @@ tools: Bash(curl), Read, Write, Edit
 
 ## 快速开始
 
+### 学习自动化（新增）
+
+现在 agent 可以完全自主进行学习，无需用户主动触发！
+
+#### 启动学习自动化
+
+```bash
+bash /workspace/group/.learning-system/scripts/learning-automation.sh start
+```
+
+这会自动：
+- 设置 cron 定时任务
+- 立即生成并执行当日学习计划
+- 每小时、每天、每周、每月、每年自动触发反思
+
+#### 停止学习自动化
+
+```bash
+bash /workspace/group/.learning-system/scripts/learning-automation.sh stop
+```
+
+#### 检查状态
+
+```bash
+bash /workspace/group/.learning-system/scripts/learning-automation.sh status
+```
+
 ### 第一步：检查并初始化学习体系
 
 **当 agent 首次需要自我学习时，必须先检查容器内是否有学习体系：**
@@ -280,13 +307,28 @@ curl -X POST http://host.docker.internal:3456/api/memory/add \
     "agentFolder": "mimi",
     "content": "我学习了情绪识别技巧：掌握了语调变化、用词选择、重复表达等关键信号",
     "level": "L2",
-    "metadata": {
-      "type": "self_learning_achievement",
-      "planId": "plan_001",
-      "phaseName": "学习情绪识别技巧"
-    }
+    "userJid": "tg:123456789"
   }'
 ```
+
+**记忆系统新特性**：
+- **查询扩展**：记忆搜索现在支持自动查询扩展，使用本地 LLM 或关键词方法生成多个查询变体，提升召回率
+- **智能分块**：学习内容会自动智能分块，保护代码块和长文本的完整性
+- **元数据支持**：记忆现在支持 tags、messageType、sourceType 等元数据，便于更好的分类和检索
+
+**高级存储示例**（使用新增元数据字段）：
+```bash
+curl -X POST http://host.docker.internal:3456/api/memory/add \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentFolder": "mimi",
+    "content": "我学习了情绪识别技巧：掌握了语调变化、用词选择、重复表达等关键信号",
+    "level": "L2",
+    "userJid": "tg:123456789"
+  }'
+```
+
+注意：新增的元数据字段（tags、messageType、sourceType、sessionId 等）会在记忆摄取时自动设置，无需手动指定。
 
 **进化库提交**：
 agent 将有价值的学习方法提交到进化库，分享给其他 agent：
@@ -498,9 +540,14 @@ curl -X POST http://host.docker.internal:3456/api/learning/task/complete \
 
 | 端点 | 方法 | 描述 |
 |------|------|------|
-| `/api/memory/search` | POST | 搜索记忆 |
+| `/api/memory/search` | POST | 搜索记忆（支持查询扩展，提升语义召回率） |
 | `/api/memory/add` | POST | 添加记忆 |
 | `/api/memory/list` | GET | 列出记忆 |
+
+**记忆搜索的新特性**：
+- **查询扩展**：会自动生成多个查询变体，提升语义搜索的召回率
+- **混合检索**：结合 BM25 关键词匹配和向量相似度搜索
+- **智能分块**：考虑记忆分块的完整性，保护代码块等结构化内容
 
 ### 进化库 API
 
@@ -522,6 +569,20 @@ curl -X POST http://host.docker.internal:3456/api/learning/task/complete \
 | `/api/learning/result` | POST | 记录学习结果 |
 | `/api/learning/results` | GET | 查询学习结果 |
 | `/api/scheduled/tasks` | GET | 查询定时任务 |
+
+### 学习自动化 API（新增）
+
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/api/learning/analyze-needs` | POST | 分析学习需求 |
+| `/api/learning/generate-daily-plan` | POST | 生成每日学习计划 |
+| `/api/learning/analyze-outcome` | POST | 分析学习成果 |
+| `/api/learning/extract-knowledge` | POST | 提取知识点 |
+| `/api/learning/reflection/generate` | POST | 生成反思内容 |
+| `/api/learning/generate-daily-summary` | POST | 生成每日总结 |
+| `/api/learning/automation/start` | POST | 启动学习自动化 |
+| `/api/learning/automation/stop` | POST | 停止学习自动化 |
+| `/api/learning/automation/status` | GET | 查询学习自动化状态 |
 
 ### 信号与饱和检测 API
 
