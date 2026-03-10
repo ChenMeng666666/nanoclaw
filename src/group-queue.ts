@@ -168,8 +168,16 @@ export class GroupQueue {
     lastMessageTimestamp?: string,
   ): boolean {
     const state = this.getGroup(groupJid);
-    if (!state.active || !state.groupFolder || state.isTaskContainer)
+    if (!state.active || !state.groupFolder)
       return false;
+
+    // 对于任务容器，我们仍然允许发送消息，但需要谨慎处理
+    if (state.isTaskContainer) {
+      logger.debug({ groupJid }, 'Task container active, marking message as pending instead of sending directly');
+      state.pendingMessages = true; // 标记有消息待处理
+      return false; // 对于任务容器，我们选择不直接发送消息，而是让它在任务完成后处理
+    }
+
     state.idleWaiting = false;
     if (lastMessageTimestamp)
       state.lastPipedMessageTimestamp = lastMessageTimestamp;
@@ -346,24 +354,24 @@ export class GroupQueue {
 
     const state = this.getGroup(groupJid);
 
-    // Tasks first (they won't be re-discovered from SQLite like messages)
+    // 聊天消息优先于任务执行，确保用户可以及时得到响应
+    if (state.pendingMessages) {
+      this.runForGroup(groupJid, 'drain').catch((err) =>
+        logger.error(
+          { groupJid, err },
+          'Unhandled error in runForGroup (drain)',
+        ),
+      );
+      return;
+    }
+
+    // 然后处理任务
     if (state.pendingTasks.length > 0) {
       const task = state.pendingTasks.shift()!;
       this.runTask(groupJid, task).catch((err) =>
         logger.error(
           { groupJid, taskId: task.id, err },
           'Unhandled error in runTask (drain)',
-        ),
-      );
-      return;
-    }
-
-    // Then pending messages
-    if (state.pendingMessages) {
-      this.runForGroup(groupJid, 'drain').catch((err) =>
-        logger.error(
-          { groupJid, err },
-          'Unhandled error in runForGroup (drain)',
         ),
       );
       return;
@@ -381,20 +389,20 @@ export class GroupQueue {
       const nextJid = this.waitingGroups.shift()!;
       const state = this.getGroup(nextJid);
 
-      // Prioritize tasks over messages
-      if (state.pendingTasks.length > 0) {
+      // 聊天消息优先于任务执行，确保用户可以及时得到响应
+      if (state.pendingMessages) {
+        this.runForGroup(nextJid, 'drain').catch((err) =>
+          logger.error(
+            { groupJid: nextJid, err },
+            'Unhandled error in runForGroup (waiting)',
+          ),
+        );
+      } else if (state.pendingTasks.length > 0) {
         const task = state.pendingTasks.shift()!;
         this.runTask(nextJid, task).catch((err) =>
           logger.error(
             { groupJid: nextJid, taskId: task.id, err },
             'Unhandled error in runTask (waiting)',
-          ),
-        );
-      } else if (state.pendingMessages) {
-        this.runForGroup(nextJid, 'drain').catch((err) =>
-          logger.error(
-            { groupJid: nextJid, err },
-            'Unhandled error in runForGroup (waiting)',
           ),
         );
       }

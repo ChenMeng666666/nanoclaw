@@ -29,7 +29,11 @@ export function safeJsonParse(json: string): unknown {
 /**
  * 安全地设置对象属性，防止原型链污染
  */
-export function safeSetProperty(obj: Record<string, unknown>, key: string, value: unknown): void {
+export function safeSetProperty(
+  obj: Record<string, unknown>,
+  key: string,
+  value: unknown,
+): void {
   if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
     logger.warn({ key }, 'Blocked attempt to set dangerous property');
     return;
@@ -77,15 +81,14 @@ export function sanitizeObject<T = unknown>(obj: T): T {
 /**
  * 验证用户输入是否包含潜在的恶意模式
  */
-export function validateUserInput(input: string): { valid: boolean; issues: string[] } {
+export function validateUserInput(input: string): {
+  valid: boolean;
+  issues: string[];
+} {
   const issues: string[] = [];
 
   // 检查原型链攻击模式
-  const protoPatterns = [
-    /__proto__/,
-    /constructor\s*\[/,
-    /prototype\s*\[/,
-  ];
+  const protoPatterns = [/__proto__/, /constructor\s*\[/, /prototype\s*\[/];
 
   for (const pattern of protoPatterns) {
     if (pattern.test(input)) {
@@ -102,7 +105,10 @@ export function validateUserInput(input: string): { valid: boolean; issues: stri
 /**
  * 安全的配置加载，验证并清理配置对象
  */
-export function safeLoadConfig<T>(rawConfig: unknown, validator: (config: unknown) => config is T): T | null {
+export function safeLoadConfig<T>(
+  rawConfig: unknown,
+  validator: (config: unknown) => config is T,
+): T | null {
   try {
     const sanitized = sanitizeObject(rawConfig);
     if (validator(sanitized)) {

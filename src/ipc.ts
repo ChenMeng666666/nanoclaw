@@ -73,7 +73,9 @@ export function startIpcWatcher(deps: IpcDeps): void {
           for (const file of messageFiles) {
             const filePath = path.join(messagesDir, file);
             try {
-              const data = safeJsonParse(fs.readFileSync(filePath, 'utf-8')) as {
+              const data = safeJsonParse(
+                fs.readFileSync(filePath, 'utf-8'),
+              ) as {
                 type?: string;
                 chatJid?: string;
                 text?: string;
@@ -128,7 +130,9 @@ export function startIpcWatcher(deps: IpcDeps): void {
           for (const file of taskFiles) {
             const filePath = path.join(tasksDir, file);
             try {
-              const data = safeJsonParse(fs.readFileSync(filePath, 'utf-8')) as any;
+              const data = safeJsonParse(
+                fs.readFileSync(filePath, 'utf-8'),
+              ) as any;
               // Pass source group identity to processTaskIpc for authorization
               await processTaskIpc(data, sourceGroup, isMain, deps);
               fs.unlinkSync(filePath);

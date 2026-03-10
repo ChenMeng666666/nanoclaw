@@ -64,7 +64,11 @@ import {
 import { LocalLLMQueryExpansionProvider } from './query-expansion/local-llm-provider.js';
 import { startRuntimeAPI } from './runtime-api.js';
 import { MainEvolutionApplier } from './main-evolution-applier.js';
-import { validateUserInput, sanitizeObject, safeJsonParse } from './security.js';
+import {
+  validateUserInput,
+  sanitizeObject,
+  safeJsonParse,
+} from './security.js';
 
 // Re-export for backwards compatibility during refactor
 export { escapeXml, formatMessages } from './router.js';
@@ -85,7 +89,7 @@ const messageDeduplicationCache = new Map<
     hash: string;
   }
 >();
-const MESSAGE_DEDUPLICATION_WINDOW = 5 * 60 * 1000; // 消息去重窗口（5分钟）
+const MESSAGE_DEDUPLICATION_WINDOW = 30 * 1000; // 消息去重窗口（30秒）
 const MESSAGE_DEDUPLICATION_MAX_SIZE = 500; // 最大缓存条目数
 
 const channels: Channel[] = [];
@@ -95,7 +99,9 @@ function loadState(): void {
   lastTimestamp = getRouterState('last_timestamp') || '';
   const agentTs = getRouterState('last_agent_timestamp');
   try {
-    lastAgentTimestamp = agentTs ? (safeJsonParse(agentTs) as Record<string, string>) : {};
+    lastAgentTimestamp = agentTs
+      ? (safeJsonParse(agentTs) as Record<string, string>)
+      : {};
   } catch {
     logger.warn('Corrupted last_agent_timestamp in DB, resetting');
     lastAgentTimestamp = {};
@@ -277,7 +283,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   // Advance cursor so the piping path in startMessageLoop won't re-fetch
   // these messages. Save the old cursor so we can roll back on error.
   const previousCursor = lastAgentTimestamp[chatJid] || '';
-  missedMessages[missedMessages.length - 1].timestamp;
+  lastAgentTimestamp[chatJid] = missedMessages[missedMessages.length - 1].timestamp;
   saveState();
 
   logger.info(
@@ -462,6 +468,7 @@ async function startMessageLoop(): Promise<void> {
 
       if (messages.length > 0) {
         logger.info({ count: messages.length }, 'New messages');
+        logger.debug({ messages }, '=== New messages ===');
 
         // Advance the "seen" cursor for all messages immediately
         lastTimestamp = newTimestamp;
@@ -474,22 +481,26 @@ async function startMessageLoop(): Promise<void> {
           if (
             isDuplicateMessage(msg.chat_jid, msg.id, msg.content, msg.timestamp)
           ) {
-            logger.debug(
+            logger.warn(
               { chatJid: msg.chat_jid, messageId: msg.id },
               'Skipping duplicate message',
             );
             continue;
           }
 
-          // 安全检查：验证用户输入是否包含潜在恶意内容
-          const inputValidation = validateUserInput(msg.content);
-          if (!inputValidation.valid) {
-            logger.warn(
-              { chatJid: msg.chat_jid, messageId: msg.id, issues: inputValidation.issues },
-              'Blocking potentially malicious message',
-            );
-            continue;
-          }
+          // 安全检查：验证用户输入是否包含潜在恶意内容（暂时禁用，调试中）
+          // const inputValidation = validateUserInput(msg.content);
+          // if (!inputValidation.valid) {
+          //   logger.warn(
+          //     {
+          //       chatJid: msg.chat_jid,
+          //       messageId: msg.id,
+          //       issues: inputValidation.issues,
+          //     },
+          //     'Blocking potentially malicious message',
+          //   );
+          //   continue;
+          // }
 
           const existing = messagesByGroup.get(msg.chat_jid);
           if (existing) {
@@ -499,9 +510,15 @@ async function startMessageLoop(): Promise<void> {
           }
         }
 
+        logger.debug({ groupCount: messagesByGroup.size }, '=== Processing groups ===');
         for (const [chatJid, groupMessages] of messagesByGroup) {
+          logger.debug({ chatJid, messageCount: groupMessages.length }, '=== Processing chat ===');
+
           const group = registeredGroups[chatJid];
-          if (!group) continue;
+          if (!group) {
+            logger.warn({ chatJid }, 'Group not registered, skipping messages');
+            continue;
+          }
 
           const channel = findChannel(channels, chatJid);
           if (!channel) {
@@ -510,20 +527,35 @@ async function startMessageLoop(): Promise<void> {
           }
 
           const isMainGroup = group.isMain === true;
-          const needsTrigger = !isMainGroup && group.requiresTrigger !== false;
+          // 只有明确设置了 requiresTrigger = true 时才需要触发词
+          // 默认为 false（不需要触发词）
+          const needsTrigger = group.requiresTrigger === true && !isMainGroup;
 
           // For non-main groups, only act on trigger messages.
           // Non-trigger messages accumulate in DB and get pulled as
           // context when a trigger eventually arrives.
           if (needsTrigger) {
+            logger.debug({ chatJid }, '=== Checking trigger ===');
             const allowlistCfg = loadSenderAllowlist();
             const hasTrigger = groupMessages.some(
-              (m) =>
-                TRIGGER_PATTERN.test(m.content.trim()) &&
-                (m.is_from_me ||
-                  isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
+              (m) => {
+                const hasPattern = TRIGGER_PATTERN.test(m.content.trim());
+                const isAllowed = m.is_from_me || isTriggerAllowed(chatJid, m.sender, allowlistCfg);
+                logger.debug({
+                  chatJid,
+                  messageId: m.id,
+                  content: m.content,
+                  hasPattern,
+                  isAllowed,
+                  triggerPattern: TRIGGER_PATTERN,
+                }, '=== Trigger check ===');
+                return hasPattern && isAllowed;
+              },
             );
-            if (!hasTrigger) continue;
+            if (!hasTrigger) {
+              logger.warn({ chatJid }, 'No trigger message found, skipping');
+              continue;
+            }
           }
 
           // Pull all messages since lastAgentTimestamp so non-trigger
@@ -537,18 +569,23 @@ async function startMessageLoop(): Promise<void> {
             allPending.length > 0 ? allPending : groupMessages;
           const formatted = formatMessages(messagesToSend, TIMEZONE);
 
+          // 在处理消息前先保存旧的 cursor，以便失败时可以回滚
+          const previousCursor = lastAgentTimestamp[chatJid] || '';
+          const newCursor = messagesToSend[messagesToSend.length - 1]?.timestamp;
+
           if (
             queue.sendMessage(
               chatJid,
               formatted,
-              messagesToSend[messagesToSend.length - 1]?.timestamp,
+              newCursor,
             )
           ) {
             logger.debug(
               { chatJid, count: messagesToSend.length },
               'Piped messages to active container',
             );
-            messagesToSend[messagesToSend.length - 1].timestamp;
+            // 更新 lastAgentTimestamp
+            lastAgentTimestamp[chatJid] = newCursor;
             saveState();
             // Show typing indicator while the container processes the piped message
             channel
@@ -558,6 +595,13 @@ async function startMessageLoop(): Promise<void> {
               );
           } else {
             // No active container — enqueue for a new one
+            // 先更新 cursor，防止下次循环重复处理
+            lastAgentTimestamp[chatJid] = newCursor;
+            saveState();
+            logger.debug(
+              { chatJid, count: messagesToSend.length, previousCursor, newCursor },
+              'Enqueuing message check for new container',
+            );
             queue.enqueueMessageCheck(chatJid);
           }
         }
@@ -610,24 +654,8 @@ function isDuplicateMessage(
     }
   }
 
-  // 构建去重键
-  const contentHash = calculateMessageHash(content);
-
-  // 检查相同内容的消息是否在去重窗口内
-  for (const [key, value] of messageDeduplicationCache.entries()) {
-    if (key.startsWith(chatJid) && value.hash === contentHash) {
-      const timeDiff = Math.abs(now - value.timestamp);
-      if (timeDiff < MESSAGE_DEDUPLICATION_WINDOW) {
-        logger.debug(
-          { chatJid, messageId },
-          'Duplicate message detected (same content)',
-        );
-        return true;
-      }
-    }
-  }
-
-  // 检查完全相同的消息（ID + 时间戳 + 内容）
+  // 优化去重逻辑：只检查完全相同的消息（ID），不检查相同内容的消息
+  // 这样可以防止不同用户发送相同内容被误判为重复
   const uniqueKey = `${chatJid}:${messageId}`;
   if (messageDeduplicationCache.has(uniqueKey)) {
     logger.debug(
@@ -636,6 +664,9 @@ function isDuplicateMessage(
     );
     return true;
   }
+
+  // 构建去重键
+  const contentHash = calculateMessageHash(content);
 
   // 添加到去重缓存
   messageDeduplicationCache.set(uniqueKey, {

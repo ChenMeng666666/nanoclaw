@@ -60,10 +60,7 @@ export class SharedStateManager {
   ): BM25Index {
     if (bm25IndexCache.has(agentFolder)) {
       stats.bm25CacheHits++;
-      logger.debug(
-        { agentFolder },
-        'BM25 index from shared cache',
-      );
+      logger.debug({ agentFolder }, 'BM25 index from shared cache');
       return bm25IndexCache.get(agentFolder)!;
     }
 
