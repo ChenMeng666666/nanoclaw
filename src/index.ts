@@ -59,9 +59,7 @@ import {
   DefaultContextEngine,
   createDefaultContextEngine,
 } from './context-engine/default-engine.js';
-import {
-  LocalLLMQueryExpansionProvider,
-} from './query-expansion/local-llm-provider.js';
+import { LocalLLMQueryExpansionProvider } from './query-expansion/local-llm-provider.js';
 import { startRuntimeAPI } from './runtime-api.js';
 import { MainEvolutionApplier } from './main-evolution-applier.js';
 
@@ -118,6 +116,66 @@ function registerGroup(jid: string, group: RegisteredGroup): void {
 
   // Create group folder
   fs.mkdirSync(path.join(groupDir, 'logs'), { recursive: true });
+
+  // 预先设置学习体系模板（可选，agent-learning skill 会自动初始化）
+  // 复制默认配置和脚本到新 group，让新 agent 一开始就有学习体系可用
+  const learningSystemDir = path.join(groupDir, '.learning-system');
+  const skillConfigDir = path.join(process.cwd(), 'container/skills/agent-learning/config');
+  const skillScriptDir = path.join(process.cwd(), 'container/skills/agent-learning/scripts');
+
+  if (fs.existsSync(skillConfigDir) && !fs.existsSync(learningSystemDir)) {
+    try {
+      // 创建学习体系目录结构
+      fs.mkdirSync(path.join(learningSystemDir, 'config'), { recursive: true });
+      fs.mkdirSync(path.join(learningSystemDir, 'scripts'), { recursive: true });
+      fs.mkdirSync(path.join(learningSystemDir, 'cron'), { recursive: true });
+      fs.mkdirSync(path.join(learningSystemDir, 'status'), { recursive: true });
+      fs.mkdirSync(path.join(learningSystemDir, 'plans'), { recursive: true });
+      fs.mkdirSync(path.join(learningSystemDir, 'reflections'), { recursive: true });
+
+      // 复制配置和脚本
+      if (fs.existsSync(skillConfigDir)) {
+        const configFiles = fs.readdirSync(skillConfigDir);
+        configFiles.forEach(file => {
+          const src = path.join(skillConfigDir, file);
+          const dest = path.join(learningSystemDir, 'config', file);
+          if (fs.statSync(src).isFile()) {
+            fs.copyFileSync(src, dest);
+          }
+        });
+      }
+
+      if (fs.existsSync(skillScriptDir)) {
+        const scriptFiles = fs.readdirSync(skillScriptDir);
+        scriptFiles.forEach(file => {
+          const src = path.join(skillScriptDir, file);
+          const dest = path.join(learningSystemDir, 'scripts', file);
+          if (fs.statSync(src).isFile()) {
+            fs.copyFileSync(src, dest);
+            fs.chmodSync(dest, '755');
+          }
+        });
+
+        // 同时复制 init.sh 到根目录
+        const initScriptSrc = path.join(skillScriptDir, 'init.sh');
+        const initScriptDest = path.join(learningSystemDir, 'init.sh');
+        if (fs.existsSync(initScriptSrc)) {
+          fs.copyFileSync(initScriptSrc, initScriptDest);
+          fs.chmodSync(initScriptDest, '755');
+        }
+      }
+
+      logger.info(
+        { jid, name: group.name, folder: group.folder },
+        'Learning system template initialized for new group',
+      );
+    } catch (err) {
+      logger.warn(
+        { jid, name: group.name, err: err instanceof Error ? err.message : String(err) },
+        'Failed to initialize learning system template, will use skill auto-init',
+      );
+    }
+  }
 
   logger.info(
     { jid, name: group.name, folder: group.folder },
@@ -489,7 +547,8 @@ function ensureContainerSystemRunning(): void {
 let localLLMProvider: LocalLLMQueryExpansionProvider | null = null;
 
 async function setupLocalLLMQueryExpansion(): Promise<void> {
-  const modelPath = process.env.LOCAL_LLM_MODEL_PATH || './model/Qwen3.5-2B-Q4_K_M.gguf';
+  const modelPath =
+    process.env.LOCAL_LLM_MODEL_PATH || './model/Qwen3.5-2B_Abliterated.Q4_K_M.gguf';
 
   try {
     localLLMProvider = new LocalLLMQueryExpansionProvider({
