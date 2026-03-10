@@ -7,7 +7,9 @@ import {
   POLL_INTERVAL,
   TIMEZONE,
   TRIGGER_PATTERN,
+  validateAllConfig,
 } from './config.js';
+import { preloadRoutingCache } from './db-routing.js';
 import './channels/index.js';
 import {
   getChannelFactory,
@@ -73,6 +75,14 @@ let lastAgentTimestamp: Record<string, string> = {};
 // ContextEngine 实例映射（按 agentFolder）
 const contextEngines = new Map<string, DefaultContextEngine>();
 let messageLoopRunning = false;
+
+// 消息去重缓存
+const messageDeduplicationCache = new Map<string, {
+  timestamp: number;
+  hash: string;
+}>();
+const MESSAGE_DEDUPLICATION_WINDOW = 5 * 60 * 1000; // 消息去重窗口（5分钟）
+const MESSAGE_DEDUPLICATION_MAX_SIZE = 500; // 最大缓存条目数
 
 const channels: Channel[] = [];
 const queue = new GroupQueue();
@@ -453,9 +463,15 @@ async function startMessageLoop(): Promise<void> {
         lastTimestamp = newTimestamp;
         saveState();
 
-        // Deduplicate by group
+        // Deduplicate messages by group and content
         const messagesByGroup = new Map<string, NewMessage[]>();
         for (const msg of messages) {
+          // 检查消息是否重复
+          if (isDuplicateMessage(msg.chat_jid, msg.id, msg.content, msg.timestamp)) {
+            logger.debug({ chatJid: msg.chat_jid, messageId: msg.id }, 'Skipping duplicate message');
+            continue;
+          }
+
           const existing = messagesByGroup.get(msg.chat_jid);
           if (existing) {
             existing.push(msg);
@@ -535,6 +551,74 @@ async function startMessageLoop(): Promise<void> {
 }
 
 /**
+ * 计算消息的哈希值（用于去重）
+ */
+function calculateMessageHash(content: string): string {
+  const crypto = require('crypto');
+  return crypto.createHash('md5').update(content.trim().toLowerCase()).digest('hex');
+}
+
+/**
+ * 检查消息是否重复
+ */
+function isDuplicateMessage(
+  chatJid: string,
+  messageId: string,
+  content: string,
+  timestamp: string,
+): boolean {
+  const now = Date.now();
+  const messageTime = new Date(timestamp).getTime();
+
+  // 清理过期的缓存条目
+  for (const [key, value] of messageDeduplicationCache.entries()) {
+    if (now - value.timestamp > MESSAGE_DEDUPLICATION_WINDOW) {
+      messageDeduplicationCache.delete(key);
+    }
+  }
+
+  // 检查缓存大小
+  if (messageDeduplicationCache.size >= MESSAGE_DEDUPLICATION_MAX_SIZE) {
+    // 清理最旧的条目
+    const oldest = [...messageDeduplicationCache.entries()].sort(
+      (a, b) => a[1].timestamp - b[1].timestamp
+    ).slice(0, Math.ceil(MESSAGE_DEDUPLICATION_MAX_SIZE * 0.1));
+    for (const [key] of oldest) {
+      messageDeduplicationCache.delete(key);
+    }
+  }
+
+  // 构建去重键
+  const contentHash = calculateMessageHash(content);
+
+  // 检查相同内容的消息是否在去重窗口内
+  for (const [key, value] of messageDeduplicationCache.entries()) {
+    if (key.startsWith(chatJid) && value.hash === contentHash) {
+      const timeDiff = Math.abs(now - value.timestamp);
+      if (timeDiff < MESSAGE_DEDUPLICATION_WINDOW) {
+        logger.debug({ chatJid, messageId }, 'Duplicate message detected (same content)');
+        return true;
+      }
+    }
+  }
+
+  // 检查完全相同的消息（ID + 时间戳 + 内容）
+  const uniqueKey = `${chatJid}:${messageId}`;
+  if (messageDeduplicationCache.has(uniqueKey)) {
+    logger.debug({ chatJid, messageId }, 'Duplicate message detected (same ID)');
+    return true;
+  }
+
+  // 添加到去重缓存
+  messageDeduplicationCache.set(uniqueKey, {
+    timestamp: messageTime,
+    hash: contentHash,
+  });
+
+  return false;
+}
+
+/**
  * Startup recovery: check for unprocessed messages in registered groups.
  * Handles crash between advancing lastTimestamp and processing messages.
  */
@@ -603,9 +687,21 @@ function setupLocalLLMQueryExpansionInBackground(): void {
 }
 
 async function main(): Promise<void> {
+  // 配置验证
+  const configValid = validateAllConfig();
+  if (!configValid) {
+    logger.fatal('Critical configuration errors, cannot start');
+    process.exit(1);
+  }
+  logger.info('Configuration validation passed');
+
   ensureContainerSystemRunning();
   initDatabase();
   logger.info('Database initialized');
+
+  // 预加载路由绑定缓存
+  preloadRoutingCache();
+
   loadState();
 
   // 在后台设置本地 LLM 查询扩展，不阻塞启动

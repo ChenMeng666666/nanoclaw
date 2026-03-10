@@ -1,4 +1,5 @@
 import { getDatabase } from './db-agents.js';
+import { logger } from './logger.js';
 
 /**
  * 路由绑定接口
@@ -11,6 +12,93 @@ export interface RoutingBinding {
   sessionKey?: string; // 绑定的 session key
   createdAt: string;
   updatedAt: string;
+}
+
+// 路由绑定缓存
+interface CachedBinding {
+  agentId: string;
+  sessionKey?: string;
+  updatedAt: string;
+}
+
+const routingCache = new Map<string, CachedBinding>();
+let cacheLoaded = false;
+const cacheListeners: Array<() => void> = [];
+
+/**
+ * 生成缓存键
+ */
+function getCacheKey(channelType: string, threadId: string): string {
+  return `${channelType}:${threadId}`;
+}
+
+/**
+ * 预加载所有路由绑定到缓存
+ */
+export function preloadRoutingCache(): void {
+  if (cacheLoaded) {
+    logger.debug('Routing cache already loaded');
+    return;
+  }
+
+  try {
+    const db = getDatabase();
+    const rows = db
+      .prepare('SELECT channel_type, thread_id, agent_id, session_key, updated_at FROM routing_bindings')
+      .all() as Array<{
+        channel_type: string;
+        thread_id: string;
+        agent_id: string;
+        session_key: string | null;
+        updated_at: string;
+      }>;
+
+    routingCache.clear();
+    for (const row of rows) {
+      const cacheKey = getCacheKey(row.channel_type, row.thread_id);
+      routingCache.set(cacheKey, {
+        agentId: row.agent_id,
+        sessionKey: row.session_key || undefined,
+        updatedAt: row.updated_at,
+      });
+    }
+
+    cacheLoaded = true;
+    logger.info({ count: routingCache.size }, 'Routing cache preloaded');
+
+    // 通知监听器
+    for (const listener of cacheListeners) {
+      try {
+        listener();
+      } catch (err) {
+        logger.warn({ err }, 'Error in cache listener');
+      }
+    }
+  } catch (err) {
+    logger.error({ err }, 'Failed to preload routing cache');
+  }
+}
+
+/**
+ * 清除路由缓存
+ */
+export function clearRoutingCache(): void {
+  routingCache.clear();
+  cacheLoaded = false;
+  logger.debug('Routing cache cleared');
+}
+
+/**
+ * 添加缓存变更监听器
+ */
+export function addCacheListener(listener: () => void): () => void {
+  cacheListeners.push(listener);
+  return () => {
+    const idx = cacheListeners.indexOf(listener);
+    if (idx !== -1) {
+      cacheListeners.splice(idx, 1);
+    }
+  };
 }
 
 /**
@@ -40,6 +128,19 @@ export function createRoutingBinding(binding: {
     now,
     now,
   );
+
+  // 更新缓存
+  const cacheKey = getCacheKey(binding.channelType, binding.threadId);
+  routingCache.set(cacheKey, {
+    agentId: binding.agentId,
+    sessionKey: binding.sessionKey,
+    updatedAt: now,
+  });
+
+  logger.debug(
+    { channelType: binding.channelType, threadId: binding.threadId, agentId: binding.agentId },
+    'Routing binding created/updated',
+  );
 }
 
 /**
@@ -50,25 +151,51 @@ export function getRoutingBinding(
   channelType: string,
   threadId: string,
 ): { agentId: string; sessionKey?: string } | null {
+  // 确保缓存已加载
+  if (!cacheLoaded) {
+    preloadRoutingCache();
+  }
+
+  const cacheKey = getCacheKey(channelType, threadId);
+  const cached = routingCache.get(cacheKey);
+
+  if (cached) {
+    logger.debug(
+      { channelType, threadId, agentId: cached.agentId },
+      'Route binding from cache',
+    );
+    return {
+      agentId: cached.agentId,
+      sessionKey: cached.sessionKey,
+    };
+  }
+
+  logger.debug({ channelType, threadId }, 'Route binding not in cache, querying DB');
+
   const db = getDatabase();
   const row = db
     .prepare(
       `
-    SELECT agent_id, session_key
+    SELECT agent_id, session_key, updated_at
     FROM routing_bindings
     WHERE channel_type = ? AND thread_id = ?
   `,
     )
     .get(channelType, threadId) as
-    | { agent_id: string; session_key: string | null }
+    | { agent_id: string; session_key: string | null; updated_at: string }
     | undefined;
 
   if (!row) return null;
 
-  return {
+  // 更新缓存
+  const binding: CachedBinding = {
     agentId: row.agent_id,
     sessionKey: row.session_key || undefined,
+    updatedAt: row.updated_at,
   };
+  routingCache.set(cacheKey, binding);
+
+  return binding;
 }
 
 /**
@@ -85,6 +212,15 @@ export function deleteRoutingBinding(
     WHERE channel_type = ? AND thread_id = ?
   `,
   ).run(channelType, threadId);
+
+  // 从缓存中删除
+  const cacheKey = getCacheKey(channelType, threadId);
+  routingCache.delete(cacheKey);
+
+  logger.debug(
+    { channelType, threadId },
+    'Routing binding deleted from cache',
+  );
 }
 
 /**
@@ -104,6 +240,22 @@ export function updateRoutingBindingSession(
     WHERE channel_type = ? AND thread_id = ?
   `,
   ).run(sessionKey, now, channelType, threadId);
+
+  // 更新缓存
+  const cacheKey = getCacheKey(channelType, threadId);
+  const existing = routingCache.get(cacheKey);
+  if (existing) {
+    routingCache.set(cacheKey, {
+      ...existing,
+      sessionKey,
+      updatedAt: now,
+    });
+  }
+
+  logger.debug(
+    { channelType, threadId, sessionKey },
+    'Routing binding session key updated',
+  );
 }
 
 /**

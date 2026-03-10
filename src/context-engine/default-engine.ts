@@ -26,20 +26,54 @@ import {
 import { generateEmbedding as generateEmbeddingFromProvider } from '../embedding-providers/registry.js';
 
 // 嵌入缓存（避免重复计算）
-const embeddingCache = new Map<string, number[]>();
+const embeddingCache = new Map<string, {
+  embedding: number[];
+  timestamp: number;
+  usageCount: number;
+}>();
+
+// 缓存配置
+const EMBEDDING_CACHE_MAX_SIZE = 1000; // 最大缓存条目数
+const EMBEDDING_CACHE_TTL = 24 * 60 * 60 * 1000; // 缓存过期时间（24小时）
 
 /**
  * 生成文本的向量嵌入
  */
 async function generateEmbedding(text: string): Promise<number[]> {
   const cacheKey = crypto.createHash('md5').update(text).digest('hex');
-  if (embeddingCache.has(cacheKey)) {
-    return embeddingCache.get(cacheKey)!;
+
+  // 检查缓存是否有效
+  const cached = embeddingCache.get(cacheKey);
+  if (cached) {
+    const now = Date.now();
+    if (now - cached.timestamp < EMBEDDING_CACHE_TTL) {
+      // 更新使用计数
+      embeddingCache.set(cacheKey, {
+        ...cached,
+        usageCount: cached.usageCount + 1,
+      });
+      return cached.embedding;
+    } else {
+      // 过期的缓存条目
+      embeddingCache.delete(cacheKey);
+    }
   }
 
   try {
     const embedding = await generateEmbeddingFromProvider(text);
-    embeddingCache.set(cacheKey, embedding);
+
+    // 检查是否需要清理缓存
+    if (embeddingCache.size >= EMBEDDING_CACHE_MAX_SIZE) {
+      evictOldestCacheEntries();
+    }
+
+    // 存储到缓存
+    embeddingCache.set(cacheKey, {
+      embedding,
+      timestamp: Date.now(),
+      usageCount: 1,
+    });
+
     return embedding;
   } catch (err) {
     logger.error(
@@ -48,6 +82,31 @@ async function generateEmbedding(text: string): Promise<number[]> {
     );
     return [];
   }
+}
+
+/**
+ * 清除最旧的缓存条目
+ */
+function evictOldestCacheEntries(): void {
+  const entries = Array.from(embeddingCache.entries());
+  // 按使用计数和时间戳排序：使用次数少且时间旧的先删除
+  entries.sort((a, b) => {
+    if (a[1].usageCount !== b[1].usageCount) {
+      return a[1].usageCount - b[1].usageCount;
+    }
+    return a[1].timestamp - b[1].timestamp;
+  });
+
+  // 删除最旧的 10% 条目
+  const numToEvict = Math.ceil(entries.length * 0.1);
+  for (let i = 0; i < numToEvict; i++) {
+    embeddingCache.delete(entries[i][0]);
+  }
+
+  logger.debug(
+    { evicted: numToEvict, remaining: embeddingCache.size },
+    'Embedding cache evicted old entries',
+  );
 }
 
 /**
@@ -106,7 +165,7 @@ export class DefaultContextEngine implements ContextEngine {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         messageType: chunk.type,
-        timestampWeight: this.calculateTimestampWeight(),
+        timestampWeight: this.calculateTimestampWeight(message.timestamp),
         sessionId: context.sessionId,
         tags: this.extractTags(chunk.content),
         sourceType: 'direct',
@@ -312,13 +371,28 @@ export class DefaultContextEngine implements ContextEngine {
    * 计算时间戳权重（用于排序）
    * 越新的消息权重越高
    */
-  private calculateTimestampWeight(): number {
+  private calculateTimestampWeight(messageTimestamp?: string | Date): number {
     const now = Date.now();
     const hourInMs = 60 * 60 * 1000;
     const dayInMs = 24 * hourInMs;
 
+    let messageTime: number;
+    try {
+      if (messageTimestamp) {
+        messageTime = typeof messageTimestamp === 'string'
+          ? new Date(messageTimestamp).getTime()
+          : messageTimestamp.getTime();
+      } else {
+        // 如果没有提供消息时间戳，使用当前时间
+        messageTime = now;
+      }
+    } catch (err) {
+      logger.warn({ err, messageTimestamp }, 'Invalid message timestamp, using current time');
+      messageTime = now;
+    }
+
     // 权重随时间衰减：最近1小时 = 1.0，最近24小时 = 0.8，1周 = 0.5，更早 = 0.3
-    const timePassed = now - new Date().getTime(); // 这里应该使用消息时间戳，暂时用当前时间
+    const timePassed = now - messageTime;
     if (timePassed < hourInMs) {
       return 1.0;
     } else if (timePassed < dayInMs) {
@@ -618,7 +692,7 @@ export class DefaultContextEngine implements ContextEngine {
 
   /**
    * 结果重排序
-   * 基于内容相关性对 RRF 结果进行二次排序
+   * 基于内容相关性对 RRF 结果进行二次排序，同时考虑时间戳权重和重要性
    */
   private reRankResults(
     results: any[],
@@ -627,31 +701,45 @@ export class DefaultContextEngine implements ContextEngine {
   ): string[] {
     // 获取所有记忆内容
     const allMemories = getMemories(this.agentFolder);
-    const memoryMap = new Map<string, string>();
+    const memoryMap = new Map<string, Memory>();
     for (const memory of allMemories) {
-      memoryMap.set(memory.id, memory.content);
+      memoryMap.set(memory.id, memory);
     }
 
-    // 对结果进行二次排序：结合 RRF 分数和内容相似度
+    // 对结果进行二次排序：结合 RRF 分数、内容相似度、时间戳权重和重要性
     const scoredResults = results.map((result) => {
-      const memoryContent = memoryMap.get(result.id);
-      if (!memoryContent) {
+      const memory = memoryMap.get(result.id);
+      if (!memory) {
         return { ...result, finalScore: result.fusedScore };
       }
 
       // 计算内容相似度（简单的词重叠分数）
       const queryWords = new Set(query.toLowerCase().split(/\s+/));
-      const contentWords = new Set(memoryContent.toLowerCase().split(/\s+/));
+      const contentWords = new Set(memory.content.toLowerCase().split(/\s+/));
       const overlap = [...queryWords].filter((word) =>
         contentWords.has(word),
       ).length;
       const overlapScore =
         overlap / Math.sqrt(queryWords.size * contentWords.size);
 
-      // 结合分数
-      const finalScore = result.fusedScore * (0.7 + 0.3 * overlapScore);
+      // 获取时间戳权重（如果记忆中没有，使用默认值）
+      const timestampWeight = memory.timestampWeight || 0.5;
 
-      return { ...result, finalScore };
+      // 获取重要性（如果记忆中没有，使用默认值）
+      const importance = memory.importance || 0.5;
+
+      // 结合分数：
+      // - 40% RRF 分数（原始搜索相关性）
+      // - 25% 内容重叠分数（查询词匹配）
+      // - 20% 时间戳权重（新鲜度）
+      // - 15% 重要性（记忆的重要程度）
+      const finalScore =
+        result.fusedScore * 0.4 +
+        overlapScore * 0.25 +
+        timestampWeight * 0.2 +
+        importance * 0.15;
+
+      return { ...result, finalScore, memory };
     });
 
     // 按最终分数排序并返回前 N 个
