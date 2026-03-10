@@ -721,6 +721,74 @@ export function startRuntimeAPI(
         return;
       }
 
+      // ===== 学习体系 API =====
+
+      // 获取学习体系版本
+      if (path === '/api/learning/system/version' && req.method === 'GET') {
+        const LATEST_VERSION = '1.1';
+        writeJSON(res, 200, {
+          version: LATEST_VERSION,
+          releaseDate: '2026-03-10',
+          features: [
+            '增强版本管理和增量更新',
+            '学习体系版本API',
+            '优化同步钩子',
+          ],
+        });
+        return;
+      }
+
+      // 触发学习体系更新
+      if (path === '/api/learning/system/update' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { agentFolder } = body;
+
+        if (!agentFolder) {
+          writeJSON(res, 400, { error: 'Missing agentFolder' });
+          return;
+        }
+
+        // 模拟学习体系更新
+        writeJSON(res, 200, {
+          status: 'updated',
+          version: '1.1',
+          message: '学习体系已更新到最新版本',
+          agentFolder,
+        });
+        return;
+      }
+
+      // 获取版本差异
+      if (path === '/api/learning/system/diff' && req.method === 'GET') {
+        const fromVersion = url.searchParams.get('fromVersion') || '1.0';
+        const toVersion = url.searchParams.get('toVersion') || '1.1';
+
+        writeJSON(res, 200, {
+          fromVersion,
+          toVersion,
+          changes: [
+            {
+              file: 'config.json',
+              type: 'modified',
+              description: '添加迁移历史记录字段',
+            },
+            {
+              file: 'init.sh',
+              type: 'modified',
+              description: '增强版本管理和增量更新功能',
+            },
+            {
+              file: 'post-load.sh',
+              type: 'modified',
+              description: '优化同步钩子，添加增量同步',
+            },
+          ],
+          breakingChanges: [],
+          migrationSteps: ['检查当前版本', '备份配置文件', '执行版本迁移', '验证更新结果'],
+        });
+        return;
+      }
+
       // ===== 信号提取 API =====
 
       if (path === '/api/signals/extract' && req.method === 'POST') {

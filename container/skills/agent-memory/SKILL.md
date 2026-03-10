@@ -181,6 +181,205 @@ curl -X POST http://host.docker.internal:3456/api/evolution/feedback \
 
 ---
 
+## 信号提取系统
+
+信号提取系统用于从对话内容和记忆中提取关键信号，这些信号可以用于进化系统的基因选择。
+
+### API 端点
+
+#### POST /api/signals/extract
+
+从内容中提取信号
+
+```bash
+curl -X POST http://host.docker.internal:3456/api/signals/extract \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "用户询问了关于 Python 数据分析的问题，我提供了使用 pandas 的解决方案，但用户反馈说 pandas 的性能不够好，需要更快的方法。",
+    "memorySnippet": "之前处理过类似的数据分析问题，使用过 numba 进行加速",
+    "language": "zh-CN"
+  }'
+```
+
+**参数**：
+- `content` (必需): 要分析的内容文本
+- `memorySnippet` (可选): 相关的记忆片段，用于上下文分析
+- `language` (可选): 语言代码 (en/zh-CN/zh-TW/ja)
+
+**响应**：
+```json
+{
+  "signals": [
+    {
+      "type": "performance",
+      "content": "性能问题，pandas 速度不够",
+      "confidence": 0.9
+    },
+    {
+      "type": "optimization",
+      "content": "需要优化方案",
+      "confidence": 0.85
+    },
+    {
+      "type": "tool",
+      "content": "涉及 pandas 工具",
+      "confidence": 0.8
+    }
+  ]
+}
+```
+
+### 信号类型
+
+| 信号类型 | 描述 | 应用场景 |
+|---------|------|---------|
+| `performance` | 性能相关问题 | 性能优化、代码加速 |
+| `bug` | Bug 或错误 | 修复问题、代码调试 |
+| `optimization` | 优化机会 | 代码优化、效率提升 |
+| `feature` | 新功能需求 | 功能开发、创新改进 |
+| `learn` | 学习需求 | 知识获取、技能提升 |
+| `tool` | 工具使用 | 工具选择、技术栈优化 |
+| `complexity` | 复杂度问题 | 代码重构、架构改进 |
+| `security` | 安全相关 | 安全加固、漏洞修复 |
+
+---
+
+## 饱和检测系统
+
+饱和检测系统用于监控学习进度，检测是否进入学习饱和状态，提供相应的应对策略。
+
+### API 端点
+
+#### GET /api/saturation/detect
+
+检测学习饱和状态
+
+```bash
+curl -G "http://host.docker.internal:3456/api/saturation/detect" \
+  --data-urlencode "agentFolder=andy" \
+  --data-urlencode "limit=20"
+```
+
+**参数**：
+- `agentFolder` (可选): 指定 agent 的 folder，如果不指定则返回全局状态
+- `limit` (可选): 分析的历史记录数量，默认 10
+
+**响应**：
+```json
+{
+  "state": {
+    "status": "healthy",
+    "saturationLevel": 0.3,
+    "keepRate": 0.7,
+    "discardRate": 0.2,
+    "crashRate": 0.1,
+    "recentResults": 20,
+    "trend": "improving",
+    "recommendedAction": "continue_learning"
+  },
+  "summary": {
+    "overallStatus": "健康 - 学习进展顺利",
+    "keyInsights": [
+      "保持率较高 (70%)，学习效果良好",
+      "趋势向好，继续当前学习方向",
+      "建议保持当前学习节奏"
+    ],
+    "recommendedStrategies": [
+      "继续当前的学习计划",
+      "尝试更具挑战性的任务",
+      "定期回顾和总结已学内容"
+    ]
+  }
+}
+```
+
+### 饱和状态
+
+| 状态 | 描述 | 推荐操作 |
+|------|------|---------|
+| `healthy` | 学习状态健康 | continue_learning |
+| `warning` | 接近饱和状态 | adjust_approach |
+| `saturated` | 已进入饱和状态 | change_focus, take_break |
+| `stagnant` | 学习停滞 | reset_strategy, seek_help |
+
+### 应对策略
+
+```typescript
+// 根据饱和状态选择应对策略
+function getStrategy(state: SaturationState): GeneCategory {
+  switch (state.status) {
+    case 'healthy':
+      // 健康状态：继续优化和学习
+      return state.saturationLevel > 0.5 ? 'optimize' : 'learn';
+    case 'warning':
+      // 警告状态：尝试创新方法
+      return 'innovate';
+    case 'saturated':
+    case 'stagnant':
+      // 饱和/停滞：修复问题或重新开始
+      return 'repair';
+    default:
+      return 'learn';
+  }
+}
+```
+
+---
+
+## 基因选择系统
+
+基因选择系统根据提取的信号推荐合适的进化基因类别。
+
+### API 端点
+
+#### POST /api/evolution/select-gene
+
+根据信号选择推荐的基因
+
+```bash
+curl -X POST http://host.docker.internal:3456/api/evolution/select-gene \
+  -H "Content-Type: application/json" \
+  -d '{
+    "signals": [
+      {"type": "performance", "content": "性能问题"},
+      {"type": "optimization", "content": "需要优化"}
+    ],
+    "category": "optimize"
+  }'
+```
+
+**参数**：
+- `signals` (可选): 提取的信号列表
+- `category` (可选): 强制指定基因类别
+
+**响应**：
+```json
+{
+  "category": "optimize",
+  "genes": [
+    {
+      "id": 123,
+      "abilityName": "Python 性能优化技巧",
+      "content": "使用 numba 加速 pandas 操作...",
+      "tags": ["性能优化", "Python", "pandas"],
+      "category": "optimize"
+    }
+  ],
+  "count": 5
+}
+```
+
+### 基因类别
+
+| 类别 | 描述 | 适用场景 |
+|------|------|---------|
+| `repair` | 修复基因 | 修复 Bug、解决问题 |
+| `optimize` | 优化基因 | 性能优化、效率提升 |
+| `innovate` | 创新基因 | 新功能开发、创新改进 |
+| `learn` | 学习基因 | 知识获取、技能提升 |
+
+---
+
 ## 代码示例
 
 ### TypeScript
