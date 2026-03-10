@@ -1,14 +1,59 @@
 ---
 name: scrapling
-description: Python 网页爬虫框架 - 支持静态/动态网页爬取、CSS/XPath 选择器、反爬虫绕过
+description: 网页爬取工具集 - Scrapling MCP（推荐）、Python 爬虫框架、轻量级方案
 trigger: 需要爬取网页内容、采集数据、提取网页信息时自动触发
-tools: Bash(curl), Python
+tools: Bash(curl), Python, mcp_scrapling
 ---
 
 # Scrapling 网页爬虫技能
 
 ## 概述
 
+提供多种网页爬取方案，按推荐优先级排序：
+
+### 🏆 **首选：Scrapling MCP 服务**（推荐）
+Scrapling MCP 是一个独立运行的网页爬取服务，提供以下功能：
+- 静态网页爬取（HTTP）
+- 动态网页爬取（JavaScript 渲染）
+- 自动分页抓取
+- Markdown/HTML 多种输出格式
+- 服务地址：`http://localhost:8008`
+
+**使用 Scrapling MCP（强烈推荐）**：
+
+```python
+# 方式 1：静态爬取
+result = mcp_scrapling_scrape({
+  "url": "https://example.com",
+  "render": False,
+  "output_format": "markdown"
+})
+
+# 方式 2：动态渲染（JavaScript）
+result = mcp_scrapling_scrape({
+  "url": "https://example.com",
+  "render": True,
+  "wait_for": 3000,  # 等待 3 秒让 JS 执行
+  "output_format": "markdown"
+})
+
+# 方式 3：自动分页抓取
+result = mcp_scrapling_crawl({
+  "start_url": "https://example.com/blog",
+  "pagination_selector": ".next-page",
+  "max_pages": 5,
+  "render": True
+})
+
+# 访问结果
+print(result["content"])  # 爬取的内容
+print(result["url"])      # 实际 URL
+print(result["title"])    # 页面标题
+```
+
+---
+
+### 🥈 **备选：Python 爬虫框架**
 Scrapling 是一个功能强大的 Python 网页爬虫框架，支持：
 - 静态网页爬取（HTTP）
 - 动态网页爬取（JavaScript 渲染）
@@ -143,7 +188,23 @@ curl -s "https://example.com" | grep -o "<title>.*</title>" | sed 's/<title>\(.*
 
 ## 推荐用法
 
-**优先使用轻量级方案**：对于 99% 的场景，使用 **requests + BeautifulSoup** 就足够了，它更稳定、更易调试。
+**优先使用 Scrapling MCP**：对于大多数场景，使用 **Scrapling MCP** 是最佳选择，它支持动态渲染和自动分页。
+
+```python
+# 推荐方式：使用 Scrapling MCP
+result = mcp_scrapling_scrape({
+  "url": "https://example.com",
+  "render": True,  # 启用 JavaScript 渲染
+  "output_format": "markdown"
+})
+
+print("=== Title ===")
+print(result["title"])
+print("\n=== Content ===")
+print(result["content"][:500])
+```
+
+**备选轻量级方案**：如果 MCP 不可用，使用 **requests + BeautifulSoup**，它更稳定、更易调试。
 
 ```bash
 # 使用 Bash 方式快速调用

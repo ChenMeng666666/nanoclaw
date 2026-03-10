@@ -784,7 +784,12 @@ export function startRuntimeAPI(
             },
           ],
           breakingChanges: [],
-          migrationSteps: ['检查当前版本', '备份配置文件', '执行版本迁移', '验证更新结果'],
+          migrationSteps: [
+            '检查当前版本',
+            '备份配置文件',
+            '执行版本迁移',
+            '验证更新结果',
+          ],
         });
         return;
       }
