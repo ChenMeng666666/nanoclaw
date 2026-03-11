@@ -46,12 +46,12 @@ function checkDependenciesSatisfied(task: CollaborationTask): boolean {
 /**
  * 分配任务给智能体
  */
-function assignTaskToAgents(task: CollaborationTask, team: TeamState | null): void {
+function assignTaskToAgents(
+  task: CollaborationTask,
+  team: TeamState | null,
+): void {
   if (task.assignedAgents.length === 0) {
-    logger.warn(
-      { taskId: task.id },
-      'No agents assigned to task, skipping',
-    );
+    logger.warn({ taskId: task.id }, 'No agents assigned to task, skipping');
     return;
   }
 
@@ -123,10 +123,7 @@ function processCollaborationTask(task: CollaborationTask): void {
       // 分配任务给智能体
       assignTaskToAgents(task, team);
     } else {
-      logger.debug(
-        { taskId: task.id },
-        'Task waiting for dependencies',
-      );
+      logger.debug({ taskId: task.id }, 'Task waiting for dependencies');
     }
   }
 
@@ -140,10 +137,7 @@ function processCollaborationTask(task: CollaborationTask): void {
       updateCollaborationTask(task.id, {
         status: 'failed',
       });
-      logger.warn(
-        { taskId: task.id },
-        'Task timed out, marked as failed',
-      );
+      logger.warn({ taskId: task.id }, 'Task timed out, marked as failed');
     }
   }
 }
@@ -182,7 +176,9 @@ async function runCollaborationSchedulerLoop(): Promise<void> {
  */
 export function startCollaborationScheduler(): void {
   if (schedulerRunning) {
-    logger.debug('Collaboration scheduler already running, skipping duplicate start');
+    logger.debug(
+      'Collaboration scheduler already running, skipping duplicate start',
+    );
     return;
   }
 
@@ -276,7 +272,7 @@ export function createCollaborationTaskWithAssignment(
     context: taskData.context,
   };
 
-  // 我们需要导入这个函数 - 添加到导入并实现
-  // 这里我们需要创建一个函数来导入
+  createCollaborationTask(fullTask);
+
   return taskId;
 }

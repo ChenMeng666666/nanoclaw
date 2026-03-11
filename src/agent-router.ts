@@ -10,6 +10,7 @@ import { getChannelInstanceByJid } from './db-agents.js';
 import { getAgentById } from './db-agents.js';
 import { getSecret } from './keystore.js';
 import { getRoutingBinding } from './db-routing.js';
+import { getBotIdentityByChatJid } from './db.js';
 import { RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
 
@@ -79,7 +80,6 @@ export async function routeMessageToAgent(
   }
 
   // 2. 检查 per-chat bot 身份绑定（新增强）
-  const { getBotIdentityByChatJid } = await import('./db.js');
   const botIdentity = getBotIdentityByChatJid(chatJid);
   if (botIdentity) {
     logger.debug(

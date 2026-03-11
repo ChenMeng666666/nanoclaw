@@ -123,8 +123,16 @@ export async function startRuntimeAPI(
     throw err;
   }
 
-  // 简单的 API Key 认证
-  const API_KEY = process.env.RUNTIME_API_KEY || 'nanoclaw-default-key';
+  // 简单的 API Key 认证 - 生产环境必须设置环境变量
+  const API_KEY = process.env.RUNTIME_API_KEY;
+  if (!API_KEY) {
+    logger.error('RUNTIME_API_KEY 环境变量未设置，这是一个安全隐患');
+    // 在开发环境可以继续，但生产环境应该拒绝启动
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (isProduction) {
+      throw new Error('RUNTIME_API_KEY 环境变量未设置');
+    }
+  }
 
   const server = http.createServer(async (req, res) => {
     // CORS headers
@@ -930,7 +938,10 @@ export async function startRuntimeAPI(
       // ===== 协作系统 API =====
 
       // 智能体间消息 API
-      if (path === '/api/collaboration/messages/send' && req.method === 'POST') {
+      if (
+        path === '/api/collaboration/messages/send' &&
+        req.method === 'POST'
+      ) {
         const body = await readJSON(req);
         const { fromAgentId, toAgentId, type, content, metadata } = body;
 
@@ -952,7 +963,10 @@ export async function startRuntimeAPI(
         return;
       }
 
-      if (path === '/api/collaboration/messages/receive' && req.method === 'POST') {
+      if (
+        path === '/api/collaboration/messages/receive' &&
+        req.method === 'POST'
+      ) {
         const body = await readJSON(req);
         const { agentId } = body;
 
@@ -961,14 +975,18 @@ export async function startRuntimeAPI(
           return;
         }
 
-        const { receiveAgentMessages } = await import('./agent-communication.js');
+        const { receiveAgentMessages } =
+          await import('./agent-communication.js');
         const messages = receiveAgentMessages(agentId as string);
 
         writeJSON(res, 200, { messages });
         return;
       }
 
-      if (path === '/api/collaboration/messages/status' && req.method === 'GET') {
+      if (
+        path === '/api/collaboration/messages/status' &&
+        req.method === 'GET'
+      ) {
         const messageId = url.searchParams.get('messageId');
 
         if (!messageId) {
@@ -976,7 +994,8 @@ export async function startRuntimeAPI(
           return;
         }
 
-        const { getAgentMessageStatus } = await import('./agent-communication.js');
+        const { getAgentMessageStatus } =
+          await import('./agent-communication.js');
         const status = getAgentMessageStatus(messageId);
 
         writeJSON(res, 200, { status });
@@ -1030,8 +1049,11 @@ export async function startRuntimeAPI(
           description: description as string | undefined,
           teamId: teamId as string | undefined,
           assignedAgents: Array.isArray(assignedAgents) ? assignedAgents : [],
-          status: (status as 'pending' | 'in_progress' | 'completed' | 'failed') || 'pending',
-          priority: (priority as 'low' | 'medium' | 'high' | 'critical') || 'medium',
+          status:
+            (status as 'pending' | 'in_progress' | 'completed' | 'failed') ||
+            'pending',
+          priority:
+            (priority as 'low' | 'medium' | 'high' | 'critical') || 'medium',
           dependencies: Array.isArray(dependencies) ? dependencies : [],
           context: context as string | undefined,
           progress: 0,
@@ -1060,7 +1082,10 @@ export async function startRuntimeAPI(
         return;
       }
 
-      if (path === '/api/collaboration/task/progress' && req.method === 'POST') {
+      if (
+        path === '/api/collaboration/task/progress' &&
+        req.method === 'POST'
+      ) {
         const body = await readJSON(req);
         const { taskId, progress, status } = body;
 
@@ -1069,11 +1094,17 @@ export async function startRuntimeAPI(
           return;
         }
 
-        const { updateTaskProgress } = await import('./collaboration-scheduler.js');
+        const { updateTaskProgress } =
+          await import('./collaboration-scheduler.js');
         updateTaskProgress(
           taskId as string,
           Number(progress),
-          status as 'pending' | 'in_progress' | 'completed' | 'failed' | undefined,
+          status as
+            | 'pending'
+            | 'in_progress'
+            | 'completed'
+            | 'failed'
+            | undefined,
         );
 
         writeJSON(res, 200, { success: true });
@@ -1103,7 +1134,11 @@ export async function startRuntimeAPI(
           String(name),
           description as string | undefined,
           Array.isArray(members) ? members : [],
-          collaborationMode as 'hierarchical' | 'peer-to-peer' | 'swarm' | undefined,
+          collaborationMode as
+            | 'hierarchical'
+            | 'peer-to-peer'
+            | 'swarm'
+            | undefined,
         );
 
         writeJSON(res, 200, { id: teamId, status: 'created' });
@@ -1126,7 +1161,10 @@ export async function startRuntimeAPI(
         return;
       }
 
-      if (path === '/api/collaboration/team/add-member' && req.method === 'POST') {
+      if (
+        path === '/api/collaboration/team/add-member' &&
+        req.method === 'POST'
+      ) {
         const body = await readJSON(req);
         const { teamId, agentId } = body;
 
@@ -1142,7 +1180,10 @@ export async function startRuntimeAPI(
         return;
       }
 
-      if (path === '/api/collaboration/team/remove-member' && req.method === 'POST') {
+      if (
+        path === '/api/collaboration/team/remove-member' &&
+        req.method === 'POST'
+      ) {
         const body = await readJSON(req);
         const { teamId, agentId } = body;
 
@@ -1189,7 +1230,10 @@ export async function startRuntimeAPI(
         return;
       }
 
-      if (path === '/api/collaboration/bot-identity/create' && req.method === 'POST') {
+      if (
+        path === '/api/collaboration/bot-identity/create' &&
+        req.method === 'POST'
+      ) {
         const body = await readJSON(req);
         const { chatJid, agentId, botName, botAvatar, config } = body;
 
