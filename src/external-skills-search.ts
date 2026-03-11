@@ -74,7 +74,8 @@ export class ExternalSkillsSearcher {
 
           return {
             name: item.name || item.title,
-            description: item.summary || item.description || `Installs: ${item.installs}`,
+            description:
+              item.summary || item.description || `Installs: ${item.installs}`,
             url: contentUrl,
             installs: item.installs,
           };

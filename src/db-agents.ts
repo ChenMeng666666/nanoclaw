@@ -974,12 +974,16 @@ export function updateEvolutionStatus(
   if (feedback) {
     fields.push('feedback = ?');
     // 确保反馈存储为 JSON 字符串
-    values.push(JSON.stringify([{
-      agentId: reviewedBy || 'system',
-      comment: feedback,
-      rating: status === 'approved' ? 5 : 1,
-      usedAt: new Date().toISOString(),
-    }]));
+    values.push(
+      JSON.stringify([
+        {
+          agentId: reviewedBy || 'system',
+          comment: feedback,
+          rating: status === 'approved' ? 5 : 1,
+          usedAt: new Date().toISOString(),
+        },
+      ]),
+    );
   }
 
   values.push(id);

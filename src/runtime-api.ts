@@ -76,7 +76,10 @@ function checkPortAvailable(port: number): Promise<boolean> {
 }
 
 // 尝试找到可用的端口
-async function findAvailablePort(basePort: number, fallbacks: number[]): Promise<number> {
+async function findAvailablePort(
+  basePort: number,
+  fallbacks: number[],
+): Promise<number> {
   // 尝试主端口
   if (await checkPortAvailable(basePort)) {
     return basePort;
@@ -85,12 +88,17 @@ async function findAvailablePort(basePort: number, fallbacks: number[]): Promise
   // 尝试备用端口
   for (const port of fallbacks) {
     if (await checkPortAvailable(port)) {
-      logger.warn({ basePort, fallbackPort: port }, 'Primary port in use, using fallback port');
+      logger.warn(
+        { basePort, fallbackPort: port },
+        'Primary port in use, using fallback port',
+      );
       return port;
     }
   }
 
-  throw new Error(`All ports in range ${basePort} and fallbacks ${fallbacks} are in use`);
+  throw new Error(
+    `All ports in range ${basePort} and fallbacks ${fallbacks} are in use`,
+  );
 }
 
 /**

@@ -17,7 +17,10 @@ export function createSafeObject<T = Record<string, unknown>>(): T {
  * 过滤掉 __proto__, constructor, prototype 等危险属性
  * 如果解析失败或输入为空，返回指定的默认值
  */
-export function safeJsonParse<T = unknown>(json: string | null | undefined, defaultValue: T = null as unknown as T): T {
+export function safeJsonParse<T = unknown>(
+  json: string | null | undefined,
+  defaultValue: T = null as unknown as T,
+): T {
   if (!json) return defaultValue;
   try {
     return JSON.parse(json, (key, value) => {
@@ -28,7 +31,10 @@ export function safeJsonParse<T = unknown>(json: string | null | undefined, defa
       return value;
     }) as T;
   } catch (error) {
-    logger.warn({ error, json }, 'Failed to parse JSON, returning default value');
+    logger.warn(
+      { error, json },
+      'Failed to parse JSON, returning default value',
+    );
     return defaultValue;
   }
 }

@@ -97,7 +97,7 @@ export class TelegramChannel implements Channel {
     // 动态获取该 agent 对应的 jid 集合，用于快速查找
     const getAgentJids = () => {
       const instances = getChannelInstancesForAgent(agentId);
-      return new Set(instances.map(inst => inst.jid).filter(Boolean));
+      return new Set(instances.map((inst) => inst.jid).filter(Boolean));
     };
 
     logger.info(

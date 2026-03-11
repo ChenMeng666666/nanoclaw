@@ -305,133 +305,141 @@ export function _setRegisteredGroups(
  * Process all pending messages for a group.
  * Called by the GroupQueue when it's this group's turn.
  */
-async function processGroupMessagesWithTimeout(chatJid: string, timeoutMs: number = 300000): Promise<boolean> {
+async function processGroupMessagesWithTimeout(
+  chatJid: string,
+  timeoutMs: number = 300000,
+): Promise<boolean> {
   const timeoutPromise = new Promise<boolean>((_, reject) => {
-    setTimeout(() => reject(new Error('Message processing timed out')), timeoutMs);
+    setTimeout(
+      () => reject(new Error('Message processing timed out')),
+      timeoutMs,
+    );
   });
 
   const processingPromise = (async (): Promise<boolean> => {
     const group = registeredGroups[chatJid];
     if (!group) return true;
 
-  const channel = findChannel(channels, chatJid);
-  if (!channel) {
-    logger.warn({ chatJid }, 'No channel owns JID, skipping messages');
-    return true;
-  }
-
-  const isMainGroup = group.isMain === true;
-
-  const sinceTimestamp = lastAgentTimestamp[chatJid] || '';
-  const missedMessages = getMessagesSince(
-    chatJid,
-    sinceTimestamp,
-    ASSISTANT_NAME,
-  );
-
-  if (missedMessages.length === 0) return true;
-
-  // For non-main groups, check if trigger is required and present
-  if (!isMainGroup && group.requiresTrigger !== false) {
-    const allowlistCfg = loadSenderAllowlist();
-    const hasTrigger = missedMessages.some(
-      (m) =>
-        TRIGGER_PATTERN.test(m.content.trim()) &&
-        (m.is_from_me || isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
-    );
-    if (!hasTrigger) return true;
-  }
-
-  const prompt = formatMessages(missedMessages, TIMEZONE);
-
-  // Advance cursor so the piping path in startMessageLoop won't re-fetch
-  // these messages. Save the old cursor so we can roll back on error.
-  const previousCursor = lastAgentTimestamp[chatJid] || '';
-  lastAgentTimestamp[chatJid] =
-    missedMessages[missedMessages.length - 1].timestamp;
-  saveState();
-
-  logger.info(
-    { group: group.name, messageCount: missedMessages.length },
-    'Processing messages',
-  );
-
-  // Track idle timer for closing stdin when agent is idle
-  let idleTimer: ReturnType<typeof setTimeout> | null = null;
-
-  const resetIdleTimer = () => {
-    if (idleTimer) clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => {
-      logger.debug(
-        { group: group.name },
-        'Idle timeout, closing container stdin',
-      );
-      queue.closeStdin(chatJid);
-    }, IDLE_TIMEOUT);
-  };
-
-  await channel.setTyping?.(chatJid, true);
-  let hadError = false;
-  let outputSentToUser = false;
-
-  const output = await runAgent(group, prompt, chatJid, async (result) => {
-    // Streaming output callback — called for each agent result
-    if (result.result) {
-      const raw =
-        typeof result.result === 'string'
-          ? result.result
-          : JSON.stringify(result.result);
-      // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
-      const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
-      logger.info({ group: group.name }, `Agent output: ${raw.slice(0, 200)}`);
-      if (text) {
-        await channel.sendMessage(chatJid, text);
-        outputSentToUser = true;
-        queue.markOutputSent(chatJid);
-      }
-      // Only reset idle timer on actual results, not session-update markers (result: null)
-      resetIdleTimer();
-    }
-
-    if (result.status === 'success') {
-      queue.notifyIdle(chatJid);
-    }
-
-    if (result.status === 'error') {
-      hadError = true;
-    }
-  });
-
-  await channel.setTyping?.(chatJid, false);
-  if (idleTimer) clearTimeout(idleTimer);
-
-  if (output === 'error' || hadError) {
-    // If we already sent output to the user, don't roll back the cursor —
-    // the user got their response and re-processing would send duplicates.
-    if (outputSentToUser) {
-      logger.warn(
-        { group: group.name },
-        'Agent error after output was sent, skipping cursor rollback to prevent duplicates',
-      );
+    const channel = findChannel(channels, chatJid);
+    if (!channel) {
+      logger.warn({ chatJid }, 'No channel owns JID, skipping messages');
       return true;
     }
-    // Roll back cursor so retries can re-process these messages
-    saveState();
-    logger.warn(
-      { group: group.name },
-      'Agent error, rolled back message cursor for retry',
+
+    const isMainGroup = group.isMain === true;
+
+    const sinceTimestamp = lastAgentTimestamp[chatJid] || '';
+    const missedMessages = getMessagesSince(
+      chatJid,
+      sinceTimestamp,
+      ASSISTANT_NAME,
     );
-    return false;
-  }
+
+    if (missedMessages.length === 0) return true;
+
+    // For non-main groups, check if trigger is required and present
+    if (!isMainGroup && group.requiresTrigger !== false) {
+      const allowlistCfg = loadSenderAllowlist();
+      const hasTrigger = missedMessages.some(
+        (m) =>
+          TRIGGER_PATTERN.test(m.content.trim()) &&
+          (m.is_from_me || isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
+      );
+      if (!hasTrigger) return true;
+    }
+
+    const prompt = formatMessages(missedMessages, TIMEZONE);
+
+    // Advance cursor so the piping path in startMessageLoop won't re-fetch
+    // these messages. Save the old cursor so we can roll back on error.
+    const previousCursor = lastAgentTimestamp[chatJid] || '';
+    lastAgentTimestamp[chatJid] =
+      missedMessages[missedMessages.length - 1].timestamp;
+    saveState();
+
+    logger.info(
+      { group: group.name, messageCount: missedMessages.length },
+      'Processing messages',
+    );
+
+    // Track idle timer for closing stdin when agent is idle
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const resetIdleTimer = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        logger.debug(
+          { group: group.name },
+          'Idle timeout, closing container stdin',
+        );
+        queue.closeStdin(chatJid);
+      }, IDLE_TIMEOUT);
+    };
+
+    await channel.setTyping?.(chatJid, true);
+    let hadError = false;
+    let outputSentToUser = false;
+
+    const output = await runAgent(group, prompt, chatJid, async (result) => {
+      // Streaming output callback — called for each agent result
+      if (result.result) {
+        const raw =
+          typeof result.result === 'string'
+            ? result.result
+            : JSON.stringify(result.result);
+        // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
+        const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
+        logger.info(
+          { group: group.name },
+          `Agent output: ${raw.slice(0, 200)}`,
+        );
+        if (text) {
+          await channel.sendMessage(chatJid, text);
+          outputSentToUser = true;
+          queue.markOutputSent(chatJid);
+        }
+        // Only reset idle timer on actual results, not session-update markers (result: null)
+        resetIdleTimer();
+      }
+
+      if (result.status === 'success') {
+        queue.notifyIdle(chatJid);
+      }
+
+      if (result.status === 'error') {
+        hadError = true;
+      }
+    });
+
+    await channel.setTyping?.(chatJid, false);
+    if (idleTimer) clearTimeout(idleTimer);
+
+    if (output === 'error' || hadError) {
+      // If we already sent output to the user, don't roll back the cursor —
+      // the user got their response and re-processing would send duplicates.
+      if (outputSentToUser) {
+        logger.warn(
+          { group: group.name },
+          'Agent error after output was sent, skipping cursor rollback to prevent duplicates',
+        );
+        return true;
+      }
+      // Roll back cursor so retries can re-process these messages
+      saveState();
+      logger.warn(
+        { group: group.name },
+        'Agent error, rolled back message cursor for retry',
+      );
+      return false;
+    }
 
     return true;
   })();
 
-  return Promise.race([processingPromise, timeoutPromise])
-    .catch(err => {
-      logger.error({ chatJid, err }, 'Message processing failed');
-      return false;
-    });
+  return Promise.race([processingPromise, timeoutPromise]).catch((err) => {
+    logger.error({ chatJid, err }, 'Message processing failed');
+    return false;
+  });
 }
 
 // 暴露原函数接口保持兼容性
@@ -688,7 +696,9 @@ async function startMessageLoop(): Promise<void> {
               },
               'Enqueuing message check for new container',
             );
-            console.log(`DEBUG: Enqueuing check for chat ${chatJid} with ${messagesToSend.length} messages`);
+            console.log(
+              `DEBUG: Enqueuing check for chat ${chatJid} with ${messagesToSend.length} messages`,
+            );
             queue.enqueueMessageCheck(chatJid);
           }
         }
