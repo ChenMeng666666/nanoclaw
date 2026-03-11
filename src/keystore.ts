@@ -45,7 +45,11 @@ export async function storeSecret(
         success = true;
       } catch (err) {
         logger.warn(
-          { agentId, key, err: err instanceof Error ? err.message : String(err) },
+          {
+            agentId,
+            key,
+            err: err instanceof Error ? err.message : String(err),
+          },
           'Keytar failed, falling back to encrypted file',
         );
         error = err instanceof Error ? err.message : String(err);
@@ -91,7 +95,11 @@ export async function getSecret(
         }
       } catch (err) {
         logger.warn(
-          { agentId, key, err: err instanceof Error ? err.message : String(err) },
+          {
+            agentId,
+            key,
+            err: err instanceof Error ? err.message : String(err),
+          },
           'Keytar failed, trying encrypted file fallback',
         );
         error = err instanceof Error ? err.message : String(err);
@@ -136,7 +144,11 @@ export async function deleteSecret(
         success = true;
       } catch (err) {
         logger.warn(
-          { agentId, key, err: err instanceof Error ? err.message : String(err) },
+          {
+            agentId,
+            key,
+            err: err instanceof Error ? err.message : String(err),
+          },
           'Keytar failed, trying encrypted file fallback',
         );
         error = err instanceof Error ? err.message : String(err);

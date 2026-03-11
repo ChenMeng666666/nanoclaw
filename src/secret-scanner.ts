@@ -17,7 +17,10 @@ export function scanFileForSecrets(filePath: string): string[] {
     const content = fs.readFileSync(filePath, 'utf8');
     return scanContentForSecrets(content, filePath);
   } catch (err) {
-    logger.warn({ filePath, err: err instanceof Error ? err.message : String(err) }, 'Failed to scan file for secrets');
+    logger.warn(
+      { filePath, err: err instanceof Error ? err.message : String(err) },
+      'Failed to scan file for secrets',
+    );
     return [];
   }
 }
@@ -25,22 +28,35 @@ export function scanFileForSecrets(filePath: string): string[] {
 /**
  * 扫描字符串内容中的凭证信息
  */
-export function scanContentForSecrets(content: string, source: string = 'unknown'): string[] {
+export function scanContentForSecrets(
+  content: string,
+  source: string = 'unknown',
+): string[] {
   const issues: string[] = [];
 
   // API 密钥模式检测
   const apiKeyPatterns = [
     /(?:api|token|key|secret|password|passwd)\s*[=:]\s*["']?[a-zA-Z0-9_\\-]{16,}["']?/i,
-    /[a-zA-Z0-9_\\-]{16,}/.test(content) ? (content.match(/[a-zA-Z0-9_\\-]{16,}/g) || []).filter(token =>
-      token.length >= 16 && !/^[\d]+$/.test(token)
-    ) : [],
-  ].flat().filter(Boolean);
+    /[a-zA-Z0-9_\\-]{16,}/.test(content)
+      ? (content.match(/[a-zA-Z0-9_\\-]{16,}/g) || []).filter(
+          (token) => token.length >= 16 && !/^[\d]+$/.test(token),
+        )
+      : [],
+  ]
+    .flat()
+    .filter(Boolean);
 
   for (const pattern of apiKeyPatterns) {
     if (typeof pattern === 'string') {
       // 简单的密钥检测
-      if (pattern.length >= 16 && pattern.length <= 64 && !/^[\d]+$/.test(pattern)) {
-        issues.push(`Potential API key detected in ${source}: ${pattern.slice(0, 8)}...`);
+      if (
+        pattern.length >= 16 &&
+        pattern.length <= 64 &&
+        !/^[\d]+$/.test(pattern)
+      ) {
+        issues.push(
+          `Potential API key detected in ${source}: ${pattern.slice(0, 8)}...`,
+        );
       }
     } else if (pattern.test(content)) {
       issues.push(`Potential API key or token detected in ${source}`);
@@ -67,9 +83,11 @@ export function scanContentForSecrets(content: string, source: string = 'unknown
   for (const pattern of sensitivePatterns) {
     const matches = content.match(pattern);
     if (matches) {
-      matches.forEach(match => {
+      matches.forEach((match) => {
         if (match.length >= 8) {
-          issues.push(`Potential sensitive information detected in ${source}: ${match.slice(0, 8)}...`);
+          issues.push(
+            `Potential sensitive information detected in ${source}: ${match.slice(0, 8)}...`,
+          );
         }
       });
     }
@@ -81,7 +99,10 @@ export function scanContentForSecrets(content: string, source: string = 'unknown
 /**
  * 扫描目录中的凭证信息
  */
-export function scanDirectoryForSecrets(dirPath: string, excludePatterns: string[] = []): string[] {
+export function scanDirectoryForSecrets(
+  dirPath: string,
+  excludePatterns: string[] = [],
+): string[] {
   const issues: string[] = [];
 
   if (!fs.existsSync(dirPath)) return issues;
@@ -92,7 +113,7 @@ export function scanDirectoryForSecrets(dirPath: string, excludePatterns: string
     const fullPath = path.join(dirPath, file.name);
 
     // 检查是否需要排除
-    if (excludePatterns.some(pattern => fullPath.match(pattern))) {
+    if (excludePatterns.some((pattern) => fullPath.match(pattern))) {
       continue;
     }
 
@@ -101,8 +122,17 @@ export function scanDirectoryForSecrets(dirPath: string, excludePatterns: string
       issues.push(...scanDirectoryForSecrets(fullPath, excludePatterns));
     } else {
       // 只扫描文本文件
-      const textExtensions = ['.js', '.ts', '.json', '.md', '.txt', '.log', '.env', '.env.*'];
-      const isTextFile = textExtensions.some(ext => fullPath.endsWith(ext));
+      const textExtensions = [
+        '.js',
+        '.ts',
+        '.json',
+        '.md',
+        '.txt',
+        '.log',
+        '.env',
+        '.env.*',
+      ];
+      const isTextFile = textExtensions.some((ext) => fullPath.endsWith(ext));
 
       if (isTextFile) {
         issues.push(...scanFileForSecrets(fullPath));
@@ -118,13 +148,27 @@ export function scanDirectoryForSecrets(dirPath: string, excludePatterns: string
  */
 export function scanEnvironmentVariables(): string[] {
   const issues: string[] = [];
-  const sensitiveKeys = ['API', 'TOKEN', 'KEY', 'SECRET', 'PASSWORD', 'PASSWD', 'ACCESS'];
+  const sensitiveKeys = [
+    'API',
+    'TOKEN',
+    'KEY',
+    'SECRET',
+    'PASSWORD',
+    'PASSWD',
+    'ACCESS',
+  ];
 
   for (const [key, value] of Object.entries(process.env)) {
-    if (sensitiveKeys.some(sensitiveKey => key.toUpperCase().includes(sensitiveKey))) {
+    if (
+      sensitiveKeys.some((sensitiveKey) =>
+        key.toUpperCase().includes(sensitiveKey),
+      )
+    ) {
       const valueStr = String(value || '');
       if (valueStr.length >= 8 && !/^[\s]+$/.test(valueStr)) {
-        issues.push(`Potential secret detected in environment variable: ${key}`);
+        issues.push(
+          `Potential secret detected in environment variable: ${key}`,
+        );
       }
     }
   }

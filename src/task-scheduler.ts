@@ -2,7 +2,7 @@ import { ChildProcess } from 'child_process';
 import { CronExpressionParser } from 'cron-parser';
 import fs from 'fs';
 
-import { ASSISTANT_NAME, SCHEDULER_POLL_INTERVAL, TIMEZONE } from './config.js';
+import { ASSISTANT_NAME, SCHEDULER_POLL_INTERVAL, TIMEZONE, COLLABORATION_CONFIG } from './config.js';
 import {
   ContainerOutput,
   runContainerAgent,
@@ -302,6 +302,20 @@ export function startSchedulerLoop(deps: SchedulerDependencies): void {
   }
   schedulerRunning = true;
   logger.info('Scheduler loop started');
+
+  // 启动协作任务调度器
+  if (COLLABORATION_CONFIG.collaborationTasks.enabled) {
+    try {
+      import('./collaboration-scheduler.js').then(({ startCollaborationScheduler }) => {
+        startCollaborationScheduler();
+        logger.info('Collaboration scheduler started');
+      });
+    } catch (err) {
+      logger.error({ err }, 'Failed to start collaboration scheduler');
+    }
+  } else {
+    logger.debug('Collaboration scheduler disabled');
+  }
 
   const loop = async () => {
     try {

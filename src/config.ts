@@ -227,13 +227,15 @@ export const SECURITY_CONFIG = {
   // 内容安全检查
   contentSecurity: {
     enableWebContentSanitization: validateConfig(
-      (process.env.SECURITY_ENABLE_WEB_CONTENT_SANITIZATION || 'true') === 'true',
+      (process.env.SECURITY_ENABLE_WEB_CONTENT_SANITIZATION || 'true') ===
+        'true',
       validateBoolean,
       true,
       'SECURITY_ENABLE_WEB_CONTENT_SANITIZATION',
     ),
     enableSensitiveDataDetection: validateConfig(
-      (process.env.SECURITY_ENABLE_SENSITIVE_DATA_DETECTION || 'true') === 'true',
+      (process.env.SECURITY_ENABLE_SENSITIVE_DATA_DETECTION || 'true') ===
+        'true',
       validateBoolean,
       true,
       'SECURITY_ENABLE_SENSITIVE_DATA_DETECTION',
@@ -249,19 +251,24 @@ export const SECURITY_CONFIG = {
   // 危险操作防护
   dangerousOperations: {
     enableDangerousOperationCheck: validateConfig(
-      (process.env.SECURITY_ENABLE_DANGEROUS_OPERATION_CHECK || 'true') === 'true',
+      (process.env.SECURITY_ENABLE_DANGEROUS_OPERATION_CHECK || 'true') ===
+        'true',
       validateBoolean,
       true,
       'SECURITY_ENABLE_DANGEROUS_OPERATION_CHECK',
     ),
     requireConfirmation: validateConfig(
-      (process.env.SECURITY_REQUIRE_DANGEROUS_OPERATION_CONFIRMATION || 'true') === 'true',
+      (process.env.SECURITY_REQUIRE_DANGEROUS_OPERATION_CONFIRMATION ||
+        'true') === 'true',
       validateBoolean,
       true,
       'SECURITY_REQUIRE_DANGEROUS_OPERATION_CONFIRMATION',
     ),
     confirmationThreshold: validateConfig(
-      parseFloat(process.env.SECURITY_DANGEROUS_OPERATION_CONFIRMATION_THRESHOLD || '0.7'),
+      parseFloat(
+        process.env.SECURITY_DANGEROUS_OPERATION_CONFIRMATION_THRESHOLD ||
+          '0.7',
+      ),
       (v) => typeof v === 'number' && v >= 0 && v <= 1,
       0.7,
       'SECURITY_DANGEROUS_OPERATION_CONFIRMATION_THRESHOLD',
@@ -283,11 +290,15 @@ export const SECURITY_CONFIG = {
       'SECURITY_ENABLE_SKILL_AUTO_UPDATE',
     ),
     trustedSources: validateConfig(
-      process.env.SECURITY_TRUSTED_SKILL_SOURCES || 'https://github.com/anthropics,https://gitlab.com',
+      process.env.SECURITY_TRUSTED_SKILL_SOURCES ||
+        'https://github.com/anthropics,https://gitlab.com',
       validateString,
       '',
       'SECURITY_TRUSTED_SKILL_SOURCES',
-    ).split(',').map(s => s.trim()).filter(Boolean),
+    )
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
   },
 
   // 网络安全
@@ -348,6 +359,75 @@ export const SECURITY_CONFIG = {
       90,
       'SECURITY_AUDIT_LOG_RETENTION_DAYS',
     ),
+  },
+};
+
+// ===== 协作系统配置 =====
+export const COLLABORATION_CONFIG = {
+  // 智能体间通信配置
+  interAgentCommunication: {
+    enabled: validateConfig(
+      (process.env.COLLABORATION_ENABLE_INTER_AGENT_COMMUNICATION || 'true') === 'true',
+      validateBoolean,
+      true,
+      'COLLABORATION_ENABLE_INTER_AGENT_COMMUNICATION',
+    ),
+    messageTimeout: validateConfig(
+      parseInt(process.env.COLLABORATION_MESSAGE_TIMEOUT || '30000', 10),
+      (v) => validateInteger(v, 1000, 300000),
+      30000,
+      'COLLABORATION_MESSAGE_TIMEOUT',
+    ), // 消息超时（毫秒）
+    maxMessageSize: validateConfig(
+      parseInt(process.env.COLLABORATION_MAX_MESSAGE_SIZE || '1048576', 10),
+      (v) => validateInteger(v, 1024, 10485760),
+      1048576,
+      'COLLABORATION_MAX_MESSAGE_SIZE',
+    ), // 最大消息大小（字节）
+  },
+
+  // 协作任务配置
+  collaborationTasks: {
+    enabled: validateConfig(
+      (process.env.COLLABORATION_ENABLE_COLLABORATION_TASKS || 'true') === 'true',
+      validateBoolean,
+      true,
+      'COLLABORATION_ENABLE_COLLABORATION_TASKS',
+    ),
+    maxTeamSize: validateConfig(
+      parseInt(process.env.COLLABORATION_MAX_TEAM_SIZE || '10', 10),
+      (v) => validateInteger(v, 2, 50),
+      10,
+      'COLLABORATION_MAX_TEAM_SIZE',
+    ), // 最大团队大小
+    taskTimeout: validateConfig(
+      parseInt(process.env.COLLABORATION_TASK_TIMEOUT || '1800000', 10),
+      (v) => validateInteger(v, 60000, 3600000),
+      1800000,
+      'COLLABORATION_TASK_TIMEOUT',
+    ), // 任务超时（毫秒）
+  },
+
+  // 团队协作配置
+  teamCollaboration: {
+    enabled: validateConfig(
+      (process.env.COLLABORATION_ENABLE_TEAM_COLLABORATION || 'true') === 'true',
+      validateBoolean,
+      true,
+      'COLLABORATION_ENABLE_TEAM_COLLABORATION',
+    ),
+    defaultCollaborationMode: validateConfig(
+      process.env.COLLABORATION_DEFAULT_MODE || 'peer-to-peer',
+      (v) => ['hierarchical', 'peer-to-peer', 'swarm'].includes(v),
+      'peer-to-peer' as any,
+      'COLLABORATION_DEFAULT_MODE',
+    ),
+    trustLevel: validateConfig(
+      parseInt(process.env.COLLABORATION_TRUST_LEVEL || '5', 10),
+      (v) => validateInteger(v, 1, 10),
+      5,
+      'COLLABORATION_TRUST_LEVEL',
+    ), // 信任级别 (1-10)
   },
 };
 

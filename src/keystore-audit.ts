@@ -54,8 +54,8 @@ class KeystoreAuditManager {
         const content = fs.readFileSync(this.logFile, 'utf8');
         this.logs = content
           .split('\n')
-          .filter(line => line.trim())
-          .map(line => JSON.parse(line))
+          .filter((line) => line.trim())
+          .map((line) => JSON.parse(line))
           .sort((a, b) => a.id - b.id);
 
         if (this.logs.length > 0) {
@@ -77,7 +77,7 @@ class KeystoreAuditManager {
     operation: 'read' | 'write' | 'delete' | 'list',
     success: boolean = true,
     error?: string,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ): CredentialAccessLog {
     const log: CredentialAccessLog = {
       id: ++this.lastId,
@@ -132,7 +132,7 @@ class KeystoreAuditManager {
     startTime?: Date;
     endTime?: Date;
   }): CredentialAccessLog[] {
-    return this.logs.filter(log => {
+    return this.logs.filter((log) => {
       if (query?.agentId && log.agentId !== query.agentId) {
         return false;
       }
@@ -142,7 +142,10 @@ class KeystoreAuditManager {
       if (query?.operation && log.operation !== query.operation) {
         return false;
       }
-      if (typeof query?.success === 'boolean' && log.success !== query.success) {
+      if (
+        typeof query?.success === 'boolean' &&
+        log.success !== query.success
+      ) {
         return false;
       }
       if (query?.startTime && new Date(log.timestamp) < query.startTime) {
@@ -192,13 +195,13 @@ class KeystoreAuditManager {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - keepDays);
 
-    this.logs = this.logs.filter(log => new Date(log.timestamp) > cutoffDate);
+    this.logs = this.logs.filter((log) => new Date(log.timestamp) > cutoffDate);
 
     // 重写日志文件
     try {
       fs.writeFileSync(
         this.logFile,
-        this.logs.map(log => JSON.stringify(log)).join('\n') + '\n'
+        this.logs.map((log) => JSON.stringify(log)).join('\n') + '\n',
       );
     } catch (err) {
       logger.error({ err }, 'Failed to cleanup keystore access audit log');
@@ -218,7 +221,14 @@ export function logCredentialAccess(
   operation: 'read' | 'write' | 'delete' | 'list',
   success: boolean = true,
   error?: string,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): CredentialAccessLog {
-  return keystoreAudit.logAccess(agentId, credentialKey, operation, success, error, metadata);
+  return keystoreAudit.logAccess(
+    agentId,
+    credentialKey,
+    operation,
+    success,
+    error,
+    metadata,
+  );
 }

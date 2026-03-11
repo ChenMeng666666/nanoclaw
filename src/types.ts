@@ -440,6 +440,99 @@ export interface DetailedReflection extends Reflection {
   rating?: 1 | 2 | 3 | 4 | 5;
 }
 
+// ===== 多智能体协作新增类型 =====
+
+/**
+ * 智能体间消息
+ */
+export interface AgentMessage {
+  id: string;
+  fromAgentId: string;
+  toAgentId: string;
+  type: 'message' | 'task' | 'notification' | 'status';
+  content: string;
+  metadata?: Record<string, unknown>;
+  timestamp: string;
+  status: 'sent' | 'delivered' | 'read' | 'failed';
+}
+
+/**
+ * Per-chat Bot 身份
+ */
+export interface BotIdentity {
+  id: string;
+  chatJid: string;
+  agentId: string;
+  botName: string;
+  botAvatar?: string;
+  isActive: boolean;
+  config?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * 协作任务
+ */
+export interface CollaborationTask {
+  id: string;
+  title: string;
+  description?: string;
+  teamId?: string;
+  assignedAgents: string[]; // 参与的智能体列表
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  progress: number; // 0-100
+  dependencies?: string[]; // 依赖的任务 ID 列表
+  context?: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
+/**
+ * 协作任务分配
+ */
+export interface CollaborationTaskAssignment {
+  id: string;
+  taskId: string;
+  agentId: string;
+  role: string; // 角色：leader、member、reviewer
+  status: 'accepted' | 'rejected' | 'in_progress' | 'completed';
+  assignedAt: string;
+  completedAt?: string;
+}
+
+/**
+ * 智能体团队状态
+ */
+export interface TeamState {
+  id: string;
+  name: string;
+  description?: string;
+  members: string[]; // 智能体 ID 列表
+  leaderId?: string;
+  status: 'active' | 'inactive' | 'dissolved';
+  collaborationMode: 'hierarchical' | 'peer-to-peer' | 'swarm';
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * 团队协作状态
+ */
+export interface TeamCollaborationState {
+  id: string;
+  teamId: string;
+  taskId?: string;
+  status: 'planning' | 'executing' | 'reviewing' | 'completed';
+  progress: number; // 0-100
+  activeAgents: string[];
+  lastActivity: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /**
  * 每日学习总结
  */

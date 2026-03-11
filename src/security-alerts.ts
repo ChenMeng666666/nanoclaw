@@ -45,7 +45,10 @@ export interface SecurityEvent {
 class SecurityAlertManager {
   private events: SecurityEvent[] = [];
   private maxEvents: number = 1000;
-  private listeners: Map<SecurityEventType, Array<(event: SecurityEvent) => void>> = new Map();
+  private listeners: Map<
+    SecurityEventType,
+    Array<(event: SecurityEvent) => void>
+  > = new Map();
 
   /**
    * 记录安全事件
@@ -55,7 +58,7 @@ class SecurityAlertManager {
     level: SecurityEventLevel,
     source: string,
     message: string,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ): SecurityEvent {
     const event: SecurityEvent = {
       id: generateEventId(),
@@ -77,7 +80,12 @@ class SecurityAlertManager {
     }
 
     // 日志记录
-    const logMethod = level === 'critical' || level === 'error' ? 'error' : level === 'warning' ? 'warn' : 'info';
+    const logMethod =
+      level === 'critical' || level === 'error'
+        ? 'error'
+        : level === 'warning'
+          ? 'warn'
+          : 'info';
     logger[logMethod]({ event }, `Security event: ${message}`);
 
     // 通知监听器
@@ -89,7 +97,10 @@ class SecurityAlertManager {
   /**
    * 添加事件监听器
    */
-  addListener(type: SecurityEventType, callback: (event: SecurityEvent) => void): void {
+  addListener(
+    type: SecurityEventType,
+    callback: (event: SecurityEvent) => void,
+  ): void {
     if (!this.listeners.has(type)) {
       this.listeners.set(type, []);
     }
@@ -99,7 +110,10 @@ class SecurityAlertManager {
   /**
    * 移除事件监听器
    */
-  removeListener(type: SecurityEventType, callback: (event: SecurityEvent) => void): void {
+  removeListener(
+    type: SecurityEventType,
+    callback: (event: SecurityEvent) => void,
+  ): void {
     if (this.listeners.has(type)) {
       const callbacks = this.listeners.get(type)!;
       const index = callbacks.indexOf(callback);
@@ -115,7 +129,7 @@ class SecurityAlertManager {
   private notifyListeners(event: SecurityEvent): void {
     // 通知特定类型的监听器
     if (this.listeners.has(event.type)) {
-      this.listeners.get(event.type)!.forEach(callback => {
+      this.listeners.get(event.type)!.forEach((callback) => {
         try {
           callback(event);
         } catch (err) {
@@ -129,28 +143,28 @@ class SecurityAlertManager {
    * 获取所有未处理的事件
    */
   getUnhandledEvents(): SecurityEvent[] {
-    return this.events.filter(event => !event.handled);
+    return this.events.filter((event) => !event.handled);
   }
 
   /**
    * 获取特定类型的事件
    */
   getEventsByType(type: SecurityEventType): SecurityEvent[] {
-    return this.events.filter(event => event.type === type);
+    return this.events.filter((event) => event.type === type);
   }
 
   /**
    * 获取特定级别的事件
    */
   getEventsByLevel(level: SecurityEventLevel): SecurityEvent[] {
-    return this.events.filter(event => event.level === level);
+    return this.events.filter((event) => event.level === level);
   }
 
   /**
    * 标记事件为已处理
    */
   markEventAsHandled(eventId: string): boolean {
-    const event = this.events.find(e => e.id === eventId);
+    const event = this.events.find((e) => e.id === eventId);
     if (event) {
       event.handled = true;
       event.handledAt = new Date().toISOString();
@@ -177,22 +191,33 @@ class SecurityAlertManager {
 
     // 初始化类型计数
     const eventTypes: SecurityEventType[] = [
-      'prompt_injection', 'sensitive_data_leak', 'dangerous_operation',
-      'unauthorized_access', 'skill_verification_failed', 'rate_limit_exceeded',
-      'credential_scan', 'network_security', 'vulnerability_detected'
+      'prompt_injection',
+      'sensitive_data_leak',
+      'dangerous_operation',
+      'unauthorized_access',
+      'skill_verification_failed',
+      'rate_limit_exceeded',
+      'credential_scan',
+      'network_security',
+      'vulnerability_detected',
     ];
-    eventTypes.forEach(type => {
+    eventTypes.forEach((type) => {
       stats.byType[type] = 0;
     });
 
     // 初始化级别计数
-    const eventLevels: SecurityEventLevel[] = ['info', 'warning', 'error', 'critical'];
-    eventLevels.forEach(level => {
+    const eventLevels: SecurityEventLevel[] = [
+      'info',
+      'warning',
+      'error',
+      'critical',
+    ];
+    eventLevels.forEach((level) => {
       stats.byLevel[level] = 0;
     });
 
     // 统计
-    this.events.forEach(event => {
+    this.events.forEach((event) => {
       stats.byType[event.type]++;
       stats.byLevel[event.level]++;
     });
@@ -205,7 +230,7 @@ class SecurityAlertManager {
    */
   cleanupOldEvents(maxAgeMs: number = 7 * 24 * 60 * 60 * 1000): void {
     const now = Date.now();
-    this.events = this.events.filter(event => {
+    this.events = this.events.filter((event) => {
       const eventTime = new Date(event.timestamp).getTime();
       return now - eventTime <= maxAgeMs;
     });
@@ -228,7 +253,7 @@ export function logSecurityEvent(
   level: SecurityEventLevel,
   source: string,
   message: string,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): SecurityEvent {
   return securityAlertManager.logEvent(type, level, source, message, metadata);
 }

@@ -35,9 +35,10 @@ export interface AgentRouteResult {
  *
  * 流程：
  * 1. 检查是否有 Topic 级路由绑定（优先）
- * 2. 查询 channel_instances 表找到对应的记录
- * 3. 查询 agents 表获取 agent 配置
- * 4. 从 keychain 解密敏感配置
+ * 2. 检查是否有 per-chat bot 身份绑定（新增强）
+ * 3. 查询 channel_instances 表找到对应的记录
+ * 4. 查询 agents 表获取 agent 配置
+ * 5. 从 keychain 解密敏感配置
  */
 export async function routeMessageToAgent(
   chatJid: string,
@@ -77,14 +78,47 @@ export async function routeMessageToAgent(
     }
   }
 
-  // 2. Fallback 到 chatJid 路由
+  // 2. 检查 per-chat bot 身份绑定（新增强）
+  const { getBotIdentityByChatJid } = await import('./db.js');
+  const botIdentity = getBotIdentityByChatJid(chatJid);
+  if (botIdentity) {
+    logger.debug(
+      { chatJid, agentId: botIdentity.agentId },
+      'Found per-chat bot identity',
+    );
+    const agent = getAgentById(botIdentity.agentId);
+    if (agent && agent.isActive) {
+      const anthropicToken = agent.credentials.anthropicToken
+        ? await getSecret(agent.id, 'anthropic_token')
+        : undefined;
+      const anthropicUrl = agent.credentials.anthropicUrl
+        ? await getSecret(agent.id, 'anthropic_url')
+        : undefined;
+      const channelInstance = getChannelInstanceByJid(chatJid);
+      return {
+        agentId: agent.id,
+        agentFolder: agent.folder,
+        agentName: botIdentity.botName, // 使用 Bot 名称替代 Agent 名称
+        channelInstanceId: channelInstance?.id || '',
+        channelType: channelInstance?.channelType || 'telegram',
+        botId: channelInstance?.botId || '',
+        agentConfig: {
+          anthropicToken: anthropicToken || undefined,
+          anthropicUrl: anthropicUrl || undefined,
+          anthropicModel: agent.credentials.anthropicModel,
+        },
+      };
+    }
+  }
+
+  // 3. Fallback 到 chatJid 路由
   const channelInstance = getChannelInstanceByJid(chatJid);
   if (!channelInstance) {
     logger.debug({ chatJid }, 'No channel instance found for JID');
     return null;
   }
 
-  // 3. 查找对应的 agent
+  // 4. 查找对应的 agent
   const agent = getAgentById(channelInstance.agentId);
   if (!agent) {
     logger.warn(
@@ -99,7 +133,7 @@ export async function routeMessageToAgent(
     return null;
   }
 
-  // 4. 从 keychain 解密敏感配置
+  // 5. 从 keychain 解密敏感配置
   const anthropicToken = agent.credentials.anthropicToken
     ? await getSecret(agent.id, 'anthropic_token')
     : undefined;
@@ -107,7 +141,7 @@ export async function routeMessageToAgent(
     ? await getSecret(agent.id, 'anthropic_url')
     : undefined;
 
-  // 5. 构建路由结果
+  // 6. 构建路由结果
   const result: AgentRouteResult = {
     agentId: agent.id,
     agentFolder: agent.folder,
@@ -125,8 +159,8 @@ export async function routeMessageToAgent(
   logger.debug(
     {
       chatJid,
-      agentName: agent.name,
-      channelType: channelInstance.channelType,
+      agentName: result.agentName,
+      channelType: result.channelType,
     },
     'Message routed to agent',
   );

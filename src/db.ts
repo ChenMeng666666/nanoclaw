@@ -20,6 +20,9 @@ import {
   RegisteredGroup,
   ScheduledTask,
   TaskRunLog,
+  BotIdentity,
+  CollaborationTask,
+  TeamState,
 } from './types.js';
 
 let db: Database.Database;
@@ -322,6 +325,90 @@ function createSchema(database: Database.Database): void {
       ON routing_bindings(channel_type, thread_id);
     CREATE INDEX IF NOT EXISTS idx_routing_bindings_agent
       ON routing_bindings(agent_id);
+
+    -- Bot identities: per-chat bot identity
+    CREATE TABLE IF NOT EXISTS bot_identities (
+      id TEXT PRIMARY KEY,
+      chat_jid TEXT NOT NULL,
+      agent_id TEXT NOT NULL,
+      bot_name TEXT NOT NULL,
+      bot_avatar TEXT,
+      is_active INTEGER DEFAULT 1,
+      config TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(chat_jid),
+      FOREIGN KEY (agent_id) REFERENCES agents(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_bot_identities_chat ON bot_identities(chat_jid);
+    CREATE INDEX IF NOT EXISTS idx_bot_identities_agent ON bot_identities(agent_id);
+
+    -- Collaboration tasks: team-based tasks
+    CREATE TABLE IF NOT EXISTS collaboration_tasks (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      team_id TEXT,
+      assigned_agents TEXT DEFAULT '[]', -- JSON array
+      status TEXT DEFAULT 'pending',
+      priority TEXT DEFAULT 'medium',
+      progress REAL DEFAULT 0,
+      dependencies TEXT DEFAULT '[]', -- JSON array
+      context TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      completed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_collaboration_tasks_status ON collaboration_tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_collaboration_tasks_team ON collaboration_tasks(team_id);
+    CREATE INDEX IF NOT EXISTS idx_collaboration_tasks_priority ON collaboration_tasks(priority);
+
+    -- Collaboration task assignments: per-agent task assignments
+    CREATE TABLE IF NOT EXISTS collaboration_task_assignments (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      agent_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      status TEXT DEFAULT 'accepted',
+      assigned_at TEXT NOT NULL,
+      completed_at TEXT,
+      FOREIGN KEY (task_id) REFERENCES collaboration_tasks(id),
+      FOREIGN KEY (agent_id) REFERENCES agents(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_task_assignments_task ON collaboration_task_assignments(task_id);
+    CREATE INDEX IF NOT EXISTS idx_task_assignments_agent ON collaboration_task_assignments(agent_id);
+
+    -- Team states: track team status and collaboration mode
+    CREATE TABLE IF NOT EXISTS team_states (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      members TEXT DEFAULT '[]', -- JSON array
+      leader_id TEXT,
+      status TEXT DEFAULT 'active',
+      collaboration_mode TEXT DEFAULT 'peer-to-peer',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_team_states_status ON team_states(status);
+    CREATE INDEX IF NOT EXISTS idx_team_states_leader ON team_states(leader_id);
+
+    -- Team collaboration states: track active team collaboration
+    CREATE TABLE IF NOT EXISTS team_collaboration_states (
+      id TEXT PRIMARY KEY,
+      team_id TEXT NOT NULL,
+      task_id TEXT,
+      status TEXT DEFAULT 'planning',
+      progress REAL DEFAULT 0,
+      active_agents TEXT DEFAULT '[]', -- JSON array
+      last_activity TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (team_id) REFERENCES team_states(id),
+      FOREIGN KEY (task_id) REFERENCES collaboration_tasks(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_team_collaboration_team ON team_collaboration_states(team_id);
+    CREATE INDEX IF NOT EXISTS idx_team_collaboration_task ON team_collaboration_states(task_id);
 
     -- Indexes for performance
     CREATE INDEX IF NOT EXISTS idx_memories_agent_level ON memories(agent_folder, level);
@@ -1117,32 +1204,40 @@ export interface OperationSnapshot {
 /**
  * 存储操作快照
  */
-export function createOperationSnapshot(snapshot: Omit<OperationSnapshot, 'id'>): number {
-  const result = db.prepare(
-    `
+export function createOperationSnapshot(
+  snapshot: Omit<OperationSnapshot, 'id'>,
+): number {
+  const result = db
+    .prepare(
+      `
     INSERT INTO operation_snapshots (
       operation_id, operation_type, group_folder, chat_jid, before_state, after_state, timestamp, status, description
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `,
-  ).run(
-    snapshot.operationId,
-    snapshot.operationType,
-    snapshot.groupFolder,
-    snapshot.chatJid,
-    snapshot.beforeState,
-    snapshot.afterState || null,
-    snapshot.timestamp,
-    snapshot.status,
-    snapshot.description || null,
-  );
+    )
+    .run(
+      snapshot.operationId,
+      snapshot.operationType,
+      snapshot.groupFolder,
+      snapshot.chatJid,
+      snapshot.beforeState,
+      snapshot.afterState || null,
+      snapshot.timestamp,
+      snapshot.status,
+      snapshot.description || null,
+    );
   return result.lastInsertRowid as number;
 }
 
 /**
  * 根据操作ID获取快照
  */
-export function getOperationSnapshotByOperationId(operationId: string): OperationSnapshot | undefined {
-  const row = db.prepare('SELECT * FROM operation_snapshots WHERE operation_id = ?').get(operationId) as
+export function getOperationSnapshotByOperationId(
+  operationId: string,
+): OperationSnapshot | undefined {
+  const row = db
+    .prepare('SELECT * FROM operation_snapshots WHERE operation_id = ?')
+    .get(operationId) as
     | (OperationSnapshot & {
         operation_id: string;
         operation_type: string;
@@ -1172,7 +1267,10 @@ export function getOperationSnapshotByOperationId(operationId: string): Operatio
 /**
  * 更新操作快照
  */
-export function updateOperationSnapshot(operationId: string, updates: Partial<OperationSnapshot>): void {
+export function updateOperationSnapshot(
+  operationId: string,
+  updates: Partial<OperationSnapshot>,
+): void {
   const fields: string[] = [];
   const values: unknown[] = [];
 
@@ -1200,15 +1298,17 @@ export function updateOperationSnapshot(operationId: string, updates: Partial<Op
 /**
  * 获取操作快照列表
  */
-export function getOperationSnapshots(query: {
-  status?: 'pending' | 'applied' | 'rolled_back';
-  operationType?: string;
-  groupFolder?: string;
-  chatJid?: string;
-  startTime?: Date;
-  endTime?: Date;
-  limit?: number;
-} = {}): OperationSnapshot[] {
+export function getOperationSnapshots(
+  query: {
+    status?: 'pending' | 'applied' | 'rolled_back';
+    operationType?: string;
+    groupFolder?: string;
+    chatJid?: string;
+    startTime?: Date;
+    endTime?: Date;
+    limit?: number;
+  } = {},
+): OperationSnapshot[] {
   let sql = `
     SELECT * FROM operation_snapshots
     WHERE 1=1
@@ -1260,7 +1360,7 @@ export function getOperationSnapshots(query: {
     description?: string;
   }>;
 
-  return rows.map(row => ({
+  return rows.map((row) => ({
     id: row.id,
     operationId: row.operation_id,
     operationType: row.operation_type,
@@ -1278,7 +1378,9 @@ export function getOperationSnapshots(query: {
  * 删除操作快照
  */
 export function deleteOperationSnapshot(operationId: string): void {
-  db.prepare('DELETE FROM operation_snapshots WHERE operation_id = ?').run(operationId);
+  db.prepare('DELETE FROM operation_snapshots WHERE operation_id = ?').run(
+    operationId,
+  );
 }
 
 /**
@@ -1288,7 +1390,643 @@ export function cleanupOperationSnapshots(keepDays: number = 7): void {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - keepDays);
 
-  db.prepare('DELETE FROM operation_snapshots WHERE timestamp < ?').run(cutoffDate.toISOString());
+  db.prepare('DELETE FROM operation_snapshots WHERE timestamp < ?').run(
+    cutoffDate.toISOString(),
+  );
+}
+
+/**
+ * Bot Identity 操作函数
+ */
+
+/**
+ * 创建 Bot Identity
+ */
+export function createBotIdentity(identity: {
+  id: string;
+  chatJid: string;
+  agentId: string;
+  botName: string;
+  botAvatar?: string;
+  config?: Record<string, any>;
+}): void {
+  db.prepare(`
+    INSERT OR REPLACE INTO bot_identities (
+      id, chat_jid, agent_id, bot_name, bot_avatar, config, is_active, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+  `).run(
+    identity.id,
+    identity.chatJid,
+    identity.agentId,
+    identity.botName,
+    identity.botAvatar || null,
+    JSON.stringify(identity.config || {}),
+    new Date().toISOString(),
+    new Date().toISOString(),
+  );
+}
+
+/**
+ * 获取 Bot Identity
+ */
+export function getBotIdentityByChatJid(chatJid: string) {
+  const row = db.prepare('SELECT * FROM bot_identities WHERE chat_jid = ?').get(
+    chatJid,
+  ) as {
+    id: string;
+    chat_jid: string;
+    agent_id: string;
+    bot_name: string;
+    bot_avatar?: string;
+    is_active: number;
+    config?: string;
+    created_at: string;
+    updated_at: string;
+  } | undefined;
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    chatJid: row.chat_jid,
+    agentId: row.agent_id,
+    botName: row.bot_name,
+    botAvatar: row.bot_avatar,
+    isActive: Boolean(row.is_active),
+    config: row.config ? safeJsonParse(row.config) : undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/**
+ * 获取所有 Bot Identities
+ */
+export function getAllBotIdentities() {
+  const rows = db.prepare('SELECT * FROM bot_identities').all() as Array<{
+    id: string;
+    chat_jid: string;
+    agent_id: string;
+    bot_name: string;
+    bot_avatar?: string;
+    is_active: number;
+    config?: string;
+    created_at: string;
+    updated_at: string;
+  }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    chatJid: row.chat_jid,
+    agentId: row.agent_id,
+    botName: row.bot_name,
+    botAvatar: row.bot_avatar,
+    isActive: Boolean(row.is_active),
+    config: row.config ? safeJsonParse(row.config) : undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+}
+
+/**
+ * 更新 Bot Identity
+ */
+export function updateBotIdentity(
+  id: string,
+  updates: Partial<{
+    chatJid?: string;
+    agentId?: string;
+    botName?: string;
+    botAvatar?: string;
+    config?: Record<string, any>;
+    isActive?: boolean;
+  }>,
+): void {
+  const fields = [];
+  const params = [];
+
+  if (updates.chatJid !== undefined) {
+    fields.push('chat_jid = ?');
+    params.push(updates.chatJid);
+  }
+  if (updates.agentId !== undefined) {
+    fields.push('agent_id = ?');
+    params.push(updates.agentId);
+  }
+  if (updates.botName !== undefined) {
+    fields.push('bot_name = ?');
+    params.push(updates.botName);
+  }
+  if (updates.botAvatar !== undefined) {
+    fields.push('bot_avatar = ?');
+    params.push(updates.botAvatar || null);
+  }
+  if (updates.config !== undefined) {
+    fields.push('config = ?');
+    params.push(JSON.stringify(updates.config));
+  }
+  if (updates.isActive !== undefined) {
+    fields.push('is_active = ?');
+    params.push(updates.isActive ? 1 : 0);
+  }
+
+  fields.push('updated_at = ?');
+  params.push(new Date().toISOString());
+  params.push(id);
+
+  if (fields.length > 1) {
+    db.prepare(`
+      UPDATE bot_identities
+      SET ${fields.join(', ')}
+      WHERE id = ?
+    `).run(...params);
+  }
+}
+
+/**
+ * 删除 Bot Identity
+ */
+export function deleteBotIdentity(id: string): void {
+  db.prepare('DELETE FROM bot_identities WHERE id = ?').run(id);
+}
+
+/**
+ * Collaboration Task 操作函数
+ */
+
+/**
+ * 创建协作任务
+ */
+export function createCollaborationTask(task: {
+  id: string;
+  title: string;
+  description?: string;
+  teamId?: string;
+  assignedAgents: string[];
+  status?: 'pending' | 'in_progress' | 'completed' | 'failed';
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+  progress?: number;
+  dependencies?: string[];
+  context?: string;
+}): void {
+  db.prepare(`
+    INSERT OR REPLACE INTO collaboration_tasks (
+      id, title, description, team_id, assigned_agents, status, priority, progress, dependencies, context, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    task.id,
+    task.title,
+    task.description || null,
+    task.teamId || null,
+    JSON.stringify(task.assignedAgents),
+    task.status || 'pending',
+    task.priority || 'medium',
+    task.progress || 0,
+    JSON.stringify(task.dependencies || []),
+    task.context || null,
+    new Date().toISOString(),
+    new Date().toISOString(),
+  );
+}
+
+/**
+ * 获取协作任务
+ */
+export function getCollaborationTaskById(id: string) {
+  const row = db.prepare('SELECT * FROM collaboration_tasks WHERE id = ?').get(
+    id,
+  ) as {
+    id: string;
+    title: string;
+    description?: string;
+    team_id?: string;
+    assigned_agents: string;
+    status: string;
+    priority: string;
+    progress: number;
+    dependencies: string;
+    context?: string;
+    created_at: string;
+    updated_at: string;
+    completed_at?: string;
+  } | undefined;
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    teamId: row.team_id,
+    assignedAgents: safeJsonParse(row.assigned_agents) as string[],
+    status: row.status as 'pending' | 'in_progress' | 'completed' | 'failed',
+    priority: row.priority as 'low' | 'medium' | 'high' | 'critical',
+    progress: row.progress,
+    dependencies: safeJsonParse(row.dependencies) as string[],
+    context: row.context,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at,
+  };
+}
+
+/**
+ * 获取所有协作任务
+ */
+export function getAllCollaborationTasks() {
+  const rows = db.prepare('SELECT * FROM collaboration_tasks').all() as Array<{
+    id: string;
+    title: string;
+    description?: string;
+    team_id?: string;
+    assigned_agents: string;
+    status: string;
+    priority: string;
+    progress: number;
+    dependencies: string;
+    context?: string;
+    created_at: string;
+    updated_at: string;
+    completed_at?: string;
+  }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    teamId: row.team_id,
+    assignedAgents: safeJsonParse(row.assigned_agents) as string[],
+    status: row.status as 'pending' | 'in_progress' | 'completed' | 'failed',
+    priority: row.priority as 'low' | 'medium' | 'high' | 'critical',
+    progress: row.progress,
+    dependencies: safeJsonParse(row.dependencies) as string[],
+    context: row.context,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at,
+  }));
+}
+
+/**
+ * 更新协作任务
+ */
+export function updateCollaborationTask(
+  id: string,
+  updates: Partial<{
+    title?: string;
+    description?: string;
+    teamId?: string;
+    assignedAgents?: string[];
+    status?: 'pending' | 'in_progress' | 'completed' | 'failed';
+    priority?: 'low' | 'medium' | 'high' | 'critical';
+    progress?: number;
+    dependencies?: string[];
+    context?: string;
+    completedAt?: string;
+  }>,
+): void {
+  const fields = [];
+  const params = [];
+
+  if (updates.title !== undefined) {
+    fields.push('title = ?');
+    params.push(updates.title);
+  }
+  if (updates.description !== undefined) {
+    fields.push('description = ?');
+    params.push(updates.description || null);
+  }
+  if (updates.teamId !== undefined) {
+    fields.push('team_id = ?');
+    params.push(updates.teamId || null);
+  }
+  if (updates.assignedAgents !== undefined) {
+    fields.push('assigned_agents = ?');
+    params.push(JSON.stringify(updates.assignedAgents));
+  }
+  if (updates.status !== undefined) {
+    fields.push('status = ?');
+    params.push(updates.status);
+  }
+  if (updates.priority !== undefined) {
+    fields.push('priority = ?');
+    params.push(updates.priority);
+  }
+  if (updates.progress !== undefined) {
+    fields.push('progress = ?');
+    params.push(updates.progress);
+  }
+  if (updates.dependencies !== undefined) {
+    fields.push('dependencies = ?');
+    params.push(JSON.stringify(updates.dependencies));
+  }
+  if (updates.context !== undefined) {
+    fields.push('context = ?');
+    params.push(updates.context || null);
+  }
+  if (updates.completedAt !== undefined) {
+    fields.push('completed_at = ?');
+    params.push(updates.completedAt);
+  }
+
+  fields.push('updated_at = ?');
+  params.push(new Date().toISOString());
+  params.push(id);
+
+  if (fields.length > 1) {
+    db.prepare(`
+      UPDATE collaboration_tasks
+      SET ${fields.join(', ')}
+      WHERE id = ?
+    `).run(...params);
+  }
+}
+
+/**
+ * 删除协作任务
+ */
+export function deleteCollaborationTask(id: string): void {
+  db.prepare('DELETE FROM collaboration_tasks WHERE id = ?').run(id);
+}
+
+/**
+ * Team State 操作函数
+ */
+
+/**
+ * 创建团队状态
+ */
+export function createTeamState(team: {
+  id: string;
+  name: string;
+  description?: string;
+  members: string[];
+  leaderId?: string;
+  collaborationMode?: 'hierarchical' | 'peer-to-peer' | 'swarm';
+}): void {
+  db.prepare(`
+    INSERT OR REPLACE INTO team_states (
+      id, name, description, members, leader_id, collaboration_mode, status, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
+  `).run(
+    team.id,
+    team.name,
+    team.description || null,
+    JSON.stringify(team.members),
+    team.leaderId || null,
+    team.collaborationMode || 'peer-to-peer',
+    new Date().toISOString(),
+    new Date().toISOString(),
+  );
+}
+
+/**
+ * 获取团队状态
+ */
+export function getTeamStateById(id: string) {
+  const row = db.prepare('SELECT * FROM team_states WHERE id = ?').get(
+    id,
+  ) as {
+    id: string;
+    name: string;
+    description?: string;
+    members: string;
+    leader_id?: string;
+    status: string;
+    collaboration_mode: string;
+    created_at: string;
+    updated_at: string;
+  } | undefined;
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    members: safeJsonParse(row.members) as string[],
+    leaderId: row.leader_id,
+    status: row.status as 'active' | 'inactive' | 'dissolved',
+    collaborationMode: row.collaboration_mode as 'hierarchical' | 'peer-to-peer' | 'swarm',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/**
+ * 获取所有团队状态
+ */
+export function getAllTeamStates() {
+  const rows = db.prepare('SELECT * FROM team_states').all() as Array<{
+    id: string;
+    name: string;
+    description?: string;
+    members: string;
+    leader_id?: string;
+    status: string;
+    collaboration_mode: string;
+    created_at: string;
+    updated_at: string;
+  }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    members: safeJsonParse(row.members) as string[],
+    leaderId: row.leader_id,
+    status: row.status as 'active' | 'inactive' | 'dissolved',
+    collaborationMode: row.collaboration_mode as 'hierarchical' | 'peer-to-peer' | 'swarm',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+}
+
+/**
+ * 更新团队状态
+ */
+export function updateTeamState(
+  id: string,
+  updates: Partial<{
+    name?: string;
+    description?: string;
+    members?: string[];
+    leaderId?: string;
+    status?: 'active' | 'inactive' | 'dissolved';
+    collaborationMode?: 'hierarchical' | 'peer-to-peer' | 'swarm';
+  }>,
+): void {
+  const fields = [];
+  const params = [];
+
+  if (updates.name !== undefined) {
+    fields.push('name = ?');
+    params.push(updates.name);
+  }
+  if (updates.description !== undefined) {
+    fields.push('description = ?');
+    params.push(updates.description || null);
+  }
+  if (updates.members !== undefined) {
+    fields.push('members = ?');
+    params.push(JSON.stringify(updates.members));
+  }
+  if (updates.leaderId !== undefined) {
+    fields.push('leader_id = ?');
+    params.push(updates.leaderId || null);
+  }
+  if (updates.status !== undefined) {
+    fields.push('status = ?');
+    params.push(updates.status);
+  }
+  if (updates.collaborationMode !== undefined) {
+    fields.push('collaboration_mode = ?');
+    params.push(updates.collaborationMode);
+  }
+
+  fields.push('updated_at = ?');
+  params.push(new Date().toISOString());
+  params.push(id);
+
+  if (fields.length > 1) {
+    db.prepare(`
+      UPDATE team_states
+      SET ${fields.join(', ')}
+      WHERE id = ?
+    `).run(...params);
+  }
+}
+
+/**
+ * 删除团队状态
+ */
+export function deleteTeamState(id: string): void {
+  db.prepare('DELETE FROM team_states WHERE id = ?').run(id);
+}
+
+/**
+ * Team Collaboration State 操作函数
+ */
+
+/**
+ * 创建团队协作状态
+ */
+export function createTeamCollaborationState(state: {
+  id: string;
+  teamId: string;
+  taskId?: string;
+  status?: 'planning' | 'executing' | 'reviewing' | 'completed';
+  progress?: number;
+  activeAgents: string[];
+}): void {
+  db.prepare(`
+    INSERT OR REPLACE INTO team_collaboration_states (
+      id, team_id, task_id, status, progress, active_agents, last_activity, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    state.id,
+    state.teamId,
+    state.taskId || null,
+    state.status || 'planning',
+    state.progress || 0,
+    JSON.stringify(state.activeAgents),
+    new Date().toISOString(),
+    new Date().toISOString(),
+    new Date().toISOString(),
+  );
+}
+
+/**
+ * 获取团队协作状态
+ */
+export function getTeamCollaborationStateById(id: string) {
+  const row = db.prepare('SELECT * FROM team_collaboration_states WHERE id = ?').get(
+    id,
+  ) as {
+    id: string;
+    team_id: string;
+    task_id?: string;
+    status: string;
+    progress: number;
+    active_agents: string;
+    last_activity: string;
+    created_at: string;
+    updated_at: string;
+  } | undefined;
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    teamId: row.team_id,
+    taskId: row.task_id,
+    status: row.status as 'planning' | 'executing' | 'reviewing' | 'completed',
+    progress: row.progress,
+    activeAgents: safeJsonParse(row.active_agents) as string[],
+    lastActivity: row.last_activity,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/**
+ * 更新团队协作状态
+ */
+export function updateTeamCollaborationState(
+  id: string,
+  updates: Partial<{
+    taskId?: string;
+    status?: 'planning' | 'executing' | 'reviewing' | 'completed';
+    progress?: number;
+    activeAgents?: string[];
+    lastActivity?: string;
+  }>,
+): void {
+  const fields = [];
+  const params = [];
+
+  if (updates.taskId !== undefined) {
+    fields.push('task_id = ?');
+    params.push(updates.taskId || null);
+  }
+  if (updates.status !== undefined) {
+    fields.push('status = ?');
+    params.push(updates.status);
+  }
+  if (updates.progress !== undefined) {
+    fields.push('progress = ?');
+    params.push(updates.progress);
+  }
+  if (updates.activeAgents !== undefined) {
+    fields.push('active_agents = ?');
+    params.push(JSON.stringify(updates.activeAgents));
+  }
+  if (updates.lastActivity !== undefined) {
+    fields.push('last_activity = ?');
+    params.push(updates.lastActivity);
+  } else {
+    fields.push('last_activity = ?');
+    params.push(new Date().toISOString());
+  }
+
+  fields.push('updated_at = ?');
+  params.push(new Date().toISOString());
+  params.push(id);
+
+  if (fields.length > 1) {
+    db.prepare(`
+      UPDATE team_collaboration_states
+      SET ${fields.join(', ')}
+      WHERE id = ?
+    `).run(...params);
+  }
+}
+
+/**
+ * 删除团队协作状态
+ */
+export function deleteTeamCollaborationState(id: string): void {
+  db.prepare('DELETE FROM team_collaboration_states WHERE id = ?').run(id);
 }
 
 /**

@@ -106,7 +106,10 @@ export function sanitizeWebContent(html: string): string {
   sanitized = sanitized.replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '');
 
   // 移除隐藏的 DOM 元素
-  sanitized = sanitized.replace(/<[^>]*style\s*=\s*["'].*?display\s*:\s*none.*?["'][^>]*>[\s\S]*?<\/[^>]*>/gi, '');
+  sanitized = sanitized.replace(
+    /<[^>]*style\s*=\s*["'].*?display\s*:\s*none.*?["'][^>]*>[\s\S]*?<\/[^>]*>/gi,
+    '',
+  );
 
   // 转义潜在的恶意脚本
   sanitized = sanitized.replace(/javascript:/gi, 'javascript:');
@@ -123,15 +126,23 @@ export function detectSensitiveDataLeak(content: string): string[] {
   // API 密钥模式检测
   const apiKeyPatterns = [
     /(?:api|token|key|secret|password|passwd)\s*[=:]\s*["']?[a-zA-Z0-9_\\-]{16,}["']?/i,
-    /[a-zA-Z0-9_\\-]{16,}/.test(content) ? (content.match(/[a-zA-Z0-9_\\-]{16,}/g) || []).filter(token =>
-      token.length >= 16 && !/^[\d]+$/.test(token)
-    ) : [],
-  ].flat().filter(Boolean);
+    /[a-zA-Z0-9_\\-]{16,}/.test(content)
+      ? (content.match(/[a-zA-Z0-9_\\-]{16,}/g) || []).filter(
+          (token) => token.length >= 16 && !/^[\d]+$/.test(token),
+        )
+      : [],
+  ]
+    .flat()
+    .filter(Boolean);
 
   for (const pattern of apiKeyPatterns) {
     if (typeof pattern === 'string') {
       // 简单的密钥检测
-      if (pattern.length >= 16 && pattern.length <= 64 && !/^[\d]+$/.test(pattern)) {
+      if (
+        pattern.length >= 16 &&
+        pattern.length <= 64 &&
+        !/^[\d]+$/.test(pattern)
+      ) {
         issues.push(`Potential API key detected: ${pattern.slice(0, 8)}...`);
       }
     } else if (pattern.test(content)) {
@@ -159,9 +170,11 @@ export function detectSensitiveDataLeak(content: string): string[] {
   for (const pattern of sensitivePatterns) {
     const matches = content.match(pattern);
     if (matches) {
-      matches.forEach(match => {
+      matches.forEach((match) => {
         if (match.length >= 8) {
-          issues.push(`Potential sensitive information detected: ${match.slice(0, 8)}...`);
+          issues.push(
+            `Potential sensitive information detected: ${match.slice(0, 8)}...`,
+          );
         }
       });
     }
@@ -294,7 +307,7 @@ export function isDangerousOperation(command: string): boolean {
     /\b(ping|nc|netcat|telnet)\b/i,
   ];
 
-  return dangerousPatterns.some(pattern => pattern.test(command));
+  return dangerousPatterns.some((pattern) => pattern.test(command));
 }
 
 /**

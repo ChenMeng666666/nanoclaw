@@ -927,6 +927,292 @@ export async function startRuntimeAPI(
         return;
       }
 
+      // ===== 协作系统 API =====
+
+      // 智能体间消息 API
+      if (path === '/api/collaboration/messages/send' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { fromAgentId, toAgentId, type, content, metadata } = body;
+
+        if (!fromAgentId || !toAgentId || !type || !content) {
+          writeJSON(res, 400, { error: 'Missing required fields' });
+          return;
+        }
+
+        const { sendAgentMessage } = await import('./agent-communication.js');
+        const messageId = sendAgentMessage(
+          fromAgentId as string,
+          toAgentId as string,
+          type as any,
+          content as string,
+          metadata as Record<string, unknown>,
+        );
+
+        writeJSON(res, 200, { id: messageId, status: 'sent' });
+        return;
+      }
+
+      if (path === '/api/collaboration/messages/receive' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { agentId } = body;
+
+        if (!agentId) {
+          writeJSON(res, 400, { error: 'Missing agentId' });
+          return;
+        }
+
+        const { receiveAgentMessages } = await import('./agent-communication.js');
+        const messages = receiveAgentMessages(agentId as string);
+
+        writeJSON(res, 200, { messages });
+        return;
+      }
+
+      if (path === '/api/collaboration/messages/status' && req.method === 'GET') {
+        const messageId = url.searchParams.get('messageId');
+
+        if (!messageId) {
+          writeJSON(res, 400, { error: 'Missing messageId' });
+          return;
+        }
+
+        const { getAgentMessageStatus } = await import('./agent-communication.js');
+        const status = getAgentMessageStatus(messageId);
+
+        writeJSON(res, 200, { status });
+        return;
+      }
+
+      // 协作任务 API
+      if (path === '/api/collaboration/tasks' && req.method === 'GET') {
+        const status = url.searchParams.get('status');
+        const teamId = url.searchParams.get('teamId');
+
+        const { getAllCollaborationTasks } = await import('./db.js');
+        let tasks = getAllCollaborationTasks();
+
+        if (status) {
+          tasks = tasks.filter((t) => t.status === status);
+        }
+
+        if (teamId) {
+          tasks = tasks.filter((t) => t.teamId === teamId);
+        }
+
+        writeJSON(res, 200, { tasks });
+        return;
+      }
+
+      if (path === '/api/collaboration/task/create' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const {
+          title,
+          description,
+          teamId,
+          assignedAgents,
+          status,
+          priority,
+          dependencies,
+          context,
+        } = body;
+
+        if (!title || !assignedAgents) {
+          writeJSON(res, 400, { error: 'Missing required fields' });
+          return;
+        }
+
+        const taskId = `collab-task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+        const { createCollaborationTask } = await import('./db.js');
+        createCollaborationTask({
+          id: taskId,
+          title: String(title),
+          description: description as string | undefined,
+          teamId: teamId as string | undefined,
+          assignedAgents: Array.isArray(assignedAgents) ? assignedAgents : [],
+          status: (status as 'pending' | 'in_progress' | 'completed' | 'failed') || 'pending',
+          priority: (priority as 'low' | 'medium' | 'high' | 'critical') || 'medium',
+          dependencies: Array.isArray(dependencies) ? dependencies : [],
+          context: context as string | undefined,
+          progress: 0,
+        });
+
+        writeJSON(res, 200, { id: taskId, status: 'created' });
+        return;
+      }
+
+      if (path === '/api/collaboration/task/update' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { taskId, updates } = body;
+
+        if (!taskId || !updates) {
+          writeJSON(res, 400, { error: 'Missing required fields' });
+          return;
+        }
+
+        const { updateCollaborationTask } = await import('./db.js');
+        updateCollaborationTask(
+          taskId as string,
+          updates as Parameters<typeof updateCollaborationTask>[1],
+        );
+
+        writeJSON(res, 200, { success: true });
+        return;
+      }
+
+      if (path === '/api/collaboration/task/progress' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { taskId, progress, status } = body;
+
+        if (!taskId || progress === undefined) {
+          writeJSON(res, 400, { error: 'Missing required fields' });
+          return;
+        }
+
+        const { updateTaskProgress } = await import('./collaboration-scheduler.js');
+        updateTaskProgress(
+          taskId as string,
+          Number(progress),
+          status as 'pending' | 'in_progress' | 'completed' | 'failed' | undefined,
+        );
+
+        writeJSON(res, 200, { success: true });
+        return;
+      }
+
+      // 团队管理 API
+      if (path === '/api/collaboration/teams' && req.method === 'GET') {
+        const { getAllTeamStates } = await import('./db.js');
+        const teams = getAllTeamStates();
+
+        writeJSON(res, 200, { teams });
+        return;
+      }
+
+      if (path === '/api/collaboration/team/create' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { name, description, members, collaborationMode } = body;
+
+        if (!name) {
+          writeJSON(res, 400, { error: 'Missing required fields' });
+          return;
+        }
+
+        const { createTeam } = await import('./team-manager.js');
+        const teamId = createTeam(
+          String(name),
+          description as string | undefined,
+          Array.isArray(members) ? members : [],
+          collaborationMode as 'hierarchical' | 'peer-to-peer' | 'swarm' | undefined,
+        );
+
+        writeJSON(res, 200, { id: teamId, status: 'created' });
+        return;
+      }
+
+      if (path === '/api/collaboration/team/update' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { teamId, updates } = body;
+
+        if (!teamId || !updates) {
+          writeJSON(res, 400, { error: 'Missing required fields' });
+          return;
+        }
+
+        const { updateTeamState } = await import('./db.js');
+        updateTeamState(teamId as string, updates);
+
+        writeJSON(res, 200, { success: true });
+        return;
+      }
+
+      if (path === '/api/collaboration/team/add-member' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { teamId, agentId } = body;
+
+        if (!teamId || !agentId) {
+          writeJSON(res, 400, { error: 'Missing required fields' });
+          return;
+        }
+
+        const { addMemberToTeam } = await import('./team-manager.js');
+        addMemberToTeam(teamId as string, agentId as string);
+
+        writeJSON(res, 200, { success: true });
+        return;
+      }
+
+      if (path === '/api/collaboration/team/remove-member' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { teamId, agentId } = body;
+
+        if (!teamId || !agentId) {
+          writeJSON(res, 400, { error: 'Missing required fields' });
+          return;
+        }
+
+        const { removeMemberFromTeam } = await import('./team-manager.js');
+        removeMemberFromTeam(teamId as string, agentId as string);
+
+        writeJSON(res, 200, { success: true });
+        return;
+      }
+
+      if (path === '/api/collaboration/team/health' && req.method === 'GET') {
+        const teamId = url.searchParams.get('teamId');
+
+        if (!teamId) {
+          writeJSON(res, 400, { error: 'Missing teamId' });
+          return;
+        }
+
+        const { checkTeamHealth } = await import('./team-manager.js');
+        const health = checkTeamHealth(teamId);
+
+        writeJSON(res, 200, health);
+        return;
+      }
+
+      // Bot Identity API
+      if (path === '/api/collaboration/bot-identity' && req.method === 'GET') {
+        const chatJid = url.searchParams.get('chatJid');
+
+        if (!chatJid) {
+          writeJSON(res, 400, { error: 'Missing chatJid' });
+          return;
+        }
+
+        const { getBotIdentityByChatJid } = await import('./db.js');
+        const identity = getBotIdentityByChatJid(chatJid);
+
+        writeJSON(res, 200, { identity });
+        return;
+      }
+
+      if (path === '/api/collaboration/bot-identity/create' && req.method === 'POST') {
+        const body = await readJSON(req);
+        const { chatJid, agentId, botName, botAvatar, config } = body;
+
+        if (!chatJid || !agentId || !botName) {
+          writeJSON(res, 400, { error: 'Missing required fields' });
+          return;
+        }
+
+        const identityId = `bot-identity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const { createBotIdentity } = await import('./db.js');
+        createBotIdentity({
+          id: identityId,
+          chatJid: String(chatJid),
+          agentId: String(agentId),
+          botName: String(botName),
+          botAvatar: botAvatar as string | undefined,
+          config: config as Record<string, any> | undefined,
+        });
+
+        writeJSON(res, 200, { id: identityId, status: 'created' });
+        return;
+      }
+
       // ===== Gene 选择 API =====
 
       if (path === '/api/evolution/select-gene' && req.method === 'POST') {

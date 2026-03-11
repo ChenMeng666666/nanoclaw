@@ -133,14 +133,19 @@ class SkillVerifier {
   /**
    * 验证技能签名
    */
-  private verifySignature(skillPath: string, signatureFile: string): SkillVerificationResult {
+  private verifySignature(
+    skillPath: string,
+    signatureFile: string,
+  ): SkillVerificationResult {
     const result: SkillVerificationResult = {
       verified: false,
       issues: [],
     };
 
     try {
-      const signature: SkillSignature = JSON.parse(fs.readFileSync(signatureFile, 'utf8'));
+      const signature: SkillSignature = JSON.parse(
+        fs.readFileSync(signatureFile, 'utf8'),
+      );
 
       // 计算技能目录的哈希
       const computedHash = this.calculateSkillHash(skillPath, signatureFile);
@@ -239,7 +244,9 @@ class SkillVerifier {
       for (const pattern of dangerousPatterns) {
         const matches = content.match(pattern);
         if (matches) {
-          issues.push(`Dangerous pattern detected in ${path.relative(skillPath, filePath)}`);
+          issues.push(
+            `Dangerous pattern detected in ${path.relative(skillPath, filePath)}`,
+          );
           break;
         }
       }
@@ -258,8 +265,8 @@ class SkillVerifier {
 
     return fs
       .readdirSync(skillsDir, { withFileTypes: true })
-      .filter(dirent => dirent.isDirectory())
-      .map(dirent => dirent.name);
+      .filter((dirent) => dirent.isDirectory())
+      .map((dirent) => dirent.name);
   }
 
   /**
@@ -277,7 +284,15 @@ class SkillVerifier {
         ...result,
         // 添加技能名称到结果中
       });
-      logger.debug({ skillName, verified: result.verified, issues: result.issues, warnings: result.warnings }, 'Skill verification result');
+      logger.debug(
+        {
+          skillName,
+          verified: result.verified,
+          issues: result.issues,
+          warnings: result.warnings,
+        },
+        'Skill verification result',
+      );
     }
 
     return results;
@@ -286,7 +301,10 @@ class SkillVerifier {
   /**
    * 生成技能签名（仅限开发使用）
    */
-  generateSkillSignature(skillPath: string, signer: string = 'NanoClaw'): SkillSignature {
+  generateSkillSignature(
+    skillPath: string,
+    signer: string = 'NanoClaw',
+  ): SkillSignature {
     const signatureFile = path.join(skillPath, 'signature.json');
     const hash = this.calculateSkillHash(skillPath, signatureFile);
 
@@ -299,7 +317,10 @@ class SkillVerifier {
     };
 
     fs.writeFileSync(signatureFile, JSON.stringify(signature, null, 2));
-    logger.debug({ skillPath, signatureId: signature.id }, 'Skill signature generated');
+    logger.debug(
+      { skillPath, signatureId: signature.id },
+      'Skill signature generated',
+    );
 
     return signature;
   }
