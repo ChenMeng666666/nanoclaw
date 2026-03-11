@@ -13,7 +13,7 @@
  * 8. 完整数据清理
  */
 
-import { initDatabase, createTask, getDueTasks, deleteTask } from '../src/db.js';
+import { _initTestDatabase, createTask, getDueTasks, deleteTask } from '../src/db.js';
 import { MemoryManager } from '../src/memory-manager.js';
 import { EvolutionManager } from '../src/evolution-manager.js';
 import { ReflectionScheduler } from '../src/reflection-scheduler.js';
@@ -57,7 +57,7 @@ async function testFullAgentFlow() {
 
     // 1. 初始化数据库和测试数据
     logger.info('1. 初始化测试环境');
-    initDatabase();
+    _initTestDatabase();
 
     // 创建测试 Agent 1
     logger.debug('  创建测试 Agent 1');

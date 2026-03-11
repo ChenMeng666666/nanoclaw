@@ -221,3 +221,88 @@ export function validateAllConfig(): boolean {
 
   return allValid;
 }
+
+// ===== 进化系统配置 (符合 GEP 标准) =====
+
+// 进化系统策略配置
+export const EVOLUTION_CONFIG = {
+  // 当前进化策略
+  strategy: validateConfig(
+    process.env.EVOLUTION_STRATEGY || 'balanced',
+    (v) =>
+      ['balanced', 'repair', 'optimize', 'innovate', 'repair-only'].includes(v),
+    'balanced' as any,
+    'EVOLUTION_STRATEGY',
+  ),
+
+  // 自动审核阈值
+  autoApproveThreshold: validateConfig(
+    parseFloat(process.env.EVOLUTION_AUTO_APPROVE_THRESHOLD || '0.9'),
+    (v) => typeof v === 'number' && v >= 0 && v <= 1,
+    0.9,
+    'EVOLUTION_AUTO_APPROVE_THRESHOLD',
+  ),
+
+  // 是否需要用户终审
+  requireUserReview: validateConfig(
+    (process.env.EVOLUTION_REQUIRE_USER_REVIEW || 'false') === 'true',
+    validateBoolean,
+    false,
+    'EVOLUTION_REQUIRE_USER_REVIEW',
+  ),
+
+  // 验证命令白名单
+  allowedCommandPrefixes: [
+    'node',
+    'npm',
+    'npx',
+    'tsx',
+    'vitest',
+    'jest',
+    'eslint',
+  ],
+
+  // 禁止的 shell 操作符
+  forbiddenOperators: ['&&', '||', ';', '|', '>', '<', '`', '$('],
+
+  // 信号去重阈值
+  duplicateThreshold: {
+    sameAuthor: 0.92,
+    differentAuthor: 0.95,
+  },
+
+  // Gene → Capsule 晋升条件
+  capsulePromotion: {
+    minSuccessCount: 3,
+    minSuccessStreak: 3,
+    minConfidence: 0.5,
+  },
+
+  // GDI 自动晋升条件
+  gdiPromotionThreshold: 25,
+
+  // 生态系统指标快照间隔 (毫秒)
+  metricsSnapshotInterval: 60000 * 60, // 1小时
+
+  // 验证超时 (毫秒)
+  validationTimeout: 60000 * 5, // 5分钟
+};
+
+// 验证命令安全
+export function isCommandAllowed(command: string): boolean {
+  const trimmedCommand = command.trim();
+
+  // 检查白名单前缀
+  const hasAllowedPrefix = EVOLUTION_CONFIG.allowedCommandPrefixes.some(
+    (prefix) => trimmedCommand.startsWith(prefix),
+  );
+  if (!hasAllowedPrefix) return false;
+
+  // 检查禁止的操作符
+  const hasForbiddenOperator = EVOLUTION_CONFIG.forbiddenOperators.some((op) =>
+    trimmedCommand.includes(op),
+  );
+  if (hasForbiddenOperator) return false;
+
+  return true;
+}

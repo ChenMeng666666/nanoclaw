@@ -1,50 +1,97 @@
 /**
- * 进化系统
- * 实现共享经验库：上传 → 审核 → 查询 → 使用反馈 → 修改 → 再审核
+ * 进化系统 (符合 GEP 1.5.0 标准)
  *
- * Gene 结构支持：
- * - category: 行动类别（repair/optimize/innovate/learn）
- * - signalsMatch: 匹配的信号类型
- * - strategy: 执行策略
- * - constraints: 执行约束
- * - validation: 验证命令
+ * 实现完整的 Genome Evolution Protocol (GEP) 协议：
+ * - GEPAsset: 基础资产接口
+ * - GEPGene: 符合 GEP 标准的 Gene 结构
+ * - GEPCapsule: 验证后的执行结果胶囊
+ * - GDIScore: 全球期望指数评分
+ * - 信号去重机制 (防止微编辑 farming)
+ * - 验证命令安全机制
+ * - 三阶段进化策略 (Repair → Optimize → Innovate)
+ * - 能力链概念 (Chain ID)
+ * - 生态系统指标
  */
+import crypto from 'crypto';
+import os from 'os';
 import { generateEmbedding } from './embedding-providers/registry.js';
 import {
   createEvolutionEntry,
   getEvolutionEntry,
   getApprovedEvolutionEntries,
   getEvolutionEntriesByCategory,
+  getEvolutionEntriesByStatus,
+  getEvolutionEntryByAssetId,
   updateEvolutionStatus,
+  updateGeneStatus,
+  updateGeneChainId,
+  updateGeneGDIScore,
   addEvolutionFeedback,
   logAudit,
   CreateGeneInput,
+  getDuplicateEvolutionEntry,
+  getDatabase,
+  createCapsule,
+  getCapsuleById,
+  getCapsulesByGeneId,
+  updateCapsuleSuccessStreak,
+  createAbilityChain,
+  getAbilityChain,
+  updateAbilityChain,
+  addGeneToChain,
+  addCapsuleToChain,
+  createValidationReport,
+  getValidationReportsByGeneId,
+  createEcosystemMetrics,
+  getEcosystemMetrics,
 } from './db-agents.js';
-import { EvolutionEntry, Gene, MainExperienceInput } from './types.js';
+import {
+  EvolutionEntry,
+  Gene,
+  MainExperienceInput,
+  GEP_SCHEMA_VERSION,
+  generateAssetId,
+  GDIScore,
+  DuplicateCheckResult,
+  EcosystemMetrics,
+  EvolutionStrategy,
+  STRATEGY_CONFIGS,
+  StrategyConfig,
+} from './types.js';
 import { logger } from './logger.js';
 import {
   extractSignals,
   getRecommendedGeneCategory,
   Signal,
 } from './signal-extractor.js';
-import { getDatabase } from './db-agents.js';
+import { EVOLUTION_CONFIG, isCommandAllowed } from './config.js';
+
+// ===== 配置和常量 =====
+
+// 验证命令白名单
+const ALLOWED_COMMAND_PREFIXES = EVOLUTION_CONFIG.allowedCommandPrefixes;
+
+// 禁止的 shell 操作符
+const FORBIDDEN_OPERATORS = EVOLUTION_CONFIG.forbiddenOperators;
 
 /**
  * 审核配置
  */
 export interface ReviewConfig {
-  autoApproveThreshold: number; // 自动通过的置信度阈值 (0.9)
-  requireUserReview: boolean; // 是否需要用户终审
-  seniorAgentIds?: string[]; // 高级 agent ID 列表
+  autoApproveThreshold: number;
+  requireUserReview: boolean;
+  seniorAgentIds?: string[];
+  strategy: EvolutionStrategy;
 }
 
 /**
- * 进化系统配置
+ * 默认配置
  */
 const DEFAULT_CONFIG: ReviewConfig = {
-  autoApproveThreshold: 0.9,
-  requireUserReview: false,
+  autoApproveThreshold: EVOLUTION_CONFIG.autoApproveThreshold,
+  requireUserReview: EVOLUTION_CONFIG.requireUserReview,
   seniorAgentIds: [],
+  strategy: EVOLUTION_CONFIG.strategy,
 };
 
 /**
@@ -98,18 +145,40 @@ const REVIEW_AGENTS: ReviewAgent[] = [
   },
 ];
 
+// ===== 进化系统类 =====
+
 /**
- * 进化系统类
+ * 进化系统类 (符合 GEP 标准)
  */
 export class EvolutionManager {
   private config: ReviewConfig;
+  private strategyConfig: StrategyConfig;
 
   constructor(config: Partial<ReviewConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.strategyConfig = STRATEGY_CONFIGS[this.config.strategy];
   }
 
   /**
-   * 上传经验到进化库（带自动初审）
+   * 更新进化策略
+   */
+  setStrategy(strategy: EvolutionStrategy): void {
+    this.config.strategy = strategy;
+    this.strategyConfig = STRATEGY_CONFIGS[strategy];
+    logger.info({ strategy }, 'Evolution strategy updated');
+  }
+
+  /**
+   * 获取当前策略配置
+   */
+  getStrategyConfig(): StrategyConfig {
+    return this.strategyConfig;
+  }
+
+  // ===== GEP 协议：Gene 提交和审核 =====
+
+  /**
+   * 上传经验到进化库（符合 GEP 标准，带自动初审）
    */
   async submitExperience(
     abilityName: string,
@@ -120,15 +189,49 @@ export class EvolutionManager {
   ): Promise<number> {
     logger.info(
       { abilityName, sourceAgentId, contentLength: content.length },
-      'Submitting experience to evolution',
+      'Submitting experience to evolution (GEP)',
     );
+
+    // 检查重复提交
+    const contentHash = crypto
+      .createHash('sha256')
+      .update(content)
+      .digest('hex');
+    const duplicate = getDuplicateEvolutionEntry(abilityName, contentHash, 24);
+    if (duplicate) {
+      logger.info(
+        { duplicateId: duplicate.id, abilityName },
+        'Duplicate experience submission detected',
+      );
+      return duplicate.id;
+    }
 
     // 从内容中提取信号
     const signals = extractSignals({ content });
-    const category = getRecommendedGeneCategory(signals);
+    const category = this.getStrategyBasedCategory(signals);
 
     // 生成向量嵌入
     const embedding = await generateEmbedding(content);
+
+    // 生成 asset_id (GEP 标准)
+    const assetId = generateAssetId(content);
+
+    // 检查信号去重
+    const duplicateCheck = await this.checkDuplicateSignal(
+      content,
+      sourceAgentId,
+    );
+    if (duplicateCheck.isDuplicate) {
+      logger.warn(
+        {
+          abilityName,
+          similarity: duplicateCheck.similarity,
+          reason: duplicateCheck.reason,
+        },
+        'Signal duplicate detected, rejecting submission',
+      );
+      throw new Error(`Duplicate signal detected: ${duplicateCheck.reason}`);
+    }
 
     // 自动初审：基于规则和内容质量
     const autoReview = await this.autoReviewEntry({
@@ -147,11 +250,11 @@ export class EvolutionManager {
       status = 'approved';
       logger.info(
         { abilityName, confidence: autoReview.confidence },
-        'Experience auto-approved',
+        'Experience auto-approved (GEP)',
       );
     }
 
-    // 创建条目（包含 Gene 结构字段）
+    // 创建条目（符合 GEP 标准的 Gene 结构）
     const id = createEvolutionEntry({
       abilityName,
       description,
@@ -164,22 +267,46 @@ export class EvolutionManager {
       signalsMatch: signals.map((s) => s.type),
     });
 
+    // 更新 GEP 标准字段
+    const db = getDatabase();
+    db.prepare(
+      `
+      UPDATE evolution_log
+      SET schema_version = ?, asset_id = ?, summary = ?,
+          preconditions = ?, validation_commands = ?, ecosystem_status = ?
+      WHERE id = ?
+    `,
+    ).run(
+      GEP_SCHEMA_VERSION,
+      assetId,
+      description || abilityName,
+      JSON.stringify([]),
+      JSON.stringify([]),
+      'stale',
+      id,
+    );
+
     // 记录审计日志
     logAudit({
       agentFolder: sourceAgentId,
       action: 'create',
-      entityType: 'evolution',
+      entityType: 'gene',
       entityId: String(id),
-      details: { abilityName, status, category, signalCount: signals.length },
+      details: {
+        abilityName,
+        status,
+        category,
+        signalCount: signals.length,
+        assetId,
+      },
     });
 
     // 提交后立即触发审核，不等待定时任务
     if (status === 'pending') {
       logger.info(
         { id, abilityName },
-        'Experience submitted, triggering immediate review',
+        'Experience submitted, triggering immediate review (GEP)',
       );
-      // 重新获取完整的条目数据用于审核
       const fullEntry = getEvolutionEntry(id);
       if (fullEntry) {
         await this.autoReviewPendingEntry(fullEntry);
@@ -187,7 +314,7 @@ export class EvolutionManager {
     } else {
       logger.info(
         { id, abilityName },
-        'Experience auto-approved and added to evolution library',
+        'Experience auto-approved and added to evolution library (GEP)',
       );
     }
 
@@ -195,10 +322,15 @@ export class EvolutionManager {
   }
 
   /**
-   * 提交 Gene 到进化库（完整 Gene 结构）
+   * 提交 Gene 到进化库（完整 GEP Gene 结构）
    */
   async submitGene(
-    input: Omit<CreateGeneInput, 'contentEmbedding'>,
+    input: Omit<CreateGeneInput, 'contentEmbedding'> & {
+      summary?: string;
+      preconditions?: string[];
+      validationCommands?: string[];
+      chainId?: string;
+    },
   ): Promise<number> {
     logger.info(
       {
@@ -206,11 +338,50 @@ export class EvolutionManager {
         category: input.category,
         sourceAgentId: input.sourceAgentId,
       },
-      'Submitting Gene to evolution',
+      'Submitting Gene to evolution (GEP)',
     );
+
+    // 检查重复提交
+    const contentHash = crypto
+      .createHash('sha256')
+      .update(input.content)
+      .digest('hex');
+    const duplicate = getDuplicateEvolutionEntry(
+      input.abilityName,
+      contentHash,
+      24,
+    );
+    if (duplicate) {
+      logger.info(
+        { duplicateId: duplicate.id, abilityName: input.abilityName },
+        'Duplicate Gene submission detected',
+      );
+      return duplicate.id;
+    }
+
+    // 验证命令安全性
+    if (input.validationCommands) {
+      for (const cmd of input.validationCommands) {
+        if (!this.validateCommandSafety(cmd)) {
+          throw new Error(`Command not allowed: ${cmd}`);
+        }
+      }
+    }
 
     // 生成向量嵌入
     const embedding = await generateEmbedding(input.content);
+
+    // 生成 asset_id (GEP 标准)
+    const assetId = generateAssetId(input.content);
+
+    // 检查信号去重
+    const duplicateCheck = await this.checkDuplicateSignal(
+      input.content,
+      input.sourceAgentId,
+    );
+    if (duplicateCheck.isDuplicate) {
+      throw new Error(`Duplicate signal detected: ${duplicateCheck.reason}`);
+    }
 
     // 自动初审
     const autoReview = await this.autoReviewEntry({
@@ -236,6 +407,26 @@ export class EvolutionManager {
       status,
     });
 
+    // 更新 GEP 标准字段
+    const db = getDatabase();
+    db.prepare(
+      `
+      UPDATE evolution_log
+      SET schema_version = ?, asset_id = ?, summary = ?,
+          preconditions = ?, validation_commands = ?, chain_id = ?, ecosystem_status = ?
+      WHERE id = ?
+    `,
+    ).run(
+      GEP_SCHEMA_VERSION,
+      assetId,
+      input.summary || input.abilityName,
+      JSON.stringify(input.preconditions || []),
+      JSON.stringify(input.validationCommands || []),
+      input.chainId || null,
+      'stale',
+      id,
+    );
+
     // 记录审计日志
     logAudit({
       agentFolder: input.sourceAgentId,
@@ -247,16 +438,21 @@ export class EvolutionManager {
         status,
         category: input.category,
         signalCount: input.signalsMatch?.length || 0,
+        assetId,
       },
     });
 
-    // 提交后立即触发审核，不等待定时任务
+    // 如果有 chain_id，添加到能力链
+    if (input.chainId) {
+      addGeneToChain(input.chainId, assetId);
+    }
+
+    // 提交后立即触发审核
     if (status === 'pending') {
       logger.info(
         { id, abilityName: input.abilityName },
-        'Gene submitted, triggering immediate review',
+        'Gene submitted, triggering immediate review (GEP)',
       );
-      // 重新获取完整的条目数据用于审核
       const fullEntry = getEvolutionEntry(id);
       if (fullEntry) {
         await this.autoReviewPendingEntry(fullEntry);
@@ -264,11 +460,632 @@ export class EvolutionManager {
     } else {
       logger.info(
         { id, abilityName: input.abilityName },
-        'Gene auto-approved and added to evolution library',
+        'Gene auto-approved and added to evolution library (GEP)',
       );
     }
 
     return id;
+  }
+
+  // ===== GEP 协议：Capsule 管理 =====
+
+  /**
+   * 创建 Capsule（验证后的执行结果）
+   */
+  async createCapsule(
+    geneId: number,
+    trigger: string[],
+    confidence: number,
+    blastRadius: { files: number; lines: number },
+    outcome: { status: 'success' | 'partial' | 'failed'; score: number },
+  ): Promise<string> {
+    const gene = getEvolutionEntry(geneId);
+    if (!gene) {
+      throw new Error(`Gene not found: ${geneId}`);
+    }
+
+    // 检查晋升条件
+    const capsules = getCapsulesByGeneId(geneId);
+    const successStreak = this.calculateSuccessStreak(capsules, outcome.status);
+
+    const shouldPromote = this.shouldPromoteToCapsule(
+      capsules.length,
+      successStreak,
+      confidence,
+      outcome.status,
+    );
+
+    if (!shouldPromote) {
+      throw new Error('Gene does not meet capsule promotion criteria');
+    }
+
+    // 生成 capsule asset_id
+    const capsuleContent = JSON.stringify({ geneId, trigger, outcome });
+    const capsuleId = generateAssetId(capsuleContent);
+
+    // 创建 Capsule
+    createCapsule({
+      id: capsuleId,
+      geneId,
+      trigger,
+      summary: gene.description || gene.abilityName,
+      confidence,
+      blastRadius,
+      outcome,
+      envFingerprint: {
+        platform: process.platform,
+        arch: process.arch,
+        runtime: `Node.js ${process.version}`,
+      },
+      successStreak,
+      approvedAt: new Date().toISOString(),
+    });
+
+    // 更新 Gene 的生态系统状态
+    updateGeneStatus(geneId, 'promoted');
+
+    // 如果 Gene 有 chain_id，添加 capsule 到能力链
+    const db = getDatabase();
+    const geneRow = db
+      .prepare('SELECT chain_id FROM evolution_log WHERE id = ?')
+      .get(geneId) as { chain_id: string | null };
+    if (geneRow?.chain_id) {
+      addCapsuleToChain(geneRow.chain_id, capsuleId);
+    }
+
+    logger.info(
+      { capsuleId, geneId, successStreak, confidence },
+      'Capsule created successfully (GEP)',
+    );
+
+    return capsuleId;
+  }
+
+  /**
+   * 获取 Capsule
+   */
+  getCapsule(capsuleId: string): any {
+    return getCapsuleById(capsuleId);
+  }
+
+  /**
+   * 获取 Gene 的所有 Capsules
+   */
+  getCapsulesForGene(geneId: number): any[] {
+    return getCapsulesByGeneId(geneId);
+  }
+
+  // ===== GEP 协议：GDI 评分 =====
+
+  /**
+   * 计算 GDI 评分（全球期望指数）
+   */
+  calculateGDIScore(gene: EvolutionEntry): GDIScore {
+    const intrinsicQuality = this.calculateIntrinsicQuality(gene);
+    const usageMetrics = this.calculateUsageMetrics(gene);
+    const socialSignals = this.calculateSocialSignals(gene);
+    const freshness = this.calculateFreshness(gene);
+
+    return {
+      intrinsicQuality,
+      usageMetrics,
+      socialSignals,
+      freshness,
+      total:
+        intrinsicQuality * 0.35 +
+        usageMetrics * 0.3 +
+        socialSignals * 0.2 +
+        freshness * 0.15,
+    };
+  }
+
+  /**
+   * 计算内在质量 (35%)
+   */
+  private calculateIntrinsicQuality(gene: EvolutionEntry): number {
+    let score = 0;
+
+    // 内容长度
+    if (gene.content.length > 200) score += 2;
+    if (gene.content.length > 500) score += 2;
+    if (gene.content.length > 1000) score += 2;
+
+    // 包含代码
+    if (gene.content.includes('```') || gene.content.includes('function'))
+      score += 2;
+
+    // 有描述和标签
+    if (gene.description && gene.description.length > 50) score += 1;
+    if (gene.tags && gene.tags.length > 0) score += 1;
+
+    return Math.min(score, 10);
+  }
+
+  /**
+   * 计算使用指标 (30%)
+   */
+  private calculateUsageMetrics(gene: EvolutionEntry): number {
+    let score = 0;
+
+    // 反馈评分
+    const avgFeedback = this.calculateAverageRating(gene.feedback);
+    score += avgFeedback; // 0-5
+
+    // 反馈数量
+    if (gene.feedback && gene.feedback.length > 0) score += 1;
+    if (gene.feedback && gene.feedback.length > 5) score += 2;
+    if (gene.feedback && gene.feedback.length > 10) score += 3;
+
+    return Math.min(score, 10);
+  }
+
+  /**
+   * 计算社交信号 (20%)
+   */
+  private calculateSocialSignals(gene: EvolutionEntry): number {
+    let score = 5; // 基础分
+
+    // 高评分反馈
+    if (gene.feedback) {
+      const highRatings = gene.feedback.filter((f) => f.rating >= 4).length;
+      if (highRatings > 0) score += 1;
+      if (highRatings > 3) score += 2;
+      if (highRatings > 5) score += 3;
+    }
+
+    return Math.min(score, 10);
+  }
+
+  /**
+   * 计算新鲜度 (15%)
+   */
+  private calculateFreshness(gene: EvolutionEntry): number {
+    const daysSinceCreation = this.getDaysSinceCreation(gene.createdAt);
+
+    if (daysSinceCreation < 7) return 10;
+    if (daysSinceCreation < 30) return 8;
+    if (daysSinceCreation < 90) return 6;
+    if (daysSinceCreation < 180) return 4;
+    if (daysSinceCreation < 365) return 2;
+    return 1;
+  }
+
+  /**
+   * 更新 Gene 的 GDI 评分
+   */
+  updateGeneGDIScore(geneId: number): GDIScore {
+    const gene = getEvolutionEntry(geneId);
+    if (!gene) {
+      throw new Error(`Gene not found: ${geneId}`);
+    }
+
+    const gdiScore = this.calculateGDIScore(gene);
+    updateGeneGDIScore(geneId, gdiScore);
+
+    // 更新生态系统状态
+    this.updateEcosystemStatus(geneId, gdiScore);
+
+    logger.info({ geneId, gdiScore }, 'GDI score updated (GEP)');
+
+    return gdiScore;
+  }
+
+  // ===== 生态系统状态管理 =====
+
+  /**
+   * 更新生态系统状态
+   */
+  private updateEcosystemStatus(geneId: number, gdiScore: GDIScore): void {
+    const gene = getEvolutionEntry(geneId);
+    if (!gene) return;
+
+    const daysSinceCreation = this.getDaysSinceCreation(gene.createdAt);
+
+    let status: 'promoted' | 'stale' | 'archived';
+    if (gdiScore.total >= 7 && daysSinceCreation < 30) {
+      status = 'promoted';
+    } else if (gdiScore.total >= 3 && daysSinceCreation < 90) {
+      status = 'stale';
+    } else {
+      status = 'archived';
+    }
+
+    updateGeneStatus(geneId, status);
+  }
+
+  /**
+   * 计算生态系统指标
+   */
+  calculateEcosystemMetrics(): EcosystemMetrics {
+    const db = getDatabase();
+
+    // 获取所有 Genes
+    const allGenes = db.prepare('SELECT * FROM evolution_log').all() as any[];
+
+    // 按状态统计
+    const promotedGenes = allGenes.filter(
+      (g) => g.ecosystem_status === 'promoted',
+    ).length;
+    const staleGenes = allGenes.filter(
+      (g) => g.ecosystem_status === 'stale',
+    ).length;
+    const archivedGenes = allGenes.filter(
+      (g) => g.ecosystem_status === 'archived',
+    ).length;
+
+    // 获取所有 Capsules
+    const totalCapsules = db
+      .prepare('SELECT COUNT(*) as count FROM capsules')
+      .get() as { count: number };
+
+    // 计算香农多样性
+    const shannonDiversity = this.calculateShannonDiversity(allGenes);
+
+    // 计算平均 GDI 评分
+    const gdiScores = allGenes
+      .map((g) => {
+        try {
+          const parsed = JSON.parse(g.gdi_score || '{}');
+          return parsed.total || 0;
+        } catch {
+          return 0;
+        }
+      })
+      .filter((score) => score > 0);
+
+    const avgGDIScore =
+      gdiScores.length > 0
+        ? gdiScores.reduce((a, b) => a + b, 0) / gdiScores.length
+        : 0;
+
+    return {
+      shannonDiversity,
+      fitnessLandscape: [],
+      symbioticRelationships: [],
+      macroEvolutionEvents: [],
+      negentropyReduction: promotedGenes * 5,
+      totalGenes: allGenes.length,
+      totalCapsules: totalCapsules.count,
+      promotedGenes,
+      staleGenes,
+      archivedGenes,
+      avgGDIScore,
+    };
+  }
+
+  /**
+   * 计算香农多样性
+   */
+  private calculateShannonDiversity(genes: any[]): number {
+    const categoryCounts: Record<string, number> = {};
+    const total = genes.length;
+
+    if (total === 0) return 0;
+
+    for (const gene of genes) {
+      const cat = gene.category || 'learn';
+      categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+    }
+
+    let diversity = 0;
+    for (const count of Object.values(categoryCounts)) {
+      const p = count / total;
+      diversity -= p * Math.log2(p);
+    }
+
+    return diversity;
+  }
+
+  /**
+   * 保存生态系统指标快照
+   */
+  saveEcosystemMetrics(): void {
+    const metrics = this.calculateEcosystemMetrics();
+    createEcosystemMetrics({
+      shannonDiversity: metrics.shannonDiversity,
+      avgGDIScore: metrics.avgGDIScore,
+      totalGenes: metrics.totalGenes,
+      totalCapsules: metrics.totalCapsules,
+      promotedGenes: metrics.promotedGenes,
+      staleGenes: metrics.staleGenes,
+      archivedGenes: metrics.archivedGenes,
+    });
+    logger.info('Ecosystem metrics snapshot saved (GEP)');
+  }
+
+  // ===== 信号去重机制 =====
+
+  /**
+   * 检查信号是否重复
+   */
+  async checkDuplicateSignal(
+    content: string,
+    authorId: string,
+  ): Promise<DuplicateCheckResult> {
+    const db = getDatabase();
+    const existingEntries = db
+      .prepare(
+        'SELECT * FROM evolution_log WHERE created_at >= datetime("now", "-7 days")',
+      )
+      .all() as any[];
+
+    if (existingEntries.length === 0) {
+      return { isDuplicate: false, similarity: 0 };
+    }
+
+    // 生成当前内容的嵌入
+    const currentEmbedding = await generateEmbedding(content);
+
+    for (const existing of existingEntries) {
+      if (!existing.content_embedding) continue;
+
+      try {
+        const existingEmbedding = JSON.parse(existing.content_embedding);
+        const similarity = this.cosineSimilarity(
+          currentEmbedding,
+          existingEmbedding,
+        );
+
+        // 阈值判断
+        const isSameAuthor = existing.source_agent_id === authorId;
+        const threshold = isSameAuthor ? 0.92 : 0.95;
+
+        if (similarity >= threshold) {
+          return {
+            isDuplicate: true,
+            similarity,
+            reason: isSameAuthor
+              ? 'Same author, high content similarity'
+              : 'Different author, very high content similarity',
+            existingAssetId: existing.asset_id,
+          };
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    return { isDuplicate: false, similarity: 0 };
+  }
+
+  // ===== 验证命令安全机制 =====
+
+  /**
+   * 验证命令安全性
+   */
+  private validateCommandSafety(command: string): boolean {
+    return isCommandAllowed(command);
+  }
+
+  /**
+   * 创建验证报告
+   */
+  createValidationReport(
+    geneId: number,
+    commands: string[],
+    success: boolean,
+    testResults?: Record<string, unknown>,
+    error?: string,
+  ): number {
+    // 验证命令安全性
+    for (const cmd of commands) {
+      if (!this.validateCommandSafety(cmd)) {
+        throw new Error(`Command not allowed: ${cmd}`);
+      }
+    }
+
+    return createValidationReport({
+      geneId,
+      commands,
+      success,
+      environment: {
+        platform: os.platform(),
+        arch: os.arch(),
+        nodeVersion: process.version,
+      },
+      testResults,
+      error,
+    });
+  }
+
+  /**
+   * 获取 Gene 的验证报告
+   */
+  getValidationReports(geneId: number): any[] {
+    return getValidationReportsByGeneId(geneId);
+  }
+
+  // ===== 能力链管理 =====
+
+  /**
+   * 创建能力链
+   */
+  createAbilityChain(description?: string): string {
+    const chainId = `chain_${crypto.randomBytes(16).toString('hex')}`;
+    createAbilityChain({
+      chainId,
+      genes: [],
+      capsules: [],
+      description,
+    });
+    logger.info({ chainId }, 'Ability chain created (GEP)');
+    return chainId;
+  }
+
+  /**
+   * 获取能力链
+   */
+  getAbilityChain(chainId: string): any {
+    return getAbilityChain(chainId);
+  }
+
+  /**
+   * 链接 Gene 到能力链
+   */
+  linkGeneToChain(geneId: number, chainId?: string): string {
+    const chainIdToUse = chainId || this.createAbilityChain();
+
+    const gene = getEvolutionEntry(geneId);
+    if (!gene) {
+      throw new Error(`Gene not found: ${geneId}`);
+    }
+
+    const db = getDatabase();
+    const geneRow = db
+      .prepare('SELECT asset_id FROM evolution_log WHERE id = ?')
+      .get(geneId) as { asset_id: string | null };
+
+    if (geneRow?.asset_id) {
+      addGeneToChain(chainIdToUse, geneRow.asset_id);
+    }
+
+    updateGeneChainId(geneId, chainIdToUse);
+
+    logger.info(
+      { geneId, chainId: chainIdToUse },
+      'Gene linked to ability chain (GEP)',
+    );
+
+    return chainIdToUse;
+  }
+
+  // ===== 辅助方法 =====
+
+  /**
+   * 基于当前策略获取推荐的类别
+   */
+  private getStrategyBasedCategory(
+    signals: Signal[],
+  ): 'repair' | 'optimize' | 'innovate' | 'learn' {
+    if (this.strategyConfig.prioritizeRepair) {
+      // 优先修复
+      for (const signal of signals) {
+        if (
+          signal.type === 'recurring_error' ||
+          signal.type === 'performance_issue' ||
+          signal.type === 'negative_feedback'
+        ) {
+          return 'repair';
+        }
+      }
+    }
+
+    const recommended = getRecommendedGeneCategory(signals);
+
+    // 根据探索率决定是否探索新类别
+    if (Math.random() < this.strategyConfig.explorationRate) {
+      const categories: Array<'repair' | 'optimize' | 'innovate' | 'learn'> = [
+        'repair',
+        'optimize',
+        'innovate',
+        'learn',
+      ];
+      return categories[Math.floor(Math.random() * categories.length)];
+    }
+
+    return recommended;
+  }
+
+  /**
+   * 检查是否应该晋升为 Capsule
+   */
+  private shouldPromoteToCapsule(
+    successCount: number,
+    successStreak: number,
+    confidence: number,
+    outcomeStatus: string,
+  ): boolean {
+    const { minSuccessCount, minSuccessStreak, minConfidence } =
+      EVOLUTION_CONFIG.capsulePromotion;
+
+    return (
+      successCount >= minSuccessCount &&
+      successStreak >= minSuccessStreak &&
+      confidence >= minConfidence &&
+      outcomeStatus === 'success'
+    );
+  }
+
+  /**
+   * 计算连续成功次数
+   */
+  private calculateSuccessStreak(capsules: any[], newOutcome: string): number {
+    let streak = 0;
+
+    // 从最新的倒序检查
+    for (let i = capsules.length - 1; i >= 0; i--) {
+      const outcome = capsules[i].outcome;
+      if (outcome?.status === 'success') {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    // 加上新的结果
+    if (newOutcome === 'success') {
+      streak++;
+    }
+
+    return streak;
+  }
+
+  /**
+   * 获取自创建以来的天数
+   */
+  private getDaysSinceCreation(createdAt: string): number {
+    const created = new Date(createdAt);
+    const now = new Date();
+    const diffMs = now.getTime() - created.getTime();
+    return diffMs / (1000 * 60 * 60 * 24);
+  }
+
+  /**
+   * 计算平均评分
+   */
+  private calculateAverageRating(
+    feedback: Array<{ rating: number }> | undefined,
+  ): number {
+    if (!feedback || feedback.length === 0) return 0;
+
+    const sum = feedback.reduce((acc, f) => acc + (f.rating || 0), 0);
+    return sum / feedback.length;
+  }
+
+  /**
+   * 余弦相似度计算
+   */
+  private cosineSimilarity(a: number[], b: number[]): number {
+    if (a.length !== b.length) return 0;
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (let i = 0; i < a.length; i++) {
+      dotProduct += a[i] * b[i];
+      normA += a[i] * a[i];
+      normB += b[i] * b[i];
+    }
+
+    if (normA === 0 || normB === 0) return 0;
+
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  }
+
+  // ===== 向后兼容的方法 =====
+
+  /**
+   * 主项目提交经验到进化库
+   */
+  async submitMainExperience(input: MainExperienceInput): Promise<number> {
+    return this.submitExperience(
+      input.abilityName,
+      input.content,
+      'main-process',
+      input.description,
+      input.tags,
+    );
   }
 
   /**
@@ -280,21 +1097,30 @@ export class EvolutionManager {
       return undefined;
     }
 
-    const category = getRecommendedGeneCategory(signals);
+    const category = this.getStrategyBasedCategory(signals);
     logger.debug(
       { category, signalCount: signals.length },
-      'Selecting Gene based on signals',
+      'Selecting Gene based on signals (GEP)',
     );
 
-    // 获取该类别下的所有 approved Gene
-    const genes = getEvolutionEntriesByCategory(category, 10); // 获取更多候选
+    // 优先获取 promoted 状态的 Genes
+    let genes = getEvolutionEntriesByStatus('promoted', 10);
+
+    if (genes.length === 0) {
+      // 如果没有 promoted，获取 stale
+      genes = getEvolutionEntriesByStatus('stale', 10);
+    }
+
+    if (genes.length === 0) {
+      // 最后尝试按类别获取
+      genes = getEvolutionEntriesByCategory(category, 10);
+    }
 
     if (genes.length === 0) {
       logger.debug({ category }, 'No approved genes found for category');
       return undefined;
     }
 
-    // 基于信号匹配度选择最佳 Gene
     return this.findBestMatchingGene(genes, signals);
   }
 
@@ -305,7 +1131,6 @@ export class EvolutionManager {
     genes: EvolutionEntry[],
     signals: Signal[],
   ): EvolutionEntry {
-    // 计算每个 Gene 的匹配分数
     const scoredGenes = genes.map((gene) => {
       const score = this.calculateGeneSignalMatchScore(gene, signals);
       logger.debug(
@@ -315,12 +1140,11 @@ export class EvolutionManager {
           score,
           signalsMatch: gene.signalsMatch,
         },
-        'Gene signal match score',
+        'Gene signal match score (GEP)',
       );
       return { gene, score };
     });
 
-    // 按分数降序排序，返回最佳匹配
     scoredGenes.sort((a, b) => b.score - a.score);
     return scoredGenes[0].gene;
   }
@@ -335,32 +1159,26 @@ export class EvolutionManager {
     let score = 0;
     const geneSignals = gene.signalsMatch || [];
 
-    // 每个信号的权重
     const signalWeights: Record<string, number> = {};
     for (const signal of signals) {
       signalWeights[signal.type] = signal.confidence;
     }
 
-    // 计算信号匹配度
     for (const geneSignal of geneSignals) {
       if (signalWeights[geneSignal]) {
-        // 匹配的信号，按置信度加权
         score += signalWeights[geneSignal];
       }
     }
 
-    // 类别匹配 bonus
     const geneCategory = gene.category;
     const recommendedCategory = getRecommendedGeneCategory(signals);
     if (geneCategory === recommendedCategory) {
       score += 0.2;
     }
 
-    // 反馈评分 bonus
     const avgFeedback = this.calculateAverageRating(gene.feedback);
-    score += avgFeedback / 10; // 最高 0.5 分的反馈 bonus
+    score += avgFeedback / 10;
 
-    // 归一化分数
     return Math.min(score, 1.0);
   }
 
@@ -383,7 +1201,7 @@ export class EvolutionManager {
     approved: boolean,
     feedback?: string,
   ): Promise<void> {
-    logger.info({ id, reviewerId, approved }, 'Reviewing experience');
+    logger.info({ id, reviewerId, approved }, 'Reviewing experience (GEP)');
 
     const entry = getEvolutionEntry(id);
     if (!entry) {
@@ -391,7 +1209,6 @@ export class EvolutionManager {
       return;
     }
 
-    // 更新状态
     updateEvolutionStatus(
       id,
       approved ? 'approved' : 'rejected',
@@ -399,35 +1216,37 @@ export class EvolutionManager {
       feedback,
     );
 
-    // 记录审计日志
     logAudit({
       agentFolder: entry.sourceAgentId,
       action: 'review',
-      entityType: 'evolution',
+      entityType: 'gene',
       entityId: String(id),
       details: { reviewerId, approved, feedback },
     });
 
+    // 如果批准，更新 GDI 评分
+    if (approved) {
+      this.updateGeneGDIScore(id);
+    }
+
     logger.info(
       { id, approved, reviewerId },
-      `Experience ${approved ? 'approved' : 'rejected'}`,
+      `Experience ${approved ? 'approved' : 'rejected'} (GEP)`,
     );
   }
 
   /**
-   * 查询经验（支持向量检索和标签过滤）
+   * 查询经验
    */
   async queryExperience(
     query: string,
     tags?: string[],
     limit: number = 20,
   ): Promise<EvolutionEntry[]> {
-    logger.debug({ query, tags, limit }, 'Querying evolution');
+    logger.debug({ query, tags, limit }, 'Querying evolution (GEP)');
 
-    // 使用数据库检索（带标签过滤）
     const entries = getApprovedEvolutionEntries(tags, limit);
 
-    // 如果有查询文本，按相似度排序
     if (query) {
       const queryEmbedding = await generateEmbedding(query);
 
@@ -452,30 +1271,30 @@ export class EvolutionManager {
     id: number,
     agentId: string,
     comment: string,
-    rating: number, // 1-5 分
+    rating: number,
   ): Promise<void> {
-    logger.info({ id, agentId, rating }, 'Submitting evolution feedback');
+    logger.info({ id, agentId, rating }, 'Submitting evolution feedback (GEP)');
 
     addEvolutionFeedback(id, agentId, comment, rating);
 
-    // 记录审计日志
     logAudit({
       action: 'feedback',
-      entityType: 'evolution',
+      entityType: 'gene',
       entityId: String(id),
       details: { agentId, rating, comment },
     });
 
-    // 检查是否需要再审核
     const entry = getEvolutionEntry(id);
     if (entry) {
       const avgRating = this.calculateAverageRating(entry.feedback);
       const feedbackCount = entry.feedback.length;
 
-      // 如果反馈过多或评分过低，触发再审核
       if (avgRating < 3 || feedbackCount >= 10) {
         await this.triggerReReview(id, avgRating, feedbackCount);
       }
+
+      // 更新 GDI 评分
+      this.updateGeneGDIScore(id);
     }
   }
 
@@ -483,16 +1302,77 @@ export class EvolutionManager {
    * 标记经验为需要再审核
    */
   async markForReReview(id: number, reason: string): Promise<void> {
-    logger.info({ id, reason }, 'Marking evolution for re-review');
+    logger.info({ id, reason }, 'Marking evolution for re-review (GEP)');
 
     updateEvolutionStatus(id, 'reviewing', undefined, reason);
 
     logAudit({
       action: 're_review',
-      entityType: 'evolution',
+      entityType: 'gene',
       entityId: String(id),
       details: { reason },
     });
+  }
+
+  /**
+   * 自动审核所有 pending 条目
+   */
+  async autoReviewPendingEntries(): Promise<void> {
+    const db = getDatabase();
+    const pendingEntries = db
+      .prepare('SELECT * FROM evolution_log WHERE status = ?')
+      .all('pending') as any[];
+
+    logger.info(
+      { count: pendingEntries.length },
+      'Starting auto-review of pending entries (GEP)',
+    );
+
+    for (const entry of pendingEntries) {
+      await this.autoReviewPendingEntry(entry);
+    }
+  }
+
+  /**
+   * 自动审核单个待审核条目
+   */
+  async autoReviewPendingEntry(entry: any): Promise<void> {
+    const scores: Record<string, { score: number; comment: string }> = {};
+    let totalScore = 0;
+
+    for (const agent of REVIEW_AGENTS) {
+      const review = await this.reviewByAgent(entry, agent);
+      scores[agent.id] = review;
+      totalScore += review.score * agent.weight;
+    }
+
+    const passed = totalScore >= 0.7;
+    const finalStatus = passed ? 'approved' : 'rejected';
+
+    updateEvolutionStatus(
+      entry.id,
+      finalStatus,
+      'auto-reviewer',
+      `自动审核完成，综合评分：${(totalScore * 100).toFixed(1)}分`,
+    );
+
+    // 如果批准，更新 GDI 评分
+    if (passed) {
+      const fullEntry = getEvolutionEntry(entry.id);
+      if (fullEntry) {
+        this.updateGeneGDIScore(entry.id);
+      }
+    }
+
+    logger.info(
+      {
+        entryId: entry.id,
+        abilityName: entry.ability_name,
+        status: finalStatus,
+        totalScore,
+      },
+      'Entry auto-reviewed (GEP)',
+    );
   }
 
   // ===== 私有方法 =====
@@ -504,21 +1384,18 @@ export class EvolutionManager {
     tags: string[];
   }): Promise<{ confidence: number; issues: string[] }> {
     const issues: string[] = [];
-    let confidence = 0.8; // 基础置信度
+    let confidence = 0.8;
 
-    // 规则 1: 内容长度检查
     if (entry.content.length < 50) {
       issues.push('Content too short');
       confidence -= 0.2;
     }
 
-    // 规则 2: 能力名称检查
     if (!entry.abilityName || entry.abilityName.length < 2) {
       issues.push('Invalid ability name');
       confidence -= 0.15;
     }
 
-    // 规则 3: 包含代码或结构化内容
     const hasCode =
       entry.content.includes('```') ||
       entry.content.includes('function') ||
@@ -526,10 +1403,9 @@ export class EvolutionManager {
       entry.content.includes('const ') ||
       entry.content.includes('export');
     if (hasCode) {
-      confidence += 0.1; // 代码内容更可能是有效的
+      confidence += 0.1;
     }
 
-    // 规则 4: 包含经验关键词
     const experienceKeywords = [
       '经验',
       '方法',
@@ -552,12 +1428,10 @@ export class EvolutionManager {
       confidence += 0.05;
     }
 
-    // 规则 5: 有标签
     if (entry.tags.length > 0) {
       confidence += 0.05;
     }
 
-    // 规则 6: 有描述
     if (entry.description && entry.description.length > 20) {
       confidence += 0.05;
     }
@@ -585,221 +1459,18 @@ export class EvolutionManager {
 
     await this.markForReReview(id, reasons.join('; '));
 
-    // 通知审核者（IPC 通知）
-    try {
-      // 发送 IPC 通知到主进程
-      const notification = {
-        type: 're-review',
-        data: {
-          id,
-          avgRating,
-          feedbackCount,
-          reason: 'Automatic re-review triggered',
-        },
-      };
-
-      logger.debug({ notification }, 'Sending IPC notification');
-      // 这里可以实现具体的 IPC 通知机制，比如写入通知文件或使用事件系统
-      // 目前记录到日志中
-      logger.info(
-        { id, avgRating, feedbackCount, notification },
-        'Re-review notification sent',
-      );
-    } catch (error) {
-      logger.error(
-        { id, avgRating, feedbackCount, error },
-        'Failed to send re-review notification',
-      );
-    }
+    logger.info({ id, avgRating, feedbackCount }, 'Re-review triggered (GEP)');
   }
 
-  private calculateAverageRating(
-    feedback: Array<{ rating: number }> | undefined,
-  ): number {
-    if (!feedback || feedback.length === 0) return 0;
-
-    const sum = feedback.reduce((acc, f) => acc + (f.rating || 0), 0);
-    return sum / feedback.length;
-  }
-
-  private cosineSimilarity(a: number[], b: number[]): number {
-    if (a.length !== b.length) return 0;
-
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-
-    for (let i = 0; i < a.length; i++) {
-      dotProduct += a[i] * b[i];
-      normA += a[i] * a[i];
-      normB += b[i] * b[i];
-    }
-
-    if (normA === 0 || normB === 0) return 0;
-
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-  }
-
-  /**
-   * 主项目提交经验到进化库
-   */
-  async submitMainExperience(input: MainExperienceInput): Promise<number> {
-    logger.info(
-      {
-        abilityName: input.abilityName,
-        component: input.component,
-        contentLength: input.content.length,
-      },
-      'Submitting main project experience to evolution',
-    );
-
-    // 从内容中提取信号
-    const signals = extractSignals({ content: input.content });
-    const category = input.category || getRecommendedGeneCategory(signals);
-
-    // 生成向量嵌入
-    const embedding = await generateEmbedding(input.content);
-
-    // 自动初审：基于内容长度、能力名称、代码内容、经验关键词等规则评分
-    const autoReview = await this.autoReviewEntry({
-      abilityName: input.abilityName,
-      content: input.content,
-      description: input.description || '',
-      tags: input.tags || [],
-    });
-
-    // 决定初始状态
-    let status: 'pending' | 'approved' = 'pending';
-    if (
-      autoReview.confidence > this.config.autoApproveThreshold &&
-      !this.config.requireUserReview
-    ) {
-      status = 'approved';
-      logger.info(
-        { abilityName: input.abilityName, confidence: autoReview.confidence },
-        'Main project experience auto-approved',
-      );
-    }
-
-    // 创建条目（包含 Gene 结构字段）
-    const id = createEvolutionEntry({
-      abilityName: input.abilityName,
-      description: input.description,
-      sourceAgentId: 'main-process',
-      content: input.content,
-      contentEmbedding: embedding,
-      tags: input.tags || [],
-      status,
-      category,
-      signalsMatch: signals.map((s) => s.type),
-    });
-
-    // 记录审计日志
-    logAudit({
-      agentFolder: 'main-process',
-      action: 'create',
-      entityType: 'evolution',
-      entityId: String(id),
-      details: {
-        abilityName: input.abilityName,
-        status,
-        category,
-        signalCount: signals.length,
-        component: input.component,
-      },
-    });
-
-    // 提交后立即触发审核，不等待定时任务
-    if (status === 'pending') {
-      logger.info(
-        { id, abilityName: input.abilityName },
-        'Main project experience submitted, triggering immediate review',
-      );
-      // 重新获取完整的条目数据用于审核
-      const fullEntry = getEvolutionEntry(id);
-      if (fullEntry) {
-        await this.autoReviewPendingEntry(fullEntry);
-      }
-    } else {
-      logger.info(
-        { id, abilityName: input.abilityName },
-        'Main project experience auto-approved and added to evolution library',
-      );
-    }
-
-    return id;
-  }
-
-  /**
-   * 自动审核所有 pending 条目
-   */
-  async autoReviewPendingEntries(): Promise<void> {
-    const db = getDatabase();
-    const pendingEntries = db
-      .prepare('SELECT * FROM evolution_log WHERE status = ?')
-      .all('pending') as any[];
-
-    logger.info(
-      { count: pendingEntries.length },
-      'Starting auto-review of pending entries',
-    );
-
-    for (const entry of pendingEntries) {
-      await this.autoReviewPendingEntry(entry);
-    }
-  }
-
-  /**
-   * 自动审核单个待审核条目
-   */
-  async autoReviewPendingEntry(entry: any): Promise<void> {
-    const scores: Record<string, { score: number; comment: string }> = {};
-    let totalScore = 0;
-
-    // 每个审核代理独立评分
-    for (const agent of REVIEW_AGENTS) {
-      const review = await this.reviewByAgent(entry, agent);
-      scores[agent.id] = review;
-      totalScore += review.score * agent.weight;
-    }
-
-    // 确定审核结果
-    const passed = totalScore >= 0.7; // 70 分通过
-    const finalStatus = passed ? 'approved' : 'rejected';
-
-    // 更新状态
-    updateEvolutionStatus(
-      entry.id,
-      finalStatus,
-      'auto-reviewer',
-      `自动审核完成，综合评分：${(totalScore * 100).toFixed(1)}分`,
-    );
-
-    // 记录每个代理的评分（可以存储在 feedback 或单独的表中）
-    logger.info(
-      {
-        entryId: entry.id,
-        abilityName: entry.ability_name,
-        status: finalStatus,
-        totalScore,
-      },
-      'Entry auto-reviewed',
-    );
-  }
-
-  /**
-   * 单个审核代理的评分逻辑
-   */
   private async reviewByAgent(
     entry: any,
     agent: ReviewAgent,
   ): Promise<{ score: number; comment: string }> {
-    let score = 0.5; // 基础分
+    let score = 0.5;
     let comment = '';
 
     switch (agent.expertise) {
       case 'safety':
-        // 安全审核：检查是否包含危险内容
         const safetyIssues = this.checkSafety(entry.content);
         if (safetyIssues.length === 0) {
           score = 0.9;
@@ -811,7 +1482,6 @@ export class EvolutionManager {
         break;
 
       case 'effectiveness':
-        // 有效性审核：检查内容是否实用
         if (
           entry.content.length > 200 &&
           this.hasPracticalAdvice(entry.content)
@@ -825,7 +1495,6 @@ export class EvolutionManager {
         break;
 
       case 'reusability':
-        // 可复用性审核：检查是否可推广
         if (this.hasReusablePatterns(entry.content)) {
           score = 0.8;
           comment = '包含可复用的模式';
@@ -836,7 +1505,6 @@ export class EvolutionManager {
         break;
 
       case 'clarity':
-        // 清晰度审核：检查表达是否清晰
         if (this.isClearlyWritten(entry.content)) {
           score = 0.85;
           comment = '表达清晰易懂';
@@ -847,7 +1515,6 @@ export class EvolutionManager {
         break;
 
       case 'completeness':
-        // 完整性审核：检查内容是否完整
         if (this.isContentComplete(entry.content, entry.description || '')) {
           score = 0.8;
           comment = '内容完整';
@@ -861,10 +1528,8 @@ export class EvolutionManager {
     return { score, comment };
   }
 
-  // 辅助审核方法
   private checkSafety(content: string): string[] {
     const issues: string[] = [];
-    // 检查是否包含危险模式
     const dangerousPatterns = [
       /rm\s+-rf/,
       /eval\s*\(/,
@@ -909,7 +1574,6 @@ export class EvolutionManager {
   }
 
   private isClearlyWritten(content: string): boolean {
-    // 简单检查：有分段、有列表、有代码块
     return (
       content.includes('\n') ||
       content.includes('```') ||
@@ -920,19 +1584,6 @@ export class EvolutionManager {
 
   private isContentComplete(content: string, description: string): boolean {
     return content.length > 150 && description.length > 20;
-  }
-
-  private calculateHistoricalScore(entry: any): number {
-    // 计算历史条目的综合评分（基于反馈）
-    if (entry.feedback && entry.feedback.length > 0) {
-      const avgRating =
-        entry.feedback.reduce(
-          (sum: number, f: any) => sum + (f.rating || 3),
-          0,
-        ) / entry.feedback.length;
-      return avgRating / 5; // 归一化到 0-1
-    }
-    return 0.7; // 默认历史分数
   }
 }
 

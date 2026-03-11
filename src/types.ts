@@ -1,8 +1,211 @@
 /**
  * 多智能体架构类型定义
+ *
+ * GEP 协议版本: 1.5.0
+ * 实现完整的 Genome Evolution Protocol (GEP) 标准
+ * - GEPAsset: 基础资产接口
+ * - GEPGene: 符合 GEP 标准的 Gene 结构
+ * - GEPCapsule: 验证后的执行结果胶囊
+ * - GDIScore: 全球期望指数评分
+ * - AbilityChain: 能力链概念
+ * - ValidationReport: 验证报告
+ * - EcosystemMetrics: 生态系统指标
  */
 
-// ===== 核心类型（现有）=====
+import crypto from 'crypto';
+
+// GEP 协议版本
+export const GEP_SCHEMA_VERSION = '1.5.0';
+
+// ===== GEP 协议标准类型（新增）=====
+
+// 基础 GEP 资产接口
+export interface GEPAsset {
+  type: 'Gene' | 'Capsule' | 'EvolutionEvent';
+  schema_version: string;
+  asset_id: string; // sha256:<hex>
+  model_name?: string; // 生成该资产的 LLM 模型
+}
+
+// asset_id 生成函数
+export function generateAssetId(content: string): string {
+  const hash = crypto.createHash('sha256').update(content).digest('hex');
+  return `sha256:${hash}`;
+}
+
+// 增强的 Gene 结构（符合 GEP 标准）
+export interface GEPGene extends GEPAsset {
+  type: 'Gene';
+  category: 'repair' | 'optimize' | 'innovate';
+  signals_match: string[];
+  summary: string;
+  preconditions: string[];
+  validation_commands: string[];
+  chain_id?: string;
+  gdi_score?: GDIScore;
+  status: 'promoted' | 'stale' | 'archived';
+
+  // 数据库字段
+  id: number;
+  ability_name: string;
+  description?: string;
+  source_agent_id: string;
+  content: string;
+  content_embedding?: number[];
+  tags: string[];
+  feedback: Array<{
+    agent_id: string;
+    comment: string;
+    rating: number;
+    used_at?: string;
+  }>;
+  created_at: string;
+}
+
+// Capsule 类型（符合 GEP 标准）
+export interface GEPCapsule extends GEPAsset {
+  type: 'Capsule';
+  trigger: string[];
+  gene: string; // Gene 的 asset_id
+  summary: string;
+  confidence: number; // 0-1
+  blast_radius: {
+    files: number;
+    lines: number;
+  };
+  outcome: {
+    status: 'success' | 'partial' | 'failed';
+    score: number;
+  };
+  env_fingerprint: {
+    platform: string;
+    arch: string;
+    runtime?: string;
+    dependencies?: string[];
+  };
+  success_streak: number;
+  gene_id: number; // 数据库中的 Gene ID
+  approved_at: string;
+}
+
+// GDI 评分（全球期望指数）
+export interface GDIScore {
+  intrinsicQuality: number; // 0-10 (35%)
+  usageMetrics: number; // 0-10 (30%)
+  socialSignals: number; // 0-10 (20%)
+  freshness: number; // 0-10 (15%)
+  total: number; // 总分 (0-10)
+}
+
+// 能力链
+export interface AbilityChain {
+  chain_id: string;
+  genes: string[]; // Gene asset_id 列表，按顺序
+  capsules: string[]; // Capsule asset_id 列表
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 验证报告
+export interface ValidationReport {
+  id: number;
+  gene_id: number;
+  timestamp: string;
+  commands: string[];
+  success: boolean;
+  environment: {
+    platform: string;
+    arch: string;
+    nodeVersion: string;
+  };
+  test_results?: Record<string, unknown>;
+  error?: string;
+}
+
+// 相似度检查结果
+export interface DuplicateCheckResult {
+  isDuplicate: boolean;
+  similarity: number;
+  reason?: string;
+  existingAssetId?: string;
+}
+
+// 生态系统指标
+export interface EcosystemMetrics {
+  shannonDiversity: number;
+  fitnessLandscape: Array<{ timestamp: string; avgSuccess: number }>;
+  symbioticRelationships: Array<{
+    geneA: number;
+    geneB: number;
+    cooccurrence: number;
+  }>;
+  macroEvolutionEvents: Array<{
+    type: 'cambrian_explosion' | 'mass_extinction';
+    timestamp: string;
+    description: string;
+    geneCount: number;
+  }>;
+  negentropyReduction: number; // 通过复用减少的重复工作量
+  totalGenes: number;
+  totalCapsules: number;
+  promotedGenes: number;
+  staleGenes: number;
+  archivedGenes: number;
+  avgGDIScore: number;
+}
+
+// 进化策略类型
+export type EvolutionStrategy =
+  | 'balanced'
+  | 'repair'
+  | 'optimize'
+  | 'innovate'
+  | 'repair-only';
+
+// 策略配置
+export interface StrategyConfig {
+  name: EvolutionStrategy;
+  prioritizeRepair: boolean;
+  explorationRate: number; // 0-1
+  riskTolerance: 'low' | 'medium' | 'high';
+}
+
+// 策略配置常量
+export const STRATEGY_CONFIGS: Record<EvolutionStrategy, StrategyConfig> = {
+  balanced: {
+    name: 'balanced',
+    prioritizeRepair: false,
+    explorationRate: 0.3,
+    riskTolerance: 'medium',
+  },
+  repair: {
+    name: 'repair',
+    prioritizeRepair: true,
+    explorationRate: 0.1,
+    riskTolerance: 'low',
+  },
+  optimize: {
+    name: 'optimize',
+    prioritizeRepair: false,
+    explorationRate: 0.2,
+    riskTolerance: 'medium',
+  },
+  innovate: {
+    name: 'innovate',
+    prioritizeRepair: false,
+    explorationRate: 0.5,
+    riskTolerance: 'high',
+  },
+  'repair-only': {
+    name: 'repair-only',
+    prioritizeRepair: true,
+    explorationRate: 0,
+    riskTolerance: 'low',
+  },
+};
+
+// ===== 核心类型（现有，向后兼容）=====
 
 export interface AdditionalMount {
   hostPath: string;

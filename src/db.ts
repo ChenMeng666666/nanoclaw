@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
 import { ASSISTANT_NAME, DATA_DIR, STORE_DIR } from './config.js';
 import { isValidGroupFolder } from './group-folder.js';
@@ -141,6 +142,7 @@ function createSchema(database: Database.Database): void {
     );
 
     -- Evolution log: shared experience repository with review status (Gene structure)
+    -- 符合 GEP 1.5.0 标准
     CREATE TABLE IF NOT EXISTS evolution_log (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       ability_name TEXT NOT NULL,
@@ -148,18 +150,96 @@ function createSchema(database: Database.Database): void {
       source_agent_id TEXT,
       content TEXT,
       content_embedding BLOB,
+      content_hash TEXT,
       tags TEXT,
       status TEXT DEFAULT 'pending',
       reviewed_by TEXT,
       reviewed_at TEXT,
       feedback TEXT,
-      -- Gene structure fields
+      -- Gene structure fields (符合 GEP 标准)
+      schema_version TEXT DEFAULT '1.5.0',
+      asset_id TEXT,
+      model_name TEXT,
       category TEXT DEFAULT 'learn',
       signals_match TEXT DEFAULT '[]',
+      summary TEXT,
+      preconditions TEXT DEFAULT '[]',
+      validation_commands TEXT DEFAULT '[]',
+      chain_id TEXT,
+      gdi_score TEXT,
+      ecosystem_status TEXT DEFAULT 'stale',
       strategy TEXT DEFAULT '[]',
       constraints TEXT DEFAULT '{}',
       validation TEXT DEFAULT '[]',
       created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_evolution_content_hash ON evolution_log(content_hash);
+    CREATE INDEX IF NOT EXISTS idx_evolution_asset_id ON evolution_log(asset_id);
+    CREATE INDEX IF NOT EXISTS idx_evolution_chain_id ON evolution_log(chain_id);
+    CREATE INDEX IF NOT EXISTS idx_evolution_status ON evolution_log(ecosystem_status);
+
+    -- Capsules 表（符合 GEP 标准）
+    CREATE TABLE IF NOT EXISTS capsules (
+      id TEXT PRIMARY KEY,           -- sha256:<hex>
+      gene_id INTEGER NOT NULL,
+      trigger TEXT DEFAULT '[]',
+      summary TEXT,
+      confidence REAL DEFAULT 0.0,
+      blast_radius TEXT DEFAULT '{}',
+      outcome TEXT DEFAULT '{}',
+      env_fingerprint TEXT DEFAULT '{}',
+      success_streak INTEGER DEFAULT 0,
+      approved_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (gene_id) REFERENCES evolution_log(id)
+    );
+
+    -- 能力链表
+    CREATE TABLE IF NOT EXISTS ability_chains (
+      chain_id TEXT PRIMARY KEY,
+      genes TEXT DEFAULT '[]',
+      capsules TEXT DEFAULT '[]',
+      description TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    -- 知识流事件表
+    CREATE TABLE IF NOT EXISTS knowledge_flow_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL,
+      gene_id INTEGER,
+      capsule_id TEXT,
+      event_id TEXT,
+      timestamp TEXT NOT NULL,
+      success INTEGER NOT NULL,
+      metrics TEXT DEFAULT '{}'
+    );
+
+    -- 验证报告表
+    CREATE TABLE IF NOT EXISTS validation_reports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      gene_id INTEGER NOT NULL,
+      timestamp TEXT NOT NULL,
+      commands TEXT DEFAULT '[]',
+      success INTEGER NOT NULL,
+      environment TEXT DEFAULT '{}',
+      test_results TEXT,
+      error TEXT,
+      FOREIGN KEY (gene_id) REFERENCES evolution_log(id)
+    );
+
+    -- 生态系统指标快照表
+    CREATE TABLE IF NOT EXISTS ecosystem_metrics (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp TEXT NOT NULL,
+      shannon_diversity REAL,
+      avg_gdi_score REAL,
+      total_genes INTEGER,
+      total_capsules INTEGER,
+      promoted_genes INTEGER,
+      stale_genes INTEGER,
+      archived_genes INTEGER
     );
 
     -- Evolution versions: version control for evolution entries
@@ -182,6 +262,7 @@ function createSchema(database: Database.Database): void {
       level TEXT NOT NULL,
       content TEXT NOT NULL,
       embedding BLOB,
+      content_hash TEXT,
       importance REAL DEFAULT 0.5,
       access_count INTEGER DEFAULT 0,
       last_accessed_at TEXT,
@@ -189,6 +270,7 @@ function createSchema(database: Database.Database): void {
       updated_at TEXT NOT NULL,
       FOREIGN KEY (agent_folder) REFERENCES agents(folder)
     );
+    CREATE INDEX IF NOT EXISTS idx_memories_content_hash ON memories(content_hash, agent_folder, level);
 
     -- Reflections: periodic reflection and summary records
     CREATE TABLE IF NOT EXISTS reflections (
@@ -327,12 +409,22 @@ function createSchema(database: Database.Database): void {
   }
 
   // Add Gene structure columns to evolution_log if they don't exist (migration for existing DBs)
+  // 符合 GEP 1.5.0 标准的字段
   const geneColumns = [
     { name: 'category', default: "'learn'" },
     { name: 'signals_match', default: "'[]'" },
     { name: 'strategy', default: "'[]'" },
     { name: 'constraints', default: "'{}'" },
     { name: 'validation', default: "'[]'" },
+    { name: 'schema_version', default: "'1.5.0'" },
+    { name: 'asset_id', default: 'NULL' },
+    { name: 'model_name', default: 'NULL' },
+    { name: 'summary', default: 'NULL' },
+    { name: 'preconditions', default: "'[]'" },
+    { name: 'validation_commands', default: "'[]'" },
+    { name: 'chain_id', default: 'NULL' },
+    { name: 'gdi_score', default: 'NULL' },
+    { name: 'ecosystem_status', default: "'stale'" },
   ];
 
   for (const col of geneColumns) {
@@ -343,6 +435,67 @@ function createSchema(database: Database.Database): void {
     } catch {
       /* column already exists */
     }
+  }
+
+  // 为现有记录计算 asset_id
+  try {
+    const existingEntries = database
+      .prepare('SELECT id, content FROM evolution_log WHERE asset_id IS NULL')
+      .all() as Array<{ id: number; content: string }>;
+    for (const entry of existingEntries) {
+      const hash = crypto
+        .createHash('sha256')
+        .update(entry.content)
+        .digest('hex');
+      const assetId = `sha256:${hash}`;
+      database
+        .prepare('UPDATE evolution_log SET asset_id = ? WHERE id = ?')
+        .run(assetId, entry.id);
+    }
+  } catch (err) {
+    logger.debug({ err }, 'Failed to compute asset_id for existing entries');
+  }
+
+  // Add content_hash column to evolution_log if it doesn't exist (migration for existing DBs)
+  try {
+    database.exec(`ALTER TABLE evolution_log ADD COLUMN content_hash TEXT`);
+    // 为现有记录计算并填充 content_hash
+    const existingEntries = database
+      .prepare('SELECT id, content FROM evolution_log')
+      .all() as Array<{ id: number; content: string }>;
+    for (const entry of existingEntries) {
+      const hash = crypto
+        .createHash('sha256')
+        .update(entry.content)
+        .digest('hex');
+      database
+        .prepare('UPDATE evolution_log SET content_hash = ? WHERE id = ?')
+        .run(hash, entry.id);
+    }
+  } catch (err) {
+    logger.debug({ err }, 'Failed to add content_hash column to evolution_log');
+    /* column already exists */
+  }
+
+  // Add content_hash column to memories if it doesn't exist (migration for existing DBs)
+  try {
+    database.exec(`ALTER TABLE memories ADD COLUMN content_hash TEXT`);
+    // 为现有记录计算并填充 content_hash
+    const existingMemories = database
+      .prepare('SELECT id, content FROM memories')
+      .all() as Array<{ id: string; content: string }>;
+    for (const memory of existingMemories) {
+      const hash = crypto
+        .createHash('sha256')
+        .update(memory.content)
+        .digest('hex');
+      database
+        .prepare('UPDATE memories SET content_hash = ? WHERE id = ?')
+        .run(hash, memory.id);
+    }
+  } catch (err) {
+    logger.debug({ err }, 'Failed to add content_hash column to memories');
+    /* column already exists */
   }
 }
 
@@ -362,6 +515,7 @@ export function initDatabase(): void {
 export function _initTestDatabase(): void {
   db = new Database(':memory:');
   createSchema(db);
+  setDatabase(db); // 确保 db-agents.ts 中的全局变量也被初始化
 }
 
 /**
@@ -899,5 +1053,43 @@ function migrateJsonState(): void {
         );
       }
     }
+  }
+}
+
+// ===== 事务支持 =====
+
+/**
+ * 开始事务
+ */
+export function beginTransaction(): void {
+  db.exec('BEGIN TRANSACTION');
+}
+
+/**
+ * 提交事务
+ */
+export function commit(): void {
+  db.exec('COMMIT');
+}
+
+/**
+ * 回滚事务
+ */
+export function rollback(): void {
+  db.exec('ROLLBACK');
+}
+
+/**
+ * 事务包装函数
+ */
+export function transaction<T>(fn: () => T): T {
+  beginTransaction();
+  try {
+    const result = fn();
+    commit();
+    return result;
+  } catch (error) {
+    rollback();
+    throw error;
   }
 }

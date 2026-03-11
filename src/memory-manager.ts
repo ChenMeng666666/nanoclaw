@@ -11,6 +11,7 @@ import {
   updateMemory,
   incrementMemoryAccess,
   deleteMemory,
+  getDuplicateMemory,
 } from './db-agents.js';
 import { Memory } from './types.js';
 import { logger } from './logger.js';
@@ -45,30 +46,34 @@ export class MemoryManager {
   /**
    * 获取工作记忆（L1）
    * 优先从缓存读取，没有则从数据库加载
+   * @param forceReloadFromDB - 是否强制从数据库重新加载（刷新缓存）
    */
   async getWorkingMemory(
     agentFolder: string,
     userJid?: string,
+    forceReloadFromDB: boolean = false,
   ): Promise<string> {
     const key = this.makeKey(agentFolder, userJid);
-    const cached = this.l1Cache.get(key);
 
-    if (cached) {
-      // 更新访问计数
-      incrementMemoryAccess(cached.id);
-      return cached.content;
+    // 如果强制刷新或缓存不存在，从数据库加载
+    if (forceReloadFromDB || !this.l1Cache.has(key)) {
+      // 从数据库加载
+      const memories = getMemories(agentFolder, 'L1', userJid);
+      if (memories.length > 0) {
+        const memory = memories[0];
+        this.l1Cache.set(key, memory);
+        incrementMemoryAccess(memory.id);
+        return memory.content;
+      }
+      // 数据库中没有，清除缓存
+      this.l1Cache.delete(key);
+      return '';
     }
 
-    // 从数据库加载
-    const memories = getMemories(agentFolder, 'L1', userJid);
-    if (memories.length > 0) {
-      const memory = memories[0];
-      this.l1Cache.set(key, memory);
-      incrementMemoryAccess(memory.id);
-      return memory.content;
-    }
-
-    return '';
+    const cached = this.l1Cache.get(key)!;
+    // 更新访问计数
+    incrementMemoryAccess(cached.id);
+    return cached.content;
   }
 
   /**
@@ -87,7 +92,37 @@ export class MemoryManager {
       existing.content = content;
       existing.updatedAt = new Date().toISOString();
       this.l1Cache.set(key, existing);
+      // 立即更新数据库，避免缓存与数据库不一致
+      updateMemory(existing.id, {
+        content,
+        updatedAt: existing.updatedAt,
+      });
     } else {
+      // 检查重复记忆
+      const contentHash = crypto
+        .createHash('sha256')
+        .update(content)
+        .digest('hex');
+      const duplicate = getDuplicateMemory(
+        agentFolder,
+        contentHash,
+        'L1',
+        userJid,
+      );
+      if (duplicate) {
+        logger.info(
+          { duplicateId: duplicate.id, agentFolder, userJid },
+          'Duplicate working memory detected, using existing',
+        );
+        this.l1Cache.set(key, {
+          ...duplicate,
+          accessCount: 0,
+          lastAccessedAt: new Date().toISOString(),
+        });
+        incrementMemoryAccess(duplicate.id);
+        return;
+      }
+
       // 创建新记忆
       const embedding = await generateEmbedding(content);
       const memory: Omit<Memory, 'accessCount' | 'lastAccessedAt'> = {
@@ -150,6 +185,27 @@ export class MemoryManager {
     level: 'L1' | 'L2' | 'L3' = 'L1',
     userJid?: string,
   ): Promise<void> {
+    // 检查重复记忆
+    const contentHash = crypto
+      .createHash('sha256')
+      .update(content)
+      .digest('hex');
+    const duplicate = getDuplicateMemory(
+      agentFolder,
+      contentHash,
+      level,
+      userJid,
+    );
+    if (duplicate) {
+      logger.info(
+        { duplicateId: duplicate.id, agentFolder, level, userJid },
+        'Duplicate memory detected, skipping',
+      );
+      // 更新访问计数而不创建新记忆
+      incrementMemoryAccess(duplicate.id);
+      return;
+    }
+
     const embedding = await generateEmbedding(content);
     const importance = this.calculateImportance(content, level);
 
@@ -352,6 +408,25 @@ export class MemoryManager {
       () => this.persistL1Memories(),
       5 * 60 * 1000,
     ); // 5 分钟
+  }
+
+  /**
+   * 清除指定的缓存条目
+   * 当外部修改记忆时调用此方法以确保缓存一致性
+   */
+  invalidateCache(agentFolder: string, userJid?: string): void {
+    const key = this.makeKey(agentFolder, userJid);
+    this.l1Cache.delete(key);
+    logger.debug({ agentFolder, userJid }, 'L1 cache invalidated');
+  }
+
+  /**
+   * 清除所有缓存条目
+   * 用于系统级操作后的完全刷新
+   */
+  invalidateAllCache(): void {
+    this.l1Cache.clear();
+    logger.debug('All L1 cache invalidated');
   }
 }
 
