@@ -37,6 +37,8 @@ function calculateFibonacci(n: number): number {
 const TEST_GROUP: RegisteredGroup = TestDataFactory.createTestGroup('full-test');
 const TEST_AGENT1 = TestDataFactory.createTestAgent(TEST_GROUP.folder, 'test-agent-1');
 const TEST_AGENT2 = TestDataFactory.createTestAgent(TEST_GROUP.folder, 'test-agent-2');
+const TEST_AGENT3 = TestDataFactory.createTestAgent(TEST_GROUP.folder, 'test-agent-3');
+const TEST_AGENT4 = TestDataFactory.createTestAgent(TEST_GROUP.folder, 'test-agent-4');
 const TEST_TASK = TestDataFactory.createTestTask(TEST_GROUP.folder, 'full-test-task-1');
 const TEST_LEARNING_TASK = TestDataFactory.createTestLearningTask(TEST_GROUP.folder, 'full-test-learning-task-1');
 const TEST_EXPERIENCE = TestDataFactory.createTestEvolutionExperience(TEST_AGENT1.id);
@@ -442,7 +444,136 @@ function calculateFibonacciOptimized(n: number): number {
 
     printDatabaseStats('进化库重用后');
 
-    // 9. 测试数据清理
+    // 9. 测试多Agent并发记忆系统
+    logger.info('9. 测试多Agent并发记忆系统');
+
+    logger.debug('  创建多个Agent同时执行任务');
+    const TEST_AGENT3 = TestDataFactory.createTestAgent(TEST_GROUP.folder, 'test-agent-3');
+    const TEST_AGENT4 = TestDataFactory.createTestAgent(TEST_GROUP.folder, 'test-agent-4');
+
+    // 创建测试Agent 3 和 4
+    await TestDatabaseHelper.setupTestAgent(TEST_AGENT3);
+    await TestDatabaseHelper.setupTestAgent(TEST_AGENT4);
+
+    logger.debug('  同时向多个Agent添加记忆');
+    const memoryPromises = [
+      memoryManager.addMemory(TEST_GROUP.folder, 'Agent 3: 测试并发记忆1', 'L1'),
+      memoryManager.addMemory(TEST_GROUP.folder, 'Agent 4: 测试并发记忆1', 'L1'),
+      memoryManager.addMemory(TEST_GROUP.folder, 'Agent 3: 测试并发记忆2', 'L2'),
+      memoryManager.addMemory(TEST_GROUP.folder, 'Agent 4: 测试并发记忆2', 'L2')
+    ];
+
+    await Promise.all(memoryPromises);
+    logger.debug('  并发记忆添加成功');
+
+    // 验证各个Agent的记忆隔离性
+    logger.debug('  验证Agent记忆隔离性');
+    const agent1Memories = TestDatabaseHelper.getDatabase().prepare(
+      'SELECT * FROM memories WHERE agent_folder = ?'
+    ).all(TEST_GROUP.folder) as any[];
+
+    logger.debug(`  总共存储 ${agent1Memories.length} 条记忆`);
+
+    // 验证每个Agent都有记忆
+    for (const agent of [TEST_AGENT1, TEST_AGENT2, TEST_AGENT3, TEST_AGENT4]) {
+      const agentMemories = agent1Memories.filter(m => m.agent_folder === TEST_GROUP.folder); // 因为所有Agent使用同一folder
+      logger.debug(`  Agent ${agent.id} 有 ${agentMemories.length} 条记忆`);
+    }
+
+    // 测试并发记忆检索
+    logger.debug('  测试并发记忆检索');
+    const searchPromises = [
+      memoryManager.searchMemories(TEST_GROUP.folder, '并发记忆1', 2),
+      memoryManager.searchMemories(TEST_GROUP.folder, '并发记忆2', 2),
+      memoryManager.searchMemories(TEST_GROUP.folder, 'Agent 3', 1),
+      memoryManager.searchMemories(TEST_GROUP.folder, 'Agent 4', 1)
+    ];
+
+    const searchResults = await Promise.all(searchPromises);
+    searchResults.forEach((results, index) => {
+      logger.debug(`  搜索 ${['并发记忆1', '并发记忆2', 'Agent 3', 'Agent 4'][index]} 找到 ${results.length} 条记录`);
+    });
+
+    printDatabaseStats('多Agent并发记忆后');
+
+    // 10. 测试进化库并发访问
+    logger.info('10. 测试进化库并发访问');
+
+    logger.debug('  多个Agent同时提交经验');
+    const experiencePromises = [
+      evolutionManager.submitExperience(
+        '并发处理测试',
+        'Agent 3: 并发处理任务经验',
+        TEST_AGENT3.id,
+        '并发任务处理经验',
+        ['并发', '任务', '测试']
+      ),
+      evolutionManager.submitExperience(
+        '并发处理测试',
+        'Agent 4: 并发处理任务经验',
+        TEST_AGENT4.id,
+        '并发任务处理经验',
+        ['并发', '任务', '测试']
+      ),
+      evolutionManager.submitExperience(
+        '记忆管理优化',
+        'Agent 3: 记忆隔离优化经验',
+        TEST_AGENT3.id,
+        '记忆隔离经验',
+        ['记忆', '隔离', '优化']
+      ),
+      evolutionManager.submitExperience(
+        '进化库查询优化',
+        'Agent 4: 进化库查询优化经验',
+        TEST_AGENT4.id,
+        '查询优化经验',
+        ['查询', '优化', '性能']
+      )
+    ];
+
+    const experienceIds = await Promise.all(experiencePromises);
+    logger.debug(`  成功提交 ${experienceIds.length} 条经验`);
+
+    // 验证进化库并发审核
+    logger.debug('  验证进化库并发审核');
+    const pendingCountBefore = TestDatabaseHelper.getDatabase().prepare(
+      'SELECT COUNT(*) as count FROM evolution_log WHERE status = ?'
+    ).get('pending') as { count: number };
+
+    logger.debug(`  审核前待处理经验: ${pendingCountBefore.count}`);
+
+    // 触发自动审核（模拟并发审核）
+    await evolutionManager.autoReviewPendingEntries();
+
+    const pendingCountAfter = TestDatabaseHelper.getDatabase().prepare(
+      'SELECT COUNT(*) as count FROM evolution_log WHERE status = ?'
+    ).get('pending') as { count: number };
+
+    logger.debug(`  审核后待处理经验: ${pendingCountAfter.count}`);
+
+    const approvedCount = TestDatabaseHelper.getDatabase().prepare(
+      'SELECT COUNT(*) as count FROM evolution_log WHERE status = ?'
+    ).get('approved') as { count: number };
+
+    logger.debug(`  审核通过经验: ${approvedCount.count}`);
+
+    // 测试并发查询进化库
+    logger.debug('  测试并发查询进化库');
+    const queryPromises = [
+      evolutionManager.queryExperience('并发'),
+      evolutionManager.queryExperience('记忆'),
+      evolutionManager.queryExperience('查询'),
+      evolutionManager.queryExperience('任务')
+    ];
+
+    const concurrentQueryResults = await Promise.all(queryPromises);
+    concurrentQueryResults.forEach((results, index) => {
+      logger.debug(`  查询 ${['并发', '记忆', '查询', '任务'][index]} 找到 ${results.length} 条经验`);
+    });
+
+    printDatabaseStats('进化库并发访问后');
+
+    // 11. 测试数据清理
     logger.info('9. 测试数据清理');
 
     // 清理测试任务
@@ -465,6 +596,8 @@ function calculateFibonacciOptimized(n: number): number {
     logger.debug('  清理测试 Agent');
     await TestDatabaseHelper.cleanupTestAgent(TEST_AGENT1.id);
     await TestDatabaseHelper.cleanupTestAgent(TEST_AGENT2.id);
+    await TestDatabaseHelper.cleanupTestAgent(TEST_AGENT3.id);
+    await TestDatabaseHelper.cleanupTestAgent(TEST_AGENT4.id);
 
     // 最终清理
     logger.debug('  执行完整数据清理');
