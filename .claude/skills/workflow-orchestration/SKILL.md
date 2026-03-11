@@ -11,7 +11,7 @@ description: |
 license: MIT
 metadata:
   author: vxcozy
-  version: "3.1.0"
+  version: "3.2.0"
   evolutionIntegration: true
 ---
 
@@ -126,6 +126,11 @@ Keep the main context window clean:
 | **CodeReview-Performance** | Performance impact assessment |
 | **CodeReview-Architecture** | Architecture and design pattern review |
 | **DocGen** | Documentation generation and update |
+| **GDI-Analysis** | 计算和分析 GDI 评分（全球期望指数） |
+| **Capsule-Promotion** | 评估基因是否符合晋升为 Capsule 的条件 |
+| **Signal-Deduplication** | 检测和防止信号重复提交 |
+| **Validation-Security** | 验证基因中的验证命令安全性 |
+| **Evolution-Strategy** | 实现三阶段进化策略（Repair → Optimize → Innovate） |
 
 **Subagent Execution Strategy**:
 - **Parallel**: Multiple independent subagents can run at the same time
@@ -497,25 +502,32 @@ Change ready for deployment
 
 ---
 
-## 11. 进化系统整合 (Evolution System Integration) 3.1
+## 11. 进化系统整合 (Evolution System Integration) 3.2 (GEP 1.5.0 兼容)
 
 ### 11.1 整合概述
 
-将 workflow-orchestration 的"纪律性执行"与进化系统的"经验循环"完美结合：
+将 workflow-orchestration 的"纪律性执行"与 GEP 1.5.0 进化系统的"经验循环"完美结合：
 
 ```
-任务接收 → 搜索进化库 → 搜索外部学习 → 执行任务 → 上传经验 → 触发审核
-      ↓            ↓           ↓         ↓         ↓
-  Evolution-Search   External-Learning    验证阶段   Evolution-Upload   多代理审核
+任务接收 → 搜索进化库 → GDI 评分分析 → 执行任务 → 信号去重 → 验证安全 → 上传经验 → 触发审核
+      ↓            ↓           ↓           ↓         ↓         ↓         ↓         ↓
+  Evolution-Search GDI-Analysis  验证阶段 Signal-Dedup Validation-Security Evolution-Upload 多代理审核
+      ↓
+  Evolution-Strategy (三阶段进化: Repair → Optimize → Innovate)
 ```
 
-### 11.2 新增子代理
+### 11.2 新增子代理 (GEP 1.5.0)
 
 | Subagent Type | Purpose | When to Use |
 |---------------|---------|--------------|
 | **Evolution-Search** | 搜索进化库，查找可复用经验 | 任务开始时，任何非 trivial 任务 |
 | **External-Learning** | 搜索外部服务获取新知识 | 进化库经验不足时 |
 | **Evolution-Upload** | 总结经验并上传到进化库 | 任务成功完成后 |
+| **GDI-Analysis** | 计算和分析 GDI 评分（全球期望指数）| 评估基因质量、决定晋升 Capsule 时 |
+| **Capsule-Promotion** | 评估基因是否符合晋升为 Capsule 的条件 | 高评分基因需要晋升时 |
+| **Signal-Deduplication** | 检测和防止信号重复提交 | 上传经验前、提交信号前 |
+| **Validation-Security** | 验证基因中的验证命令安全性 | 基因包含验证命令时 |
+| **Evolution-Strategy** | 实现三阶段进化策略（Repair → Optimize → Innovate）| 进化改进基因时 |
 
 ### 11.3 整合工作流
 

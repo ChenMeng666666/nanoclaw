@@ -104,6 +104,11 @@ Complete reference for all practices, rules, and decision criteria.
 | **CodeReview-Performance** | N+1 queries, algorithm efficiency, memory, caching, benchmarks | Performance-sensitive code |
 | **CodeReview-Architecture** | SRP, separation of concerns, coupling, extensibility, backward compatibility | Core logic, API changes |
 | **DocGen** | API documentation, usage examples, migration guides, CHANGELOG | Feature, API, behavior changes |
+| **GDI-Analysis** | 计算和分析 GDI 评分（全球期望指数），评估基因质量 | 评估基因、决定晋升、审核质量 |
+| **Capsule-Promotion** | 评估基因是否符合晋升为 Capsule 的条件，更新 Capsule 索引 | 高评分基因晋升 |
+| **Signal-Deduplication** | 检测和防止信号重复提交，使用语义相似度计算 | 上传经验前、提交信号前 |
+| **Validation-Security** | 验证基因中的验证命令安全性，检查白名单和禁止操作符 | 基因包含验证命令时 |
+| **Evolution-Strategy** | 实现三阶段进化策略（Repair → Optimize → Innovate） | 进化改进基因时 |
 
 ### Multi-Agent Code Review 2.0
 
