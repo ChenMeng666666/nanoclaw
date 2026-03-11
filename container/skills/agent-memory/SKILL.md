@@ -105,15 +105,22 @@ curl -G "http://host.docker.internal:3456/api/memory/list" \
 
 ## 
 
-## 进化库系统
+## 进化库系统 (GEP 1.5.0 标准)
 
-进化库用于共享经验：上传 → 审核 → 查询 → 使用反馈
+进化库用于共享经验：上传 → 审核 → 查询 → 使用反馈，完全符合 GEP 1.5.0 标准。
+
+### GEP 1.5.0 核心概念
+
+- **GEPGene**：符合 GEP 标准的基因结构，包含 signalsMatch、validationCommands、chainId 等字段
+- **GEPCapsule**：验证后的执行结果胶囊，包含置信度、影响范围、执行结果等
+- **GDIScore**：全球期望指数评分，综合内在质量、使用指标、社交信号和新鲜度
+- **AbilityChain**：能力链概念，用于链接相关的基因和胶囊
 
 ### API 端点
 
 #### POST /api/evolution/query
 
-查询经验库
+查询经验库（符合 GEP 标准）
 
 ```bash
 curl -X POST http://host.docker.internal:3456/api/evolution/query \
@@ -134,7 +141,16 @@ curl -X POST http://host.docker.internal:3456/api/evolution/query \
       "abilityName": "情绪化对话处理技巧",
       "content": "1. 首先表达理解和共情...",
       "tags": ["沟通技巧", "情绪管理"],
-      "status": "approved"
+      "status": "promoted",
+      "schema_version": "1.5.0",
+      "asset_id": "sha256:abc123...",
+      "gdi_score": {
+        "intrinsicQuality": 8.5,
+        "usageMetrics": 7.2,
+        "socialSignals": 6.8,
+        "freshness": 9.0,
+        "total": 7.8
+      }
     }
   ]
 }
@@ -142,7 +158,7 @@ curl -X POST http://host.docker.internal:3456/api/evolution/query \
 
 #### POST /api/evolution/submit
 
-提交经验到进化库
+提交经验到进化库（符合 GEP 标准）
 
 ```bash
 curl -X POST http://host.docker.internal:3456/api/evolution/submit \
@@ -152,7 +168,8 @@ curl -X POST http://host.docker.internal:3456/api/evolution/submit \
     "description": "如何给出简洁有效的回答",
     "content": "1. 直接给出答案\n2. 避免冗余解释\n3. 使用列表结构化...",
     "sourceAgentId": "andy",
-    "tags": ["沟通技巧", "效率优化"]
+    "tags": ["沟通技巧", "效率优化"],
+    "validationCommands": ["npm run test:communication"]
   }'
 ```
 
@@ -160,7 +177,9 @@ curl -X POST http://host.docker.internal:3456/api/evolution/submit \
 ```json
 {
   "id": 456,
-  "status": "submitted"
+  "status": "pending",
+  "schema_version": "1.5.0",
+  "asset_id": "sha256:def456..."
 }
 ```
 
@@ -177,6 +196,31 @@ curl -X POST http://host.docker.internal:3456/api/evolution/feedback \
     "comment": "这个方法很有效",
     "rating": 5
   }'
+```
+
+#### POST /api/evolution/create-capsule
+
+创建 Capsule（验证后的执行结果）
+
+```bash
+curl -X POST http://host.docker.internal:3456/api/evolution/create-capsule \
+  -H "Content-Type: application/json" \
+  -d '{
+    "geneId": 123,
+    "trigger": ["user_emotional", "communication"],
+    "confidence": 0.95,
+    "blastRadius": {"files": 2, "lines": 50},
+    "outcome": {"status": "success", "score": 0.9}
+  }'
+```
+
+**响应**：
+```json
+{
+  "capsuleId": "sha256:ghi789...",
+  "status": "created",
+  "geneStatus": "promoted"
+}
 ```
 
 ---
@@ -369,7 +413,7 @@ curl -X POST http://host.docker.internal:3456/api/evolution/select-gene \
 }
 ```
 
-### 基因类别
+### 基因类别 (GEP 标准)
 
 | 类别 | 描述 | 适用场景 |
 |------|------|---------|
@@ -377,6 +421,74 @@ curl -X POST http://host.docker.internal:3456/api/evolution/select-gene \
 | `optimize` | 优化基因 | 性能优化、效率提升 |
 | `innovate` | 创新基因 | 新功能开发、创新改进 |
 | `learn` | 学习基因 | 知识获取、技能提升 |
+
+### 基因状态 (GEP 标准)
+
+| 状态 | 描述 | GDI 评分要求 |
+|------|------|-------------|
+| `promoted` | 已晋升 | GDI ≥ 7.0 且 < 30 天 |
+| `stale` | 陈旧 | 3.0 ≤ GDI < 7.0 且 < 90 天 |
+| `archived` | 已归档 | GDI < 3.0 或 ≥ 90 天 |
+
+---
+
+## GEP 1.5.0 数据结构示例
+
+### GEPGene 结构
+
+```typescript
+interface GEPGene {
+  type: 'Gene';
+  schema_version: '1.5.0';
+  asset_id: string; // sha256:<hex>
+  category: 'repair' | 'optimize' | 'innovate';
+  signals_match: string[];
+  summary: string;
+  preconditions: string[];
+  validation_commands: string[];
+  chain_id?: string;
+  gdi_score?: GDIScore;
+  status: 'promoted' | 'stale' | 'archived';
+  // ... 其他字段
+}
+```
+
+### GEPCapsule 结构
+
+```typescript
+interface GEPCapsule {
+  type: 'Capsule';
+  schema_version: '1.5.0';
+  asset_id: string;
+  trigger: string[];
+  gene: string; // Gene 的 asset_id
+  summary: string;
+  confidence: number; // 0-1
+  blast_radius: {
+    files: number;
+    lines: number;
+  };
+  outcome: {
+    status: 'success' | 'partial' | 'failed';
+    score: number;
+  };
+  success_streak: number;
+  gene_id: number;
+  approved_at: string;
+}
+```
+
+### GDIScore 结构
+
+```typescript
+interface GDIScore {
+  intrinsicQuality: number; // 0-10 (35%)
+  usageMetrics: number;     // 0-10 (30%)
+  socialSignals: number;    // 0-10 (20%)
+  freshness: number;        // 0-10 (15%)
+  total: number;            // 总分 (0-10)
+}
+```
 
 ---
 

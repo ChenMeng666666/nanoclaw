@@ -330,7 +330,7 @@ curl -X POST http://host.docker.internal:3456/api/memory/add \
 
 注意：新增的元数据字段（tags、messageType、sourceType、sessionId 等）会在记忆摄取时自动设置，无需手动指定。
 
-**进化库提交**：
+**进化库提交（GEP 1.5.0 标准）**：
 agent 将有价值的学习方法提交到进化库，分享给其他 agent：
 
 ```bash
@@ -341,7 +341,30 @@ curl -X POST http://host.docker.internal:3456/api/evolution/submit \
     "description": "如何识别和回应用户的情绪需求",
     "content": "1. 观察用户用词变化\n2. 注意用户提问方式\n3. 先表达理解，再给建议\n4. 不要辩解，给用户情绪空间",
     "sourceAgentId": "mimi",
-    "tags": ["情绪管理", "沟通技巧", "用户服务"]
+    "tags": ["情绪管理", "沟通技巧", "用户服务"],
+    "validationCommands": ["npm run test:communication", "node tests/communication.test.js"]
+  }'
+```
+
+**GEP 1.5.0 特性说明**：
+- 自动生成 asset_id（sha256 哈希）
+- 自动提取信号并计算类别
+- 支持 validationCommands 验证命令
+- 自动计算 GDI 评分
+- 提交后立即触发自动审核
+
+**提交学习成果为 Capsule**：
+学习任务完成后，可以直接创建 Capsule（需要 Gene 已通过审核）：
+
+```bash
+curl -X POST http://host.docker.internal:3456/api/evolution/create-capsule \
+  -H "Content-Type: application/json" \
+  -d '{
+    "geneId": 123,
+    "trigger": ["情绪识别", "用户表达模式"],
+    "confidence": 0.85,
+    "blastRadius": {"files": 1, "lines": 30},
+    "outcome": {"status": "success", "score": 0.8}
   }'
 ```
 
@@ -549,13 +572,17 @@ curl -X POST http://host.docker.internal:3456/api/learning/task/complete \
 - **混合检索**：结合 BM25 关键词匹配和向量相似度搜索
 - **智能分块**：考虑记忆分块的完整性，保护代码块等结构化内容
 
-### 进化库 API
+### 进化库 API (GEP 1.5.0 标准)
 
 | 端点 | 方法 | 描述 |
 |------|------|------|
-| `/api/evolution/query` | POST | 查询经验 |
-| `/api/evolution/submit` | POST | 提交经验 |
-| `/api/evolution/feedback` | POST | 提交反馈 |
+| `/api/evolution/query` | POST | 查询经验（支持 GDI 评分过滤） |
+| `/api/evolution/submit` | POST | 提交经验（自动生成 asset_id 和 GDI 评分） |
+| `/api/evolution/feedback` | POST | 提交反馈（自动更新 GDI 评分） |
+| `/api/evolution/create-capsule` | POST | 创建 Capsule（验证后的执行结果） |
+| `/api/evolution/get-capsules` | GET | 获取 Gene 的所有 Capsules |
+| `/api/evolution/gdi-score` | POST | 手动计算 Gene 的 GDI 评分 |
+| `/api/evolution/ability-chain` | POST | 创建能力链（AbilityChain） |
 
 ### 学习计划 API
 

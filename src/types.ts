@@ -568,4 +568,13 @@ export type EvolutionEntry = Omit<
   strategy?: string[];
   constraints?: Gene['constraints'];
   validation?: string[];
+  // GEP 1.5.0 新增属性
+  schema_version?: string;
+  asset_id?: string;
+  gdi_score?: GDIScore;
+  chain_id?: string;
+  summary?: string;
+  preconditions?: string[];
+  validation_commands?: string[];
+  ecosystem_status?: 'promoted' | 'stale' | 'archived';
 };

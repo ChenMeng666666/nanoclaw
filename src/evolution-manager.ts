@@ -626,8 +626,8 @@ export class EvolutionManager {
     let score = 5; // 基础分
 
     // 高评分反馈
-    if (gene.feedback) {
-      const highRatings = gene.feedback.filter((f) => f.rating >= 4).length;
+    if (gene.feedback && Array.isArray(gene.feedback)) {
+      const highRatings = gene.feedback.filter((f) => f?.rating >= 4).length;
       if (highRatings > 0) score += 1;
       if (highRatings > 3) score += 2;
       if (highRatings > 5) score += 3;
@@ -805,7 +805,7 @@ export class EvolutionManager {
     const db = getDatabase();
     const existingEntries = db
       .prepare(
-        'SELECT * FROM evolution_log WHERE created_at >= datetime("now", "-7 days")',
+        "SELECT * FROM evolution_log WHERE created_at >= datetime('now', '-7 days')",
       )
       .all() as any[];
 
@@ -1044,11 +1044,11 @@ export class EvolutionManager {
    * 计算平均评分
    */
   private calculateAverageRating(
-    feedback: Array<{ rating: number }> | undefined,
+    feedback: Array<{ rating: number }> | undefined | null,
   ): number {
-    if (!feedback || feedback.length === 0) return 0;
+    if (!feedback || !Array.isArray(feedback) || feedback.length === 0) return 0;
 
-    const sum = feedback.reduce((acc, f) => acc + (f.rating || 0), 0);
+    const sum = feedback.reduce((acc, f) => acc + (f?.rating || 0), 0);
     return sum / feedback.length;
   }
 

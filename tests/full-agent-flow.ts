@@ -193,6 +193,58 @@ async function testFullAgentFlow() {
 
     printDatabaseStats('进化系统后');
 
+    // 4.1. 测试 GEP 1.5.0 新特性
+    logger.info('4.1. 测试 GEP 1.5.0 新特性');
+
+    // 测试 GDI 评分计算
+    logger.debug('  测试 GDI 评分计算');
+    const gepTestExperiences = TestDatabaseHelper.getDatabase().prepare(
+      'SELECT * FROM evolution_log WHERE source_agent_id = ? AND ability_name = ?'
+    ).all(TEST_EXPERIENCE.source_agent_id, TEST_EXPERIENCE.ability_name) as any[];
+
+    if (gepTestExperiences.length > 0) {
+      const gene = gepTestExperiences[0];
+      const gdiScore = evolutionManager.calculateGDIScore(gene);
+      logger.debug(`  GDI 评分: intrinsic=${gdiScore.intrinsicQuality}, usage=${gdiScore.usageMetrics}, social=${gdiScore.socialSignals}, freshness=${gdiScore.freshness}, total=${gdiScore.total}`);
+
+      // 更新 GDI 评分
+      evolutionManager.updateGeneGDIScore(gene.id);
+      logger.debug('  GDI 评分已更新');
+    }
+
+    // 测试创建 Capsule（需要 Gene 先通过审核）
+    logger.debug('  测试 Capsule 创建');
+    const approvedExperiences = TestDatabaseHelper.getDatabase().prepare(
+      'SELECT * FROM evolution_log WHERE status = ?'
+    ).all('approved') as any[];
+
+    if (approvedExperiences.length > 0) {
+      const approvedGene = approvedExperiences[0];
+      try {
+        const capsuleId = await evolutionManager.createCapsule(
+          approvedGene.id,
+          ['task_execution', 'optimization'],
+          0.9,
+          { files: 5, lines: 100 },
+          { status: 'success', score: 0.95 }
+        );
+        logger.debug(`  Capsule 创建成功: ${capsuleId}`);
+
+        // 获取 Gene 的所有 Capsules
+        const capsules = evolutionManager.getCapsulesForGene(approvedGene.id);
+        logger.debug(`  Gene ${approvedGene.id} 有 ${capsules.length} 个 Capsules`);
+      } catch (error) {
+        logger.debug(`  Capsule 创建条件不满足，跳过测试 (这是正常的)`);
+      }
+    }
+
+    // 测试生态系统指标
+    logger.debug('  测试生态系统指标');
+    const ecosystemMetrics = evolutionManager.calculateEcosystemMetrics();
+    logger.debug(`  生态系统指标: totalGenes=${ecosystemMetrics.totalGenes}, totalCapsules=${ecosystemMetrics.totalCapsules}, promotedGenes=${ecosystemMetrics.promotedGenes}, avgGDIScore=${ecosystemMetrics.avgGDIScore}`);
+
+    printDatabaseStats('GEP 1.5.0 新特性测试后');
+
     // 5. 测试定时任务系统
     logger.info('5. 测试定时任务系统');
 

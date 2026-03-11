@@ -1,10 +1,17 @@
 import { getDatabase } from '../src/db-agents.js';
 import { logger } from '../src/logger.js';
+import crypto from 'crypto';
 
 /**
- * 测试数据生成器
+ * 测试数据生成器 (GEP 1.5.0 标准)
  */
 export class TestDataFactory {
+  // 生成 GEP 标准的 asset_id
+  static generateGEPAssetId(content: string): string {
+    const hash = crypto.createHash('sha256').update(content).digest('hex');
+    return `sha256:${hash}`;
+  }
+
   static createTestAgent(folder: string, id: string = 'test-agent') {
     const now = new Date().toISOString();
     return {
@@ -66,11 +73,11 @@ export class TestDataFactory {
     };
   }
 
+  /**
+   * 创建符合 GEP 1.5.0 标准的测试进化经验
+   */
   static createTestEvolutionExperience(agentId: string) {
-    return {
-      source_agent_id: agentId,
-      ability_name: '测试任务执行',
-      content: `
+    const content = `
 在执行任务时，应该遵循以下步骤：
 
 1. **搜索记忆**：首先从L1工作记忆、L2短期记忆和L3长期记忆中检索相关信息。使用语义搜索来找到最相关的内容，关键词包括"任务执行"、"步骤"、"方法"等。
@@ -84,15 +91,108 @@ export class TestDataFactory {
 5. **经验总结**：任务完成后，将成功的方法、遇到的问题和解决方案整理成经验，提交到进化库进行审核。
 
 这个流程确保了每次任务执行都能充分利用已有知识，同时不断积累和改进经验库。
-      `.trim(),
+    `.trim();
+
+    const assetId = this.generateGEPAssetId(content);
+
+    return {
+      source_agent_id: agentId,
+      ability_name: '测试任务执行',
+      content,
       description: '测试任务的完整执行流程，包含详细的步骤说明和最佳实践',
       tags: ['测试', '任务执行', '流程', '最佳实践', '学习'],
-      category: 'task_execution',
-      status: 'pending',
+      category: 'optimize' as const,
+      status: 'pending' as const,
       reviewed_by: null,
       reviewed_at: null,
-      feedback: null,
+      feedback: JSON.stringify([]),
       created_at: new Date().toISOString(),
+      // GEP 1.5.0 新增字段
+      schema_version: '1.5.0',
+      asset_id: assetId,
+      signals_match: ['task_execution', 'optimization', 'learning'],
+      summary: '测试任务的完整执行流程',
+      preconditions: JSON.stringify(['需要基本的Node.js环境']),
+      validation_commands: JSON.stringify(['npm run test:task-execution']),
+      ecosystem_status: 'stale' as const,
+    };
+  }
+
+  /**
+   * 创建 GEP 1.5.0 标准的测试 Gene（完整结构）
+   */
+  static createGEPTestGene(agentId: string) {
+    const content = `
+## 性能优化最佳实践
+
+### 优化方法
+1. 使用连接池管理数据库连接
+2. 实现缓存机制减少重复计算
+3. 使用批量操作减少IO次数
+4. 优化算法复杂度
+
+### 验证命令
+\`\`\`bash
+npm run test:performance
+node benchmarks/connection-pool.js
+\`\`\`
+    `.trim();
+
+    const assetId = this.generateGEPAssetId(content);
+
+    return {
+      abilityName: '数据库连接池优化',
+      category: 'optimize' as const,
+      signalsMatch: ['performance', 'database', 'connection'],
+      summary: '使用连接池优化数据库访问性能',
+      preconditions: ['使用SQLite数据库', '有频繁的数据库访问'],
+      validationCommands: ['npm run test:database', 'node tests/connection-pool.test.js'],
+      sourceAgentId: agentId,
+      content,
+      description: '优化数据库连接管理的最佳实践',
+      tags: ['性能优化', '数据库', '连接池'],
+    };
+  }
+
+  /**
+   * 创建 GEP 1.5.0 标准的测试 Capsule
+   */
+  static createGEPTestCapsule(geneId: number) {
+    const capsuleContent = JSON.stringify({
+      geneId,
+      trigger: ['performance', 'database'],
+      outcome: { status: 'success', score: 0.9 }
+    });
+    const assetId = this.generateGEPAssetId(capsuleContent);
+
+    return {
+      id: assetId,
+      geneId,
+      trigger: ['performance', 'database'],
+      summary: '数据库连接池优化验证成功',
+      confidence: 0.92,
+      blastRadius: { files: 3, lines: 150 },
+      outcome: { status: 'success' as const, score: 0.9 },
+      envFingerprint: {
+        platform: process.platform,
+        arch: process.arch,
+        runtime: `Node.js ${process.version}`,
+      },
+      successStreak: 5,
+      approvedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * 创建 GEP 1.5.0 标准的测试 GDI 评分
+   */
+  static createGEPTestGDIScore() {
+    return {
+      intrinsicQuality: 8.5,
+      usageMetrics: 7.2,
+      socialSignals: 6.8,
+      freshness: 9.0,
+      total: 7.8,
     };
   }
 }
@@ -164,7 +264,7 @@ export class TestDatabaseHelper {
     db.prepare(
       `
       INSERT INTO evolution_log (source_agent_id, ability_name, content, description, tags, category, status, reviewed_by, reviewed_at, feedback, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, 'pending', null, null, null, ?)
+      VALUES (?, ?, ?, ?, ?, ?, 'pending', null, null, ?, ?)
     `,
     ).run(
       experienceData.source_agent_id,
@@ -173,6 +273,7 @@ export class TestDatabaseHelper {
       experienceData.description,
       JSON.stringify(experienceData.tags),
       experienceData.category,
+      experienceData.feedback || JSON.stringify([]),
       experienceData.created_at,
     );
   }
