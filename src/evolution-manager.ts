@@ -173,8 +173,14 @@ export class EvolutionManager {
       details: { abilityName, status, category, signalCount: signals.length },
     });
 
+    // 提交后立即触发审核，不等待定时任务
     if (status === 'pending') {
-      logger.info({ id, abilityName }, 'Experience submitted, awaiting review');
+      logger.info({ id, abilityName }, 'Experience submitted, triggering immediate review');
+      // 重新获取完整的条目数据用于审核
+      const fullEntry = getEvolutionEntry(id);
+      if (fullEntry) {
+        await this.autoReviewPendingEntry(fullEntry);
+      }
     } else {
       logger.info(
         { id, abilityName },
@@ -240,6 +246,21 @@ export class EvolutionManager {
         signalCount: input.signalsMatch?.length || 0,
       },
     });
+
+    // 提交后立即触发审核，不等待定时任务
+    if (status === 'pending') {
+      logger.info({ id, abilityName: input.abilityName }, 'Gene submitted, triggering immediate review');
+      // 重新获取完整的条目数据用于审核
+      const fullEntry = getEvolutionEntry(id);
+      if (fullEntry) {
+        await this.autoReviewPendingEntry(fullEntry);
+      }
+    } else {
+      logger.info(
+        { id, abilityName: input.abilityName },
+        'Gene auto-approved and added to evolution library',
+      );
+    }
 
     return id;
   }
@@ -682,11 +703,17 @@ export class EvolutionManager {
       },
     });
 
+    // 提交后立即触发审核，不等待定时任务
     if (status === 'pending') {
       logger.info(
         { id, abilityName: input.abilityName },
-        'Main project experience submitted, awaiting review',
+        'Main project experience submitted, triggering immediate review',
       );
+      // 重新获取完整的条目数据用于审核
+      const fullEntry = getEvolutionEntry(id);
+      if (fullEntry) {
+        await this.autoReviewPendingEntry(fullEntry);
+      }
     } else {
       logger.info(
         { id, abilityName: input.abilityName },
@@ -719,7 +746,7 @@ export class EvolutionManager {
   /**
    * 自动审核单个待审核条目
    */
-  private async autoReviewPendingEntry(entry: any): Promise<void> {
+  async autoReviewPendingEntry(entry: any): Promise<void> {
     const scores: Record<string, { score: number; comment: string }> = {};
     let totalScore = 0;
 

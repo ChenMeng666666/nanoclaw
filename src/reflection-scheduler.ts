@@ -56,13 +56,6 @@ export class ReflectionScheduler {
       logger.info('Scheduled memory consolidation completed');
     });
 
-    // 每天 0:00 执行进化库自动审核
-    cron.schedule('0 0 * * *', async () => {
-      logger.info('Starting scheduled evolution library auto-review');
-      await evolutionManager.autoReviewPendingEntries();
-      logger.info('Scheduled evolution library auto-review completed');
-    });
-
     // 每周日 23:00 反思
 
     // 每周日 20:00 检查学习进度并触发反思
