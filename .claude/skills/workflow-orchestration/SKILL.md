@@ -5,11 +5,14 @@ description: |
   Use when starting non-trivial tasks (3+ steps), fixing bugs, building features,
   refactoring code, or when rigorous execution with quality gates is needed.
   Includes subagent delegation, lessons tracking, staff-engineer-level verification,
-  multi-agent code review, risk management, and rollback strategies.
+  multi-agent code review, risk management, rollback strategies, and
+  integration with evolution system (search evolution library, learn, execute,
+  upload experience, trigger review).
 license: MIT
 metadata:
   author: vxcozy
-  version: "3.0.0"
+  version: "3.1.0"
+  evolutionIntegration: true
 ---
 
 # Workflow Orchestration 3.0
@@ -17,6 +20,22 @@ metadata:
 Apply these practices for disciplined, high-quality task execution with risk management and continuous improvement.
 
 ## Quick Reference
+
+| Practice | When to Apply |
+|----------|---------------|
+| **Evolution Integration** | Search evolution library, learn, execute, upload experience, trigger review |
+| Plan Mode | Any task with 3+ steps or architectural decisions |
+| Risk Assessment | Before starting any non-trivial task |
+| Subagents | Research, exploration, parallel analysis, code review |
+| Lessons | After ANY user correction or task completion |
+| Verification | Before marking any task complete |
+| Elegance Check | Non-trivial changes only |
+| Multi-Agent Review | Any code change touching core logic or 3+ files |
+| Parallel Execution | Independent tasks that can run concurrently |
+| Rollback Plan | Any change that could impact production |
+| Documentation Update | Any feature, API, or behavior change |
+| Performance Benchmark | Performance-sensitive changes |
+| Progressive Rollout | High-risk changes |
 
 | Practice | When to Apply |
 |----------|---------------|
@@ -475,3 +494,183 @@ Change ready for deployment
     │
     └─ Otherwise → Direct deploy, keep monitoring
 ```
+
+---
+
+## 11. 进化系统整合 (Evolution System Integration) 3.1
+
+### 11.1 整合概述
+
+将 workflow-orchestration 的"纪律性执行"与进化系统的"经验循环"完美结合：
+
+```
+任务接收 → 搜索进化库 → 搜索外部学习 → 执行任务 → 上传经验 → 触发审核
+      ↓            ↓           ↓         ↓         ↓
+  Evolution-Search   External-Learning    验证阶段   Evolution-Upload   多代理审核
+```
+
+### 11.2 新增子代理
+
+| Subagent Type | Purpose | When to Use |
+|---------------|---------|--------------|
+| **Evolution-Search** | 搜索进化库，查找可复用经验 | 任务开始时，任何非 trivial 任务 |
+| **External-Learning** | 搜索外部服务获取新知识 | 进化库经验不足时 |
+| **Evolution-Upload** | 总结经验并上传到进化库 | 任务成功完成后 |
+
+### 11.3 整合工作流
+
+#### 阶段 1: 任务接收与进化库搜索
+
+```
+任务接收
+    │
+    ▼
+[Evolution-Search 代理]
+    ├─ 搜索进化库 (queryExperience)
+    ├─ 查找相关经验
+    ├─ 分析是否有可复用的方案
+    └─ 生成经验搜索报告
+    │
+    ▼
+{ 找到可用经验? }
+    ├─ 是 → 使用进化库经验，跳转到阶段 2
+    └─ 否 → 继续正常 workflow-orchestration 流程
+```
+
+#### 阶段 2: 使用进化库经验 + 外部学习
+
+```
+使用进化库经验
+    │
+    ▼
+[Plan 代理]
+    ├─ 基于进化库经验制定计划
+    ├─ 评估经验适用性
+    ├─ 确定需要调整的部分
+    └─ 制定执行计划
+    │
+    ▼
+{ 需要外部学习? }
+    ├─ 是 → [External-Learning 代理]
+    │       ├─ 搜索外部服务
+    │       └─ 生成学习结果
+    └─ 否 → 继续执行
+    │
+    ▼
+[Risk 代理]
+    ├─ 评估使用进化库经验的风险
+    ├─ 识别可能的不匹配点
+    └─ 制定回滚计划
+```
+
+#### 阶段 3: 执行任务 + 验证
+
+```
+执行任务
+    │
+    ▼
+[Verify 代理]
+    ├─ 验证任务结果
+    ├─ 与进化库经验对比
+    ├─ 评估是否改进了原有经验
+    └─ 生成验证报告
+    │
+    ▼
+[Benchmark 代理] (如果是性能敏感任务)
+    ├─ 测量性能指标
+    ├─ 与进化库经验对比
+    └─ 确定是否有改进
+    │
+    ▼
+[CodeReview 代理] (如果涉及代码变更)
+    └─ 特别关注经验复用的实现
+```
+
+#### 阶段 4: 经验总结 + 上传进化库
+
+```
+任务完成，验证成功
+    │
+    ▼
+[Evolution-Upload 代理]
+    ├─ 总结本次执行的经验
+    ├─ 与原有进化库经验对比
+    ├─ 判断是否应该上传
+    │   ├─ 是新类型任务? → 上传
+    │   ├─ 改进了原有经验? → 上传新版本
+    │   └─ 与现有经验相似? → 可选上传
+    ├─ 生成完整的经验文档
+    ├─ 调用 submitExperience()
+    └─ 触发进化库审核
+    │
+    ▼
+[Lessons 记录]
+    ├─ 记录到 tasks/lessons.md
+    ├─ 记录经验复用情况
+    └─ 记录改进点
+```
+
+#### 阶段 5: 进化库审核 + 持续改进
+
+```
+经验上传到进化库
+    │
+    ▼
+进化库自动审核
+    (safety, effectiveness, reusability, clarity, completeness)
+    │
+    ▼
+{ 需要人工审核? }
+    ├─ 是 → 使用 workflow-orchestration 审核代理
+    │       ├─ CodeReview-Quality → 对应 clarity/completeness
+    │       ├─ CodeReview-Security → 对应 safety
+    │       ├─ CodeReview-Performance → 对应 effectiveness
+    │       └─ CodeReview-Architecture → 对应 reusability
+    └─ 否 → 自动通过
+    │
+    ▼
+审核完成
+    │
+    ▼
+{ 经验被批准? }
+    ├─ 是 → 经验加入进化库，可供未来使用
+    └─ 否 → 记录反馈，用于改进下次经验
+```
+
+### 11.4 整合的优势
+
+| 优势 | 说明 |
+|------|------|
+| **效率提升** | 经验复用避免重复发明轮子，快速启动 |
+| **质量保证** | 双重审核（workflow-orchestration + 进化系统） |
+| **知识积累** | 自动记录成功经验，结构化存储 |
+| **风险降低** | 使用已验证方法，回滚计划就绪 |
+| **持续改进** | 经验不断优化，审核代理越来越聪明 |
+
+### 11.5 详细文档
+
+完整的整合方案、技术实现要点、实际示例请参考：
+
+**[references/evolution-integration.md](references/evolution-integration.md)**
+
+包含：
+- 详细的工作流描述
+- 决策树整合
+- 实际整合示例（bug修复、新功能实现）
+- 实施建议（MVP → 深度整合 → 完全整合）
+- 技术实现要点
+- API 整合点
+- 子代理定义
+
+---
+
+## 12. 总结
+
+**workflow-orchestration 与进化系统的结合是非常必要且价值巨大的！**
+
+1. **互补性**: workflow-orchestration 提供纪律性和流程，进化系统提供经验复用和持续学习
+2. **增效**: 经验复用提高效率，减少重复工作
+3. **提质**: 双重审核确保质量，经验不断优化
+4. **闭环**: 执行 → 总结 → 上传 → 复用 → 改进，形成完整闭环
+
+这两个系统的结合将大大提升开发效率和代码质量！
