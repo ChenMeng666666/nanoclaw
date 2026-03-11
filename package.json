@@ -19,7 +19,8 @@
     "test:watch": "vitest",
     "test:e2e": "tsx tests/e2e-agent-flow.ts",
     "test:run": "bash tests/run-tests.sh",
-    "test:minimal": "tsx tests/minimal-test.ts"
+    "test:minimal": "tsx tests/minimal-test.ts",
+    "test:full": "tsx tests/full-agent-flow.ts"
   },
   "dependencies": {
     "@types/natural": "^6.0.1",
