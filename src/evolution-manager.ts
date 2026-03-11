@@ -175,7 +175,10 @@ export class EvolutionManager {
 
     // 提交后立即触发审核，不等待定时任务
     if (status === 'pending') {
-      logger.info({ id, abilityName }, 'Experience submitted, triggering immediate review');
+      logger.info(
+        { id, abilityName },
+        'Experience submitted, triggering immediate review',
+      );
       // 重新获取完整的条目数据用于审核
       const fullEntry = getEvolutionEntry(id);
       if (fullEntry) {
@@ -249,7 +252,10 @@ export class EvolutionManager {
 
     // 提交后立即触发审核，不等待定时任务
     if (status === 'pending') {
-      logger.info({ id, abilityName: input.abilityName }, 'Gene submitted, triggering immediate review');
+      logger.info(
+        { id, abilityName: input.abilityName },
+        'Gene submitted, triggering immediate review',
+      );
       // 重新获取完整的条目数据用于审核
       const fullEntry = getEvolutionEntry(id);
       if (fullEntry) {

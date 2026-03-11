@@ -22,6 +22,17 @@ import { TestDataFactory, TestDatabaseHelper, TestAssertions } from './test-util
 import { clearTestData, printDatabaseStats, getDatabaseStats } from './test-helper.js';
 import { RegisteredGroup } from '../src/types.js';
 
+// 辅助函数：计算斐波那契数列
+function calculateFibonacci(n: number): number {
+  if (n <= 0) return 0;
+  if (n === 1) return 1;
+  let a = 0, b = 1;
+  for (let i = 2; i <= n; i++) {
+    [a, b] = [b, a + b];
+  }
+  return b;
+}
+
 // 测试配置
 const TEST_GROUP: RegisteredGroup = TestDataFactory.createTestGroup('full-test');
 const TEST_AGENT1 = TestDataFactory.createTestAgent(TEST_GROUP.folder, 'test-agent-1');
@@ -56,6 +67,9 @@ async function testFullAgentFlow() {
     logger.info('2. 测试记忆管理系统');
     memoryManager = new MemoryManager();
 
+    // 初始化 reflectionScheduler（需要先初始化才能使用）
+    reflectionScheduler = new ReflectionScheduler();
+
     // 添加 L1 工作记忆
     logger.debug('  添加 L1 工作记忆');
     await memoryManager.addMemory(
@@ -84,6 +98,18 @@ async function testFullAgentFlow() {
       throw new Error('L2 短期记忆存储失败');
     }
     logger.debug('  记忆存储验证成功');
+
+    // 测试记忆固化（L1→L2→L3）
+    logger.debug('  测试记忆固化');
+    const initialL3Count = getDatabaseStats().memories; // 记录初始记忆数量
+
+    // 调用记忆固化方法（模拟定时任务）
+    await reflectionScheduler.consolidateMemoriesForAllAgents();
+    logger.debug('  记忆固化完成');
+
+    // 验证记忆层级变化
+    const afterConsolidationCount = getDatabaseStats().memories;
+    logger.debug(`  记忆固化后数量变化: ${initialL3Count} → ${afterConsolidationCount}`);
 
     // 打印当前记忆状态
     printDatabaseStats('记忆管理后');
@@ -228,38 +254,196 @@ async function testFullAgentFlow() {
     // 7. 测试完整任务执行流程
     logger.info('7. 测试完整任务执行流程');
 
-    // 模拟任务执行（简化版）
-    logger.debug('  模拟任务执行');
+    // 模拟真实的 Agent 任务执行流程
+    logger.debug('  模拟 Agent 任务执行流程');
 
-    // 1. 搜索记忆
-    const memorySearch = await memoryManager.searchMemories(TEST_GROUP.folder, '任务执行', 3);
-    logger.debug(`  记忆搜索到 ${memorySearch.length} 条记录`);
+    // ====== 完整任务执行流程模拟 ======
+    // 1. 接收任务
+    const taskDescription = '计算斐波那契数列的第10项';
+    logger.debug(`  [1/7] 接收任务: ${taskDescription}`);
 
-    // 2. 搜索进化库
-    const evolutionSearch = await evolutionManager.queryExperience('任务执行');
-    logger.debug(`  进化库搜索到 ${evolutionSearch.length} 条记录`);
-
-    // 3. 搜索外部服务（模拟）
-    logger.debug('  外部服务搜索（模拟）');
-
-    // 4. 执行任务
-    logger.debug('  执行任务');
-
-    // 5. 任务完成，记录经验
-    logger.debug('  记录任务完成经验');
-    const newExperienceId = await evolutionManager.submitExperience(
-      'full-test-task-execution',
-      '执行任务流程验证成功',
-      TEST_AGENT2.id,
-      '任务执行流程测试',
-      ['任务执行', '流程验证']
+    // 2. 搜索记忆（L1→L2→L3）
+    logger.debug('  [2/7] 搜索记忆系统');
+    const memoryResults = await memoryManager.searchMemories(
+      TEST_GROUP.folder,
+      '斐波那契 计算 数列',
+      5
     );
-    logger.debug(`  经验提交成功: ${newExperienceId}`);
+    logger.debug(`    找到 ${memoryResults.length} 条相关记忆`);
+
+    // 3. 搜索进化库
+    logger.debug('  [3/7] 搜索进化库');
+    const evolutionResults = await evolutionManager.queryExperience('斐波那契');
+    logger.debug(`    找到 ${evolutionResults.length} 条相关经验`);
+
+    // 4. 外部学习（模拟）
+    logger.debug('  [4/7] 外部学习（模拟）');
+    const externalKnowledge = `
+斐波那契数列定义：
+- F(0) = 0
+- F(1) = 1
+- F(n) = F(n-1) + F(n-2) for n > 1
+
+计算方法：
+1. 递归法（简单但效率低）
+2. 迭代法（高效，推荐）
+3. 动态规划法
+`;
+    logger.debug('    获取外部知识完成');
+
+    // 5. 执行任务
+    logger.debug('  [5/7] 执行任务');
+    const fib10 = calculateFibonacci(10);
+    logger.debug(`    计算结果: F(10) = ${fib10}`);
+
+    // 6. 验证结果
+    logger.debug('  [6/7] 验证任务结果');
+    if (fib10 !== 55) {
+      throw new Error(`斐波那契计算错误: 期望 55，实际 ${fib10}`);
+    }
+    logger.debug('    任务执行成功！');
+
+    // 7. 经验总结并上传进化库
+    logger.debug('  [7/7] 经验总结并上传进化库');
+    const taskExperienceContent = `
+## 任务：计算斐波那契数列第10项
+
+### 执行流程
+1. **记忆搜索**：搜索了 L1/L2/L3 记忆，未找到相关记录
+2. **进化库查询**：查询了进化库，未找到相关经验
+3. **外部学习**：获取了斐波那契数列的定义和计算方法
+4. **任务执行**：使用迭代法计算 F(10) = 55
+5. **结果验证**：验证结果正确
+
+### 学到的经验
+- 斐波那契数列的标准定义
+- 三种计算方法的比较
+- 对于 n=10，迭代法是最优选择
+- 可以将此方法应用到其他递归问题
+
+### 代码示例
+\`\`\`typescript
+function calculateFibonacci(n: number): number {
+  if (n <= 0) return 0;
+  if (n === 1) return 1;
+  let a = 0, b = 1;
+  for (let i = 2; i <= n; i++) {
+    [a, b] = [b, a + b];
+  }
+  return b;
+}
+\`\`\`
+
+### 最佳实践
+1. 优先使用迭代法而非递归法
+2. 对于小 n 值，可以预先计算结果
+3. 记录计算过程便于后续优化
+`;
+
+    const experienceId = await evolutionManager.submitExperience(
+      '斐波那契数列计算',
+      taskExperienceContent,
+      TEST_AGENT1.id,
+      '计算斐波那契数列第10项的完整流程',
+      ['斐波那契', '数学计算', '算法', '迭代法']
+    );
+
+    logger.debug(`    经验上传成功: ${experienceId}`);
+    logger.debug('    进化库审核已自动触发');
+
+    // 验证经验已正确提交并审核
+    await new Promise(resolve => setTimeout(resolve, 1000)); // 等待审核完成
+    const dbAfterSubmit = TestDatabaseHelper.getDatabase();
+    const submittedExperience = dbAfterSubmit.prepare(
+      'SELECT * FROM evolution_log WHERE id = ?'
+    ).get(experienceId) as any;
+
+    if (!submittedExperience) {
+      throw new Error('经验提交后未找到');
+    }
+    logger.debug(`    经验审核状态: ${submittedExperience.status}`);
+    logger.debug(`    审核反馈: ${submittedExperience.feedback}`);
 
     printDatabaseStats('任务执行后');
 
-    // 8. 测试数据清理
-    logger.info('8. 测试数据清理');
+    // 8. 测试进化库重用（第二个Agent执行相同任务）
+    logger.info('8. 测试进化库重用');
+
+    logger.debug('  创建第二个Agent执行相同任务');
+    logger.debug('  任务: 计算斐波那契数列的第15项');
+
+    // Agent 2 搜索进化库
+    logger.debug('  Agent 2 搜索进化库');
+    const agent2EvolutionResults = await evolutionManager.queryExperience('斐波那契');
+    logger.debug(`    找到 ${agent2EvolutionResults.length} 条相关经验`);
+
+    if (agent2EvolutionResults.length === 0) {
+      logger.warn('    警告：Agent 2 未在进化库中找到经验');
+    } else {
+      logger.debug('    进化库经验重用成功！');
+      const reusedExp = agent2EvolutionResults[0];
+      logger.debug(`    重用经验: ${reusedExp.abilityName}`);
+      logger.debug(`    经验来源: ${reusedExp.sourceAgentId}`);
+    }
+
+    // Agent 2 执行任务（使用进化库经验）
+    logger.debug('  Agent 2 执行任务');
+    const fib15 = calculateFibonacci(15);
+    logger.debug(`    计算结果: F(15) = ${fib15}`);
+
+    if (fib15 !== 610) {
+      throw new Error(`斐波那契计算错误: 期望 610，实际 ${fib15}`);
+    }
+    logger.debug('    Agent 2 任务执行成功！');
+
+    // Agent 2 也可以提交新经验（基于已有经验改进）
+    logger.debug('  Agent 2 提交改进经验');
+    const improvedExperienceId = await evolutionManager.submitExperience(
+      '斐波那契数列计算优化',
+      `
+## 斐波那契数列计算（优化版）
+
+### 基于前人经验的改进
+在 Agent 1 的经验基础上，我们发现：
+- 对于更大的 n 值，迭代法依然高效
+- 可以增加边界条件检查
+- 可以添加记忆化缓存
+
+### 优化实现
+\`\`\`typescript
+function calculateFibonacciOptimized(n: number): number {
+  if (n < 0) throw new Error('n 不能为负数');
+  if (n === 0) return 0;
+  if (n === 1) return 1;
+
+  const cache = new Map<number, number>();
+  cache.set(0, 0);
+  cache.set(1, 1);
+
+  for (let i = 2; i <= n; i++) {
+    cache.set(i, cache.get(i - 1)! + cache.get(i - 2)!);
+  }
+
+  return cache.get(n)!;
+}
+\`\`\`
+
+### 本次计算
+- 任务: F(15) = 610
+- 执行时间: <1ms
+- 方法: 迭代法（基于进化库经验）
+`,
+      TEST_AGENT2.id,
+      '基于进化库经验优化斐波那契计算',
+      ['斐波那契', '优化', '算法', '记忆化', '进化库重用']
+    );
+
+    logger.debug(`    Agent 2 改进经验提交成功: ${improvedExperienceId}`);
+
+    printDatabaseStats('进化库重用后');
+
+    // 9. 测试数据清理
+    logger.info('9. 测试数据清理');
 
     // 清理测试任务
     logger.debug('  清理定时任务');

@@ -496,7 +496,11 @@ ${analysis.rating} / 5
   /**
    * 对所有智能体执行记忆固化
    */
-  private async consolidateMemoriesForAllAgents(): Promise<void> {
+  /**
+   * 对所有智能体执行记忆固化（L1→L2→L3）
+   * 可以通过定时任务或手动调用触发
+   */
+  async consolidateMemoriesForAllAgents(): Promise<void> {
     const agents = getAllActiveAgents();
     for (const agent of agents) {
       await this.consolidateAgentMemories(agent);
