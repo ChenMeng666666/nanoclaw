@@ -5,6 +5,7 @@ import path from 'path';
 import { ASSISTANT_NAME, DATA_DIR, STORE_DIR } from './config.js';
 import { isValidGroupFolder } from './group-folder.js';
 import { logger } from './logger.js';
+import { safeJsonParse } from './security.js';
 import { setDatabase } from './db-agents.js';
 import {
   AgentConfig,
@@ -776,7 +777,7 @@ export function getRegisteredGroup(
     trigger: row.trigger_pattern,
     added_at: row.added_at,
     containerConfig: row.container_config
-      ? JSON.parse(row.container_config)
+      ? safeJsonParse(row.container_config, undefined)
       : undefined,
     requiresTrigger:
       row.requires_trigger === null ? undefined : row.requires_trigger === 1,
@@ -829,7 +830,7 @@ export function getAllRegisteredGroups(): Record<string, RegisteredGroup> {
       trigger: row.trigger_pattern,
       added_at: row.added_at,
       containerConfig: row.container_config
-        ? JSON.parse(row.container_config)
+        ? safeJsonParse(row.container_config, undefined)
         : undefined,
       requiresTrigger:
         row.requires_trigger === null ? undefined : row.requires_trigger === 1,

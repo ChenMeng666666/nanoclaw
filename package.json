@@ -16,7 +16,10 @@
     "setup": "tsx setup/index.ts",
     "auth": "tsx src/whatsapp-auth.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "tsx tests/e2e-agent-flow.ts",
+    "test:run": "bash tests/run-tests.sh",
+    "test:minimal": "tsx tests/minimal-test.ts"
   },
   "dependencies": {
     "@types/natural": "^6.0.1",

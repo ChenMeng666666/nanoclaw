@@ -13,17 +13,24 @@ export function createSafeObject<T = Record<string, unknown>>(): T {
 }
 
 /**
- * 安全的 JSON.parse，防止原型链攻击
+ * 安全的 JSON.parse，防止原型链攻击并提供错误处理
  * 过滤掉 __proto__, constructor, prototype 等危险属性
+ * 如果解析失败或输入为空，返回指定的默认值
  */
-export function safeJsonParse(json: string): unknown {
-  return JSON.parse(json, (key, value) => {
-    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
-      logger.warn({ key }, 'Blocked potentially dangerous property in JSON');
-      return undefined;
-    }
-    return value;
-  });
+export function safeJsonParse<T = unknown>(json: string | null | undefined, defaultValue: T = null as unknown as T): T {
+  if (!json) return defaultValue;
+  try {
+    return JSON.parse(json, (key, value) => {
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+        logger.warn({ key }, 'Blocked potentially dangerous property in JSON');
+        return undefined;
+      }
+      return value;
+    }) as T;
+  } catch (error) {
+    logger.warn({ error, json }, 'Failed to parse JSON, returning default value');
+    return defaultValue;
+  }
 }
 
 /**

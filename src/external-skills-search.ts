@@ -10,7 +10,6 @@ export class ExternalSkillsSearcher {
    */
   async searchClawhub(query: string): Promise<any[]> {
     try {
-      // 实现 clawhub API 搜索
       const encodedQuery = encodeURIComponent(query);
       const response = await fetch(
         `https://clawhub.ai/api/search?q=${encodedQuery}`,
@@ -22,12 +21,11 @@ export class ExternalSkillsSearcher {
 
       const data = (await response.json()) as any;
 
-      // 解析返回的搜索结果
       return (
         data.results?.map((item: any) => ({
-          title: item.title || item.name,
-          description: item.description || item.content?.slice(0, 150) || '',
-          url: item.url || `https://clawhub.ai/search?q=${encodedQuery}`,
+          title: item.displayName || item.title || item.name,
+          description: item.summary || item.description || '',
+          url: item.url || `https://clawhub.ai/skills/${item.slug}`,
         })) || []
       );
     } catch (error) {
@@ -36,22 +34,10 @@ export class ExternalSkillsSearcher {
           query,
           error: error instanceof Error ? error.message : String(error),
         },
-        'Failed to search clawhub, returning mock data',
+        'Failed to search clawhub, returning empty results',
       );
 
-      // 失败时返回模拟数据
-      return [
-        {
-          title: '如何优化 Node.js 性能',
-          description: '介绍了几种优化 Node.js 应用程序性能的方法',
-          url: `https://clawhub.ai/search?q=${encodeURIComponent(query)}`,
-        },
-        {
-          title: 'Docker 最佳实践',
-          description: 'Docker 容器化的最佳实践指南',
-          url: `https://clawhub.ai/search?q=${encodeURIComponent(query)}`,
-        },
-      ];
+      return [];
     }
   }
 
@@ -60,7 +46,6 @@ export class ExternalSkillsSearcher {
    */
   async searchSkillsSh(query: string): Promise<any[]> {
     try {
-      // 实现 skills.sh API 搜索
       const encodedQuery = encodeURIComponent(query);
       const response = await fetch(
         `https://skills.sh/api/search?q=${encodedQuery}`,
@@ -72,13 +57,28 @@ export class ExternalSkillsSearcher {
 
       const data = (await response.json()) as any;
 
-      // 解析返回的技能包结果
       return (
-        data.skills?.map((item: any) => ({
-          name: item.name || item.title,
-          description: item.description || item.summary || '',
-          url: item.url || `https://skills.sh/${item.name}`,
-        })) || []
+        data.skills?.map((item: any) => {
+          // 从 source 字段构建 GitHub 链接
+          let contentUrl = `https://skills.sh/skills/${item.skillId}`;
+
+          // 如果有 source 字段，尝试构建 GitHub 链接
+          if (item.source) {
+            const sourceParts = item.source.split('/');
+            if (sourceParts.length >= 2) {
+              const org = sourceParts[0];
+              const repo = sourceParts[1];
+              contentUrl = `https://github.com/${org}/${repo}`;
+            }
+          }
+
+          return {
+            name: item.name || item.title,
+            description: item.summary || item.description || `Installs: ${item.installs}`,
+            url: contentUrl,
+            installs: item.installs,
+          };
+        }) || []
       );
     } catch (error) {
       logger.warn(
@@ -86,22 +86,10 @@ export class ExternalSkillsSearcher {
           query,
           error: error instanceof Error ? error.message : String(error),
         },
-        'Failed to search skills.sh, returning mock data',
+        'Failed to search skills.sh, returning empty results',
       );
 
-      // 失败时返回模拟数据
-      return [
-        {
-          name: 'nodejs',
-          description: 'Node.js 开发技能包',
-          url: 'https://skills.sh/nodejs',
-        },
-        {
-          name: 'docker',
-          description: 'Docker 容器技能包',
-          url: 'https://skills.sh/docker',
-        },
-      ];
+      return [];
     }
   }
 }

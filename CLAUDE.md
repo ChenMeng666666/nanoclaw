@@ -20,7 +20,7 @@ Personal Claude assistant. See [README.md](README.md) for philosophy and setup. 
    2. **防御性编程**：NanoClaw 涉及 Docker 容器读写、IPC 通信、SQLite 交互。对于所有 I/O 操作、异步调用，**必须**编写严谨的 `try...catch` 错误处理，并附带清晰的错误日志输出。 
    3. **架构红线**：牢记系统的隔离性。主进程（Node.js）负责调度，Agent SDK 必须运行在隔离的 Linux VM 容器中。绝不在主进程中执行业务 Agent 的危险 Shell 命令。 
    4. **自动化执行**：不要只把 `npm run xxx` 或 Docker 命令打印给我看，请直接利用你的工具能力（CLI/Bash）去执行它们。 
-   5.  **Git 工作流**：每次修改并验证代码有效后，主动使用 Git 记录版本并推送到远程仓库。提交信息严格使用中文，格式为：`类型: 描述` (例如 `feat: 新增 Slack 频道路由` 或 `fix: 修复容器缓存无法刷新的问题`)。
+   5.  **Git 工作流**：每次修改并验证代码有效后，主动使用 Git 记录版本并代码审查：使用三个审查代理评估代码质量，推送到远程仓库。提交信息严格使用中文，格式为：`类型: 描述` (例如 `feat: 新增 Slack 频道路由` 或 `fix: 修复容器缓存无法刷新的问题`)。
 
 ## Quick Context
 

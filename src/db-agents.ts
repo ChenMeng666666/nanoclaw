@@ -14,6 +14,7 @@ import {
   EvolutionEntry,
 } from './types.js';
 import { readEnvFile } from './env.js';
+import { safeJsonParse } from './security.js';
 
 let db: Database.Database;
 
@@ -281,7 +282,7 @@ export function getChannelInstanceById(
     botId: row.bot_id,
     jid: row.jid,
     name: row.name || undefined,
-    config: row.config ? JSON.parse(row.config) : undefined,
+    config: safeJsonParse(row.config, undefined),
     mode: row.mode as 'dm' | 'group' | 'both',
     isActive: row.is_active === 1,
   };
@@ -314,7 +315,7 @@ export function getChannelInstanceByJid(
     botId: row.bot_id,
     jid: row.jid,
     name: row.name || undefined,
-    config: row.config ? JSON.parse(row.config) : undefined,
+    config: safeJsonParse(row.config, undefined),
     mode: row.mode as 'dm' | 'group' | 'both',
     isActive: row.is_active === 1,
   };
@@ -346,7 +347,7 @@ export function getChannelInstancesForAgent(
     botId: row.bot_id,
     jid: row.jid,
     name: row.name || undefined,
-    config: row.config ? JSON.parse(row.config) : undefined,
+    config: safeJsonParse(row.config, undefined),
     mode: row.mode as 'dm' | 'group' | 'both',
     isActive: row.is_active === 1,
   }));
@@ -410,7 +411,7 @@ export function getUserProfile(
     channelInstanceId: row.channel_instance_id,
     userJid: row.user_jid,
     name: row.name || undefined,
-    preferences: row.preferences ? JSON.parse(row.preferences) : undefined,
+    preferences: safeJsonParse(row.preferences, undefined),
     memorySummary: row.memory_summary || undefined,
     lastInteraction: row.last_interaction,
     createdAt: row.created_at,
@@ -480,7 +481,7 @@ export function getMemories(
     userJid: row.user_jid || undefined,
     level: row.level as 'L1' | 'L2' | 'L3',
     content: row.content,
-    embedding: row.embedding ? JSON.parse(row.embedding) : undefined,
+    embedding: safeJsonParse(row.embedding, undefined),
     importance: row.importance,
     accessCount: row.access_count,
     lastAccessedAt: row.last_accessed_at || undefined,
@@ -529,7 +530,7 @@ export function getUserMemories(
     userJid: row.user_jid || undefined,
     level: row.level as 'L1' | 'L2' | 'L3',
     content: row.content,
-    embedding: row.embedding ? JSON.parse(row.embedding) : undefined,
+    embedding: safeJsonParse(row.embedding, undefined),
     importance: row.importance,
     accessCount: row.access_count,
     lastAccessedAt: row.last_accessed_at || undefined,
@@ -683,7 +684,7 @@ export function getLearningTask(id: string): LearningTask | undefined {
     description: row.description,
     status: row.status as 'pending' | 'in_progress' | 'completed' | 'failed',
     reflectionId: row.reflection_id || undefined,
-    resources: row.resources ? JSON.parse(row.resources) : undefined,
+    resources: safeJsonParse(row.resources, undefined),
     createdAt: row.created_at,
     completedAt: row.completed_at || undefined,
   };
@@ -710,7 +711,7 @@ export function getLearningTasksByAgent(agentFolder: string): LearningTask[] {
     description: row.description,
     status: row.status as 'pending' | 'in_progress' | 'completed' | 'failed',
     reflectionId: row.reflection_id || undefined,
-    resources: row.resources ? JSON.parse(row.resources) : undefined,
+    resources: safeJsonParse(row.resources, undefined),
     createdAt: row.created_at,
     completedAt: row.completed_at || undefined,
   }));
@@ -826,20 +827,18 @@ export function getEvolutionEntry(id: number): EvolutionEntry | undefined {
     description: row.description || '',
     sourceAgentId: row.source_agent_id || '',
     content: row.content,
-    contentEmbedding: row.content_embedding
-      ? JSON.parse(row.content_embedding)
-      : undefined,
-    tags: row.tags ? JSON.parse(row.tags) : [],
+    contentEmbedding: safeJsonParse(row.content_embedding, undefined),
+    tags: safeJsonParse(row.tags, []),
     status: row.status as 'pending' | 'reviewing' | 'approved' | 'rejected',
     reviewedBy: row.reviewed_by || undefined,
     reviewedAt: row.reviewed_at || undefined,
-    feedback: row.feedback ? JSON.parse(row.feedback) : [],
+    feedback: safeJsonParse(row.feedback, []),
     category:
       (row.category as 'repair' | 'optimize' | 'innovate' | 'learn') || 'learn',
-    signalsMatch: row.signals_match ? JSON.parse(row.signals_match) : [],
-    strategy: row.strategy ? JSON.parse(row.strategy) : [],
-    constraints: row.constraints ? JSON.parse(row.constraints) : {},
-    validation: row.validation ? JSON.parse(row.validation) : [],
+    signalsMatch: safeJsonParse(row.signals_match, []),
+    strategy: safeJsonParse(row.strategy, []),
+    constraints: safeJsonParse(row.constraints, {}),
+    validation: safeJsonParse(row.validation, []),
     createdAt: row.created_at,
   };
 }
@@ -890,20 +889,18 @@ export function getApprovedEvolutionEntries(
     description: row.description || '',
     sourceAgentId: row.source_agent_id || '',
     content: row.content,
-    contentEmbedding: row.content_embedding
-      ? JSON.parse(row.content_embedding)
-      : undefined,
-    tags: row.tags ? JSON.parse(row.tags) : [],
+    contentEmbedding: safeJsonParse(row.content_embedding, undefined),
+    tags: safeJsonParse(row.tags, []),
     status: row.status as 'pending' | 'reviewing' | 'approved' | 'rejected',
     reviewedBy: row.reviewed_by || undefined,
     reviewedAt: row.reviewed_at || undefined,
-    feedback: row.feedback ? JSON.parse(row.feedback) : [],
+    feedback: safeJsonParse(row.feedback, []),
     category:
       (row.category as 'repair' | 'optimize' | 'innovate' | 'learn') || 'learn',
-    signalsMatch: row.signals_match ? JSON.parse(row.signals_match) : [],
-    strategy: row.strategy ? JSON.parse(row.strategy) : [],
-    constraints: row.constraints ? JSON.parse(row.constraints) : {},
-    validation: row.validation ? JSON.parse(row.validation) : [],
+    signalsMatch: safeJsonParse(row.signals_match, []),
+    strategy: safeJsonParse(row.strategy, []),
+    constraints: safeJsonParse(row.constraints, {}),
+    validation: safeJsonParse(row.validation, []),
     createdAt: row.created_at,
   }));
 }
@@ -945,20 +942,18 @@ export function getEvolutionEntriesByCategory(
     description: row.description || '',
     sourceAgentId: row.source_agent_id || '',
     content: row.content,
-    contentEmbedding: row.content_embedding
-      ? JSON.parse(row.content_embedding)
-      : undefined,
-    tags: row.tags ? JSON.parse(row.tags) : [],
+    contentEmbedding: safeJsonParse(row.content_embedding, undefined),
+    tags: safeJsonParse(row.tags, []),
     status: row.status as 'pending' | 'reviewing' | 'approved' | 'rejected',
     reviewedBy: row.reviewed_by || undefined,
     reviewedAt: row.reviewed_at || undefined,
-    feedback: row.feedback ? JSON.parse(row.feedback) : [],
+    feedback: safeJsonParse(row.feedback, []),
     category:
       (row.category as 'repair' | 'optimize' | 'innovate' | 'learn') || 'learn',
-    signalsMatch: row.signals_match ? JSON.parse(row.signals_match) : [],
-    strategy: row.strategy ? JSON.parse(row.strategy) : [],
-    constraints: row.constraints ? JSON.parse(row.constraints) : {},
-    validation: row.validation ? JSON.parse(row.validation) : [],
+    signalsMatch: safeJsonParse(row.signals_match, []),
+    strategy: safeJsonParse(row.strategy, []),
+    constraints: safeJsonParse(row.constraints, {}),
+    validation: safeJsonParse(row.validation, []),
     createdAt: row.created_at,
   }));
 }
@@ -978,7 +973,13 @@ export function updateEvolutionStatus(
   }
   if (feedback) {
     fields.push('feedback = ?');
-    values.push(feedback);
+    // 确保反馈存储为 JSON 字符串
+    values.push(JSON.stringify([{
+      agentId: reviewedBy || 'system',
+      comment: feedback,
+      rating: status === 'approved' ? 5 : 1,
+      usedAt: new Date().toISOString(),
+    }]));
   }
 
   values.push(id);
@@ -1102,7 +1103,7 @@ export function getAuditLogs(
     action: row.action,
     entityType: row.entity_type,
     entityId: row.entity_id || undefined,
-    details: row.details ? JSON.parse(row.details) : undefined,
+    details: safeJsonParse(row.details, undefined),
     createdAt: row.created_at,
   }));
 }
@@ -1193,9 +1194,9 @@ export function getLearningResult(id: number): LearningResultEntry | undefined {
     metricName: row.metric_name || undefined,
     status: row.status as 'keep' | 'discard' | 'crash',
     description: row.description || undefined,
-    signals: row.signals ? JSON.parse(row.signals) : undefined,
+    signals: safeJsonParse(row.signals, undefined),
     geneId: row.gene_id || undefined,
-    blastRadius: row.blast_radius ? JSON.parse(row.blast_radius) : undefined,
+    blastRadius: safeJsonParse(row.blast_radius, undefined),
     createdAt: row.created_at,
   };
 }
@@ -1235,9 +1236,9 @@ export function getLearningResultsByAgent(
     metricName: row.metric_name || undefined,
     status: row.status as 'keep' | 'discard' | 'crash',
     description: row.description || undefined,
-    signals: row.signals ? JSON.parse(row.signals) : undefined,
+    signals: safeJsonParse(row.signals, undefined),
     geneId: row.gene_id || undefined,
-    blastRadius: row.blast_radius ? JSON.parse(row.blast_radius) : undefined,
+    blastRadius: safeJsonParse(row.blast_radius, undefined),
     createdAt: row.created_at,
   }));
 }
@@ -1274,9 +1275,9 @@ export function getRecentLearningResults(
     metricName: row.metric_name || undefined,
     status: row.status as 'keep' | 'discard' | 'crash',
     description: row.description || undefined,
-    signals: row.signals ? JSON.parse(row.signals) : undefined,
+    signals: safeJsonParse(row.signals, undefined),
     geneId: row.gene_id || undefined,
-    blastRadius: row.blast_radius ? JSON.parse(row.blast_radius) : undefined,
+    blastRadius: safeJsonParse(row.blast_radius, undefined),
     createdAt: row.created_at,
   }));
 }
