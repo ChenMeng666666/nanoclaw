@@ -71,7 +71,7 @@ export class GroupQueue {
 
     if (state.active) {
       state.pendingMessages = true;
-      logger.debug({ groupJid }, 'Container active, message queued');
+      logger.info({ groupJid }, 'Container active, message queued');
       return;
     }
 
@@ -80,13 +80,14 @@ export class GroupQueue {
       if (!this.waitingGroups.includes(groupJid)) {
         this.waitingGroups.push(groupJid);
       }
-      logger.debug(
+      logger.info(
         { groupJid, activeCount: this.activeCount },
         'At concurrency limit, message queued',
       );
       return;
     }
 
+    logger.info({ groupJid }, 'Starting container for new message');
     this.runForGroup(groupJid, 'messages').catch((err) =>
       logger.error({ groupJid, err }, 'Unhandled error in runForGroup'),
     );
@@ -258,7 +259,7 @@ export class GroupQueue {
 
     // 对于任务容器，我们仍然允许发送消息，但需要谨慎处理
     if (state.isTaskContainer) {
-      logger.debug(
+      logger.info(
         { groupJid },
         'Task container active, marking message as pending instead of sending directly',
       );
@@ -338,7 +339,7 @@ export class GroupQueue {
     state.outputSent = false; // Reset outputSent flag for new processing
     this.activeCount++;
 
-    logger.debug(
+    logger.info(
       { groupJid, reason, activeCount: this.activeCount },
       'Starting container for group',
     );
@@ -392,7 +393,7 @@ export class GroupQueue {
     state.runningTaskId = task.id;
     this.activeCount++;
 
-    logger.debug(
+    logger.info(
       { groupJid, taskId: task.id, activeCount: this.activeCount },
       'Running queued task',
     );
@@ -444,6 +445,7 @@ export class GroupQueue {
 
     // 聊天消息优先于任务执行，确保用户可以及时得到响应
     if (state.pendingMessages) {
+      logger.info({ groupJid }, 'Processing pending chat messages first');
       this.runForGroup(groupJid, 'drain').catch((err) =>
         logger.error(
           { groupJid, err },
