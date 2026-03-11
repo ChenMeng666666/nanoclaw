@@ -1,7 +1,13 @@
 import { evolutionManager } from './evolution-manager.js';
 import { extractSignals, SignalType, Signal } from './signal-extractor.js';
 import { logger } from './logger.js';
-import { MainComponent, MainExperienceInput, EvolutionEntry, GEPCapsule, GEP_SCHEMA_VERSION } from './types.js';
+import {
+  MainComponent,
+  MainExperienceInput,
+  EvolutionEntry,
+  GEPCapsule,
+  GEP_SCHEMA_VERSION,
+} from './types.js';
 
 export class MainEvolutionApplier {
   /**
@@ -35,8 +41,13 @@ export class MainEvolutionApplier {
   /**
    * 根据信号选择合适的 Gene
    */
-  static async selectGene(signals: Signal[]): Promise<EvolutionEntry | undefined> {
-    logger.debug({ signalCount: signals.length }, 'Main app selecting Gene (GEP 1.5.0)');
+  static async selectGene(
+    signals: Signal[],
+  ): Promise<EvolutionEntry | undefined> {
+    logger.debug(
+      { signalCount: signals.length },
+      'Main app selecting Gene (GEP 1.5.0)',
+    );
     return evolutionManager.selectGene(signals);
   }
 
@@ -44,7 +55,10 @@ export class MainEvolutionApplier {
    * 从信号中应用进化策略
    */
   static async applyEvolutionFromSignals(signals: string[]): Promise<void> {
-    logger.debug({ signals }, 'Main app applying evolution from signals (GEP 1.5.0)');
+    logger.debug(
+      { signals },
+      'Main app applying evolution from signals (GEP 1.5.0)',
+    );
 
     const gene = await evolutionManager.selectGene(
       signals.map((type) => ({ type: type as SignalType, confidence: 0.8 })),
@@ -56,7 +70,11 @@ export class MainEvolutionApplier {
     }
 
     logger.info(
-      { geneId: gene.id, abilityName: gene.abilityName, gdiScore: gene.gdi_score?.total },
+      {
+        geneId: gene.id,
+        abilityName: gene.abilityName,
+        gdiScore: gene.gdi_score?.total,
+      },
       'Applying Gene strategy (GEP 1.5.0)',
     );
 
@@ -91,7 +109,9 @@ export class MainEvolutionApplier {
   /**
    * 应用修复策略
    */
-  private static async applyRepairStrategy(gene: EvolutionEntry): Promise<void> {
+  private static async applyRepairStrategy(
+    gene: EvolutionEntry,
+  ): Promise<void> {
     logger.info(
       { abilityName: gene.abilityName },
       'Applying repair strategy (GEP 1.5.0)',
@@ -102,7 +122,9 @@ export class MainEvolutionApplier {
   /**
    * 应用优化策略
    */
-  private static async applyOptimizeStrategy(gene: EvolutionEntry): Promise<void> {
+  private static async applyOptimizeStrategy(
+    gene: EvolutionEntry,
+  ): Promise<void> {
     logger.info(
       { abilityName: gene.abilityName },
       'Applying optimize strategy (GEP 1.5.0)',
@@ -113,7 +135,9 @@ export class MainEvolutionApplier {
   /**
    * 应用创新策略
    */
-  private static async applyInnovateStrategy(gene: EvolutionEntry): Promise<void> {
+  private static async applyInnovateStrategy(
+    gene: EvolutionEntry,
+  ): Promise<void> {
     logger.info(
       { abilityName: gene.abilityName },
       'Applying innovate strategy (GEP 1.5.0)',
@@ -164,10 +188,7 @@ export class MainEvolutionApplier {
    */
   static updateGeneGDIScore(geneId: number): void {
     const gdiScore = evolutionManager.updateGeneGDIScore(geneId);
-    logger.info(
-      { geneId, gdiScore },
-      'GDI score updated (GEP 1.5.0)',
-    );
+    logger.info({ geneId, gdiScore }, 'GDI score updated (GEP 1.5.0)');
   }
 
   /**

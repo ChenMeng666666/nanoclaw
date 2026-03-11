@@ -1046,7 +1046,8 @@ export class EvolutionManager {
   private calculateAverageRating(
     feedback: Array<{ rating: number }> | undefined | null,
   ): number {
-    if (!feedback || !Array.isArray(feedback) || feedback.length === 0) return 0;
+    if (!feedback || !Array.isArray(feedback) || feedback.length === 0)
+      return 0;
 
     const sum = feedback.reduce((acc, f) => acc + (f?.rating || 0), 0);
     return sum / feedback.length;

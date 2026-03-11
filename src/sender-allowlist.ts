@@ -51,6 +51,10 @@ export function loadSenderAllowlist(
   let parsed: unknown;
   try {
     parsed = safeJsonParse(raw);
+    if (parsed === null) {
+      logger.warn({ path: filePath }, 'sender-allowlist: invalid JSON');
+      return DEFAULT_CONFIG;
+    }
     parsed = sanitizeObject(parsed);
   } catch {
     logger.warn({ path: filePath }, 'sender-allowlist: invalid JSON');

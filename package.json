@@ -20,7 +20,9 @@
     "test:e2e": "tsx tests/e2e-agent-flow.ts",
     "test:run": "bash tests/run-tests.sh",
     "test:minimal": "tsx tests/minimal-test.ts",
-    "test:full": "tsx tests/full-agent-flow.ts"
+    "test:full": "tsx tests/full-agent-flow.ts",
+    "security:scan": "tsx src/secret-scanner.ts",
+    "security:audit": "npm audit"
   },
   "dependencies": {
     "@types/natural": "^6.0.1",

@@ -1,6 +1,6 @@
 /**
  * 安全工具模块
- * 提供防止原型链攻击等安全功能
+ * 提供防止原型链攻击、网页内容安全检查、敏感数据检测等安全功能
  */
 
 import { logger } from './logger.js';
@@ -92,6 +92,127 @@ export function sanitizeObject<T = unknown>(obj: T): T {
 }
 
 /**
+ * 网页内容安全检查 - 过滤隐藏指令和恶意内容
+ */
+export function sanitizeWebContent(html: string): string {
+  let sanitized = html;
+
+  // 移除 HTML 注释，防止隐藏指令
+  sanitized = sanitized.replace(/<!--[\s\S]*?-->/g, '');
+
+  // 移除隐藏标签
+  sanitized = sanitized.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  sanitized = sanitized.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+  sanitized = sanitized.replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '');
+
+  // 移除隐藏的 DOM 元素
+  sanitized = sanitized.replace(/<[^>]*style\s*=\s*["'].*?display\s*:\s*none.*?["'][^>]*>[\s\S]*?<\/[^>]*>/gi, '');
+
+  // 转义潜在的恶意脚本
+  sanitized = sanitized.replace(/javascript:/gi, 'javascript:');
+
+  return sanitized;
+}
+
+/**
+ * 敏感数据泄露检测
+ */
+export function detectSensitiveDataLeak(content: string): string[] {
+  const issues: string[] = [];
+
+  // API 密钥模式检测
+  const apiKeyPatterns = [
+    /(?:api|token|key|secret|password|passwd)\s*[=:]\s*["']?[a-zA-Z0-9_\\-]{16,}["']?/i,
+    /[a-zA-Z0-9_\\-]{16,}/.test(content) ? (content.match(/[a-zA-Z0-9_\\-]{16,}/g) || []).filter(token =>
+      token.length >= 16 && !/^[\d]+$/.test(token)
+    ) : [],
+  ].flat().filter(Boolean);
+
+  for (const pattern of apiKeyPatterns) {
+    if (typeof pattern === 'string') {
+      // 简单的密钥检测
+      if (pattern.length >= 16 && pattern.length <= 64 && !/^[\d]+$/.test(pattern)) {
+        issues.push(`Potential API key detected: ${pattern.slice(0, 8)}...`);
+      }
+    } else if (pattern.test(content)) {
+      issues.push('Potential API key or token detected');
+    }
+  }
+
+  // 密码模式检测
+  const passwordPatterns = [
+    /(?:password|passwd|pwd)\s*[=:]\s*["']?[^\s"']{6,}["']?/i,
+  ];
+
+  for (const pattern of passwordPatterns) {
+    if (pattern.test(content)) {
+      issues.push('Potential password detected');
+    }
+  }
+
+  // 银行卡号、身份证号等敏感信息检测
+  const sensitivePatterns = [
+    /\b(?:\d{16,19}|\d{15}|\d{18}|\d{20})\b/, // 银行卡号或身份证号
+    /(?:https?:\/\/)?(?:[^\s@]+@)?[^\s.]+\.(?:com|org|net|io)/g, // 邮箱或域名
+  ];
+
+  for (const pattern of sensitivePatterns) {
+    const matches = content.match(pattern);
+    if (matches) {
+      matches.forEach(match => {
+        if (match.length >= 8) {
+          issues.push(`Potential sensitive information detected: ${match.slice(0, 8)}...`);
+        }
+      });
+    }
+  }
+
+  return issues;
+}
+
+/**
+ * 提示词意图验证
+ */
+export function validatePromptIntent(prompt: string): {
+  valid: boolean;
+  issues: string[];
+} {
+  const issues: string[] = [];
+
+  // 危险操作意图检测
+  const dangerousIntents = [
+    /(?:delete|remove|erase|destroy|wipe|clear)\s+(?:all|system|data|files)/i,
+    /(?:format|reset|reinstall|reconfigure)\s+(?:system|disk)/i,
+    /(?:download|upload|transfer|send)\s+(?:secret|password|key|token)/i,
+    /(?:execute|run|start|launch)\s+(?:malware|virus|trojan|backdoor)/i,
+  ];
+
+  for (const pattern of dangerousIntents) {
+    if (pattern.test(prompt)) {
+      issues.push('Potential dangerous operation intent detected');
+    }
+  }
+
+  // 隐藏指令检测
+  const hiddenCommandPatterns = [
+    /<!--.*?command.*?-->/i,
+    /<script.*?eval.*?<\/script>/i,
+    /<img.*?onerror.*?>/i,
+  ];
+
+  for (const pattern of hiddenCommandPatterns) {
+    if (pattern.test(prompt)) {
+      issues.push('Potential hidden command detected');
+    }
+  }
+
+  return {
+    valid: issues.length === 0,
+    issues,
+  };
+}
+
+/**
  * 验证用户输入是否包含潜在的恶意模式
  */
 export function validateUserInput(input: string): {
@@ -145,10 +266,35 @@ export function validateUserInput(input: string): {
     }
   }
 
+  // 检查敏感数据泄露
+  const sensitiveIssues = detectSensitiveDataLeak(input);
+  issues.push(...sensitiveIssues);
+
+  // 检查意图验证
+  const intentIssues = validatePromptIntent(input).issues;
+  issues.push(...intentIssues);
+
   return {
     valid: issues.length === 0,
     issues,
   };
+}
+
+/**
+ * 危险操作检测
+ */
+export function isDangerousOperation(command: string): boolean {
+  const dangerousPatterns = [
+    /\b(rm|rmdir|unlink|delete|remove|erase|truncate)\b/i,
+    /\b(drop|alter|truncate|delete)\s+(?:table|database|index)\b/i,
+    /\b(format|mkfs|fdisk|parted)\b/i,
+    /\b(chmod|chown|chgrp)\s+[0-7]{3,4}\b/i,
+    /\b(exec|eval|system|spawn|fork)\b/i,
+    /\b(wget|curl|fetch|download)\b/i,
+    /\b(ping|nc|netcat|telnet)\b/i,
+  ];
+
+  return dangerousPatterns.some(pattern => pattern.test(command));
 }
 
 /**

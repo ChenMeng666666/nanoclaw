@@ -350,6 +350,24 @@ function createSchema(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_learning_results_agent ON learning_results(agent_folder);
     CREATE INDEX IF NOT EXISTS idx_learning_results_task ON learning_results(task_id);
     CREATE INDEX IF NOT EXISTS idx_learning_results_status ON learning_results(status);
+
+    -- Operation snapshots: for rollback capability
+    CREATE TABLE IF NOT EXISTS operation_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      operation_id TEXT NOT NULL UNIQUE,
+      operation_type TEXT NOT NULL,
+      group_folder TEXT,
+      chat_jid TEXT,
+      before_state TEXT NOT NULL,
+      after_state TEXT,
+      timestamp TEXT NOT NULL,
+      status TEXT DEFAULT 'pending',
+      description TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_operation_snapshots_operation_id ON operation_snapshots(operation_id);
+    CREATE INDEX IF NOT EXISTS idx_operation_snapshots_group ON operation_snapshots(group_folder);
+    CREATE INDEX IF NOT EXISTS idx_operation_snapshots_status ON operation_snapshots(status);
+    CREATE INDEX IF NOT EXISTS idx_operation_snapshots_time ON operation_snapshots(timestamp DESC);
   `);
 
   // Add context_mode column if it doesn't exist (migration for existing DBs)
@@ -1077,6 +1095,200 @@ export function commit(): void {
  */
 export function rollback(): void {
   db.exec('ROLLBACK');
+}
+
+/**
+ * 操作快照管理函数
+ */
+
+export interface OperationSnapshot {
+  id: number;
+  operationId: string;
+  operationType: string;
+  groupFolder?: string;
+  chatJid?: string;
+  beforeState: string;
+  afterState?: string;
+  timestamp: string;
+  status: 'pending' | 'applied' | 'rolled_back';
+  description?: string;
+}
+
+/**
+ * 存储操作快照
+ */
+export function createOperationSnapshot(snapshot: Omit<OperationSnapshot, 'id'>): number {
+  const result = db.prepare(
+    `
+    INSERT INTO operation_snapshots (
+      operation_id, operation_type, group_folder, chat_jid, before_state, after_state, timestamp, status, description
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `,
+  ).run(
+    snapshot.operationId,
+    snapshot.operationType,
+    snapshot.groupFolder,
+    snapshot.chatJid,
+    snapshot.beforeState,
+    snapshot.afterState || null,
+    snapshot.timestamp,
+    snapshot.status,
+    snapshot.description || null,
+  );
+  return result.lastInsertRowid as number;
+}
+
+/**
+ * 根据操作ID获取快照
+ */
+export function getOperationSnapshotByOperationId(operationId: string): OperationSnapshot | undefined {
+  const row = db.prepare('SELECT * FROM operation_snapshots WHERE operation_id = ?').get(operationId) as
+    | (OperationSnapshot & {
+        operation_id: string;
+        operation_type: string;
+        group_folder?: string;
+        chat_jid?: string;
+        before_state: string;
+        after_state?: string;
+      })
+    | undefined;
+
+  if (!row) return undefined;
+
+  return {
+    id: row.id,
+    operationId: row.operation_id,
+    operationType: row.operation_type,
+    groupFolder: row.group_folder,
+    chatJid: row.chat_jid,
+    beforeState: row.before_state,
+    afterState: row.after_state,
+    timestamp: row.timestamp,
+    status: row.status as 'pending' | 'applied' | 'rolled_back',
+    description: row.description,
+  };
+}
+
+/**
+ * 更新操作快照
+ */
+export function updateOperationSnapshot(operationId: string, updates: Partial<OperationSnapshot>): void {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+
+  if (updates.afterState !== undefined) {
+    fields.push('after_state = ?');
+    values.push(updates.afterState);
+  }
+  if (updates.status !== undefined) {
+    fields.push('status = ?');
+    values.push(updates.status);
+  }
+  if (updates.description !== undefined) {
+    fields.push('description = ?');
+    values.push(updates.description);
+  }
+
+  if (fields.length === 0) return;
+
+  values.push(operationId);
+  db.prepare(
+    `UPDATE operation_snapshots SET ${fields.join(', ')} WHERE operation_id = ?`,
+  ).run(...values);
+}
+
+/**
+ * 获取操作快照列表
+ */
+export function getOperationSnapshots(query: {
+  status?: 'pending' | 'applied' | 'rolled_back';
+  operationType?: string;
+  groupFolder?: string;
+  chatJid?: string;
+  startTime?: Date;
+  endTime?: Date;
+  limit?: number;
+} = {}): OperationSnapshot[] {
+  let sql = `
+    SELECT * FROM operation_snapshots
+    WHERE 1=1
+  `;
+  const params: unknown[] = [];
+
+  if (query.status) {
+    sql += ' AND status = ?';
+    params.push(query.status);
+  }
+  if (query.operationType) {
+    sql += ' AND operation_type = ?';
+    params.push(query.operationType);
+  }
+  if (query.groupFolder) {
+    sql += ' AND group_folder = ?';
+    params.push(query.groupFolder);
+  }
+  if (query.chatJid) {
+    sql += ' AND chat_jid = ?';
+    params.push(query.chatJid);
+  }
+  if (query.startTime) {
+    sql += ' AND timestamp >= ?';
+    params.push(query.startTime.toISOString());
+  }
+  if (query.endTime) {
+    sql += ' AND timestamp <= ?';
+    params.push(query.endTime.toISOString());
+  }
+
+  sql += ' ORDER BY timestamp DESC';
+
+  if (query.limit) {
+    sql += ' LIMIT ?';
+    params.push(query.limit);
+  }
+
+  const rows = db.prepare(sql).all(...params) as Array<{
+    id: number;
+    operation_id: string;
+    operation_type: string;
+    group_folder?: string;
+    chat_jid?: string;
+    before_state: string;
+    after_state?: string;
+    timestamp: string;
+    status: string;
+    description?: string;
+  }>;
+
+  return rows.map(row => ({
+    id: row.id,
+    operationId: row.operation_id,
+    operationType: row.operation_type,
+    groupFolder: row.group_folder,
+    chatJid: row.chat_jid,
+    beforeState: row.before_state,
+    afterState: row.after_state,
+    timestamp: row.timestamp,
+    status: row.status as 'pending' | 'applied' | 'rolled_back',
+    description: row.description,
+  }));
+}
+
+/**
+ * 删除操作快照
+ */
+export function deleteOperationSnapshot(operationId: string): void {
+  db.prepare('DELETE FROM operation_snapshots WHERE operation_id = ?').run(operationId);
+}
+
+/**
+ * 清理旧的操作快照
+ */
+export function cleanupOperationSnapshots(keepDays: number = 7): void {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - keepDays);
+
+  db.prepare('DELETE FROM operation_snapshots WHERE timestamp < ?').run(cutoffDate.toISOString());
 }
 
 /**

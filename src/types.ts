@@ -578,3 +578,137 @@ export type EvolutionEntry = Omit<
   validation_commands?: string[];
   ecosystem_status?: 'promoted' | 'stale' | 'archived';
 };
+
+// ===== 安全相关类型 =====
+
+/**
+ * 安全事件类型
+ */
+export type SecurityEventType =
+  | 'prompt_injection'
+  | 'sensitive_data_leak'
+  | 'dangerous_operation'
+  | 'unauthorized_access'
+  | 'skill_verification_failed'
+  | 'rate_limit_exceeded'
+  | 'credential_scan'
+  | 'network_security'
+  | 'vulnerability_detected';
+
+/**
+ * 安全事件级别
+ */
+export type SecurityEventLevel = 'info' | 'warning' | 'error' | 'critical';
+
+/**
+ * 安全事件
+ */
+export interface SecurityEvent {
+  id: string;
+  timestamp: string;
+  type: SecurityEventType;
+  level: SecurityEventLevel;
+  source: string;
+  message: string;
+  metadata?: Record<string, unknown>;
+  handled: boolean;
+  handledAt?: string;
+}
+
+/**
+ * 操作快照
+ */
+export interface OperationSnapshot {
+  id: number;
+  operationId: string;
+  operationType: string;
+  groupFolder?: string;
+  chatJid?: string;
+  beforeState: string; // JSON 序列化的状态
+  afterState?: string; // JSON 序列化的状态
+  timestamp: string;
+  status: 'pending' | 'applied' | 'rolled_back';
+  description?: string;
+}
+
+/**
+ * 危险操作检查结果
+ */
+export interface DangerousOperationCheckResult {
+  isDangerous: boolean;
+  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+  reasons: string[];
+  suggestions?: string[];
+  requiresConfirmation: boolean;
+}
+
+/**
+ * 内容安全检查结果
+ */
+export interface ContentSecurityCheckResult {
+  safe: boolean;
+  issues: string[];
+  sanitizedContent?: string;
+  riskScore: number; // 0-1
+}
+
+/**
+ * 敏感数据检测结果
+ */
+export interface SensitiveDataDetectionResult {
+  detected: boolean;
+  dataTypes: string[];
+  locations: Array<{
+    type: string;
+    position: { start: number; end: number };
+    preview: string;
+  }>;
+}
+
+/**
+ * 凭证访问审计日志
+ */
+export interface CredentialAccessAuditLog {
+  id: number;
+  credentialType: string;
+  agentId?: string;
+  accessedAt: string;
+  accessedBy: string;
+  operation: 'read' | 'write' | 'delete';
+  success: boolean;
+  ipAddress?: string;
+  userAgent?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * 速率限制配置
+ */
+export interface RateLimitConfig {
+  windowMs: number;
+  maxRequests: number;
+  message?: string;
+  standardHeaders?: boolean;
+  legacyHeaders?: boolean;
+}
+
+/**
+ * 速率限制记录
+ */
+export interface RateLimitRecord {
+  key: string;
+  count: number;
+  resetTime: number;
+}
+
+/**
+ * 插件签名验证结果
+ */
+export interface SkillVerificationResult {
+  verified: boolean;
+  signature?: string;
+  signer?: string;
+  timestamp?: string;
+  issues?: string[];
+  warnings?: string[];
+}

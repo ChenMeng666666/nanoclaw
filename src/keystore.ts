@@ -9,6 +9,7 @@ import path from 'path';
 import os from 'os';
 
 import { logger } from './logger.js';
+import { logCredentialAccess, keystoreAudit } from './keystore-audit.js';
 
 const SERVICE_NAME = 'nanoclaw';
 const USE_KEYTAR = process.env.USE_KEYTAR !== 'false';
@@ -33,21 +34,37 @@ export async function storeSecret(
   key: string,
   value: string,
 ): Promise<void> {
-  if (USE_KEYTAR && keytar) {
-    try {
-      await keytar.setPassword(`${SERVICE_NAME}-${agentId}`, key, value);
-      logger.debug({ agentId, key }, 'Secret stored in keychain');
-      return;
-    } catch (err) {
-      logger.warn(
-        { agentId, key, err: err instanceof Error ? err.message : String(err) },
-        'Keytar failed, falling back to encrypted file',
-      );
-    }
-  }
+  let success = false;
+  let error: string | undefined;
 
-  // Fallback: 使用 crypto 加密存储到文件
-  await storeEncryptedFile(agentId, key, value);
+  try {
+    if (USE_KEYTAR && keytar) {
+      try {
+        await keytar.setPassword(`${SERVICE_NAME}-${agentId}`, key, value);
+        logger.debug({ agentId, key }, 'Secret stored in keychain');
+        success = true;
+      } catch (err) {
+        logger.warn(
+          { agentId, key, err: err instanceof Error ? err.message : String(err) },
+          'Keytar failed, falling back to encrypted file',
+        );
+        error = err instanceof Error ? err.message : String(err);
+      }
+    }
+
+    if (!success) {
+      // Fallback: 使用 crypto 加密存储到文件
+      await storeEncryptedFile(agentId, key, value);
+      success = true;
+      error = undefined;
+    }
+  } catch (err) {
+    success = false;
+    error = err instanceof Error ? err.message : String(err);
+    throw err;
+  } finally {
+    logCredentialAccess(agentId, key, 'write', success, error);
+  }
 }
 
 /**
@@ -60,23 +77,43 @@ export async function getSecret(
   agentId: string,
   key: string,
 ): Promise<string | null> {
-  if (USE_KEYTAR && keytar) {
-    try {
-      const value = await keytar.getPassword(`${SERVICE_NAME}-${agentId}`, key);
-      if (value) {
-        logger.debug({ agentId, key }, 'Secret retrieved from keychain');
-        return value;
-      }
-    } catch (err) {
-      logger.warn(
-        { agentId, key, err: err instanceof Error ? err.message : String(err) },
-        'Keytar failed, trying encrypted file fallback',
-      );
-    }
-  }
+  let success = false;
+  let error: string | undefined;
+  let value: string | null = null;
 
-  // Fallback: 从加密文件读取
-  return await getEncryptedFile(agentId, key);
+  try {
+    if (USE_KEYTAR && keytar) {
+      try {
+        value = await keytar.getPassword(`${SERVICE_NAME}-${agentId}`, key);
+        if (value) {
+          logger.debug({ agentId, key }, 'Secret retrieved from keychain');
+          success = true;
+        }
+      } catch (err) {
+        logger.warn(
+          { agentId, key, err: err instanceof Error ? err.message : String(err) },
+          'Keytar failed, trying encrypted file fallback',
+        );
+        error = err instanceof Error ? err.message : String(err);
+      }
+    }
+
+    if (!success) {
+      // Fallback: 从加密文件读取
+      value = await getEncryptedFile(agentId, key);
+      success = true;
+      error = undefined;
+    }
+
+    return value;
+  } catch (err) {
+    success = false;
+    error = err instanceof Error ? err.message : String(err);
+    logger.error({ agentId, key, err: error }, 'Failed to get secret');
+    return null;
+  } finally {
+    logCredentialAccess(agentId, key, 'read', success, error);
+  }
 }
 
 /**
@@ -88,21 +125,37 @@ export async function deleteSecret(
   agentId: string,
   key: string,
 ): Promise<void> {
-  if (USE_KEYTAR && keytar) {
-    try {
-      await keytar.deletePassword(`${SERVICE_NAME}-${agentId}`, key);
-      logger.debug({ agentId, key }, 'Secret deleted from keychain');
-      return;
-    } catch (err) {
-      logger.warn(
-        { agentId, key, err: err instanceof Error ? err.message : String(err) },
-        'Keytar failed, trying encrypted file fallback',
-      );
-    }
-  }
+  let success = false;
+  let error: string | undefined;
 
-  // Fallback: 删除加密文件
-  await deleteEncryptedFile(agentId, key);
+  try {
+    if (USE_KEYTAR && keytar) {
+      try {
+        await keytar.deletePassword(`${SERVICE_NAME}-${agentId}`, key);
+        logger.debug({ agentId, key }, 'Secret deleted from keychain');
+        success = true;
+      } catch (err) {
+        logger.warn(
+          { agentId, key, err: err instanceof Error ? err.message : String(err) },
+          'Keytar failed, trying encrypted file fallback',
+        );
+        error = err instanceof Error ? err.message : String(err);
+      }
+    }
+
+    if (!success) {
+      // Fallback: 删除加密文件
+      await deleteEncryptedFile(agentId, key);
+      success = true;
+      error = undefined;
+    }
+  } catch (err) {
+    success = false;
+    error = err instanceof Error ? err.message : String(err);
+    throw err;
+  } finally {
+    logCredentialAccess(agentId, key, 'delete', success, error);
+  }
 }
 
 /**
@@ -111,22 +164,43 @@ export async function deleteSecret(
  * @returns 密钥名称列表
  */
 export async function listSecrets(agentId: string): Promise<string[]> {
-  if (USE_KEYTAR && keytar) {
-    try {
-      const passwords = await keytar.findCredentials(
-        `${SERVICE_NAME}-${agentId}`,
-      );
-      return passwords.map((p) => p.account);
-    } catch (err) {
-      logger.warn(
-        { agentId, err: err instanceof Error ? err.message : String(err) },
-        'Keytar failed, listing encrypted files instead',
-      );
-    }
-  }
+  let success = false;
+  let error: string | undefined;
+  let secrets: string[] = [];
 
-  // Fallback: 列出加密文件
-  return listEncryptedFiles(agentId);
+  try {
+    if (USE_KEYTAR && keytar) {
+      try {
+        const passwords = await keytar.findCredentials(
+          `${SERVICE_NAME}-${agentId}`,
+        );
+        secrets = passwords.map((p) => p.account);
+        success = true;
+      } catch (err) {
+        logger.warn(
+          { agentId, err: err instanceof Error ? err.message : String(err) },
+          'Keytar failed, listing encrypted files instead',
+        );
+        error = err instanceof Error ? err.message : String(err);
+      }
+    }
+
+    if (!success) {
+      // Fallback: 列出加密文件
+      secrets = listEncryptedFiles(agentId);
+      success = true;
+      error = undefined;
+    }
+
+    return secrets;
+  } catch (err) {
+    success = false;
+    error = err instanceof Error ? err.message : String(err);
+    logger.error({ agentId, err: error }, 'Failed to list secrets');
+    return [];
+  } finally {
+    logCredentialAccess(agentId, 'all', 'list', success, error);
+  }
 }
 
 // ===== 加密文件 Fallback 实现 =====
