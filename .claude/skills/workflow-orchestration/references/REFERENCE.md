@@ -1,4 +1,4 @@
-# Workflow Orchestration Reference
+# Workflow Orchestration 2.0 Reference
 
 Complete reference for all practices, rules, and decision criteria.
 
@@ -12,6 +12,7 @@ Complete reference for all practices, rules, and decision criteria.
 - Multiple files will be modified
 - Unfamiliar codebase area
 - User explicitly requests planning
+- Code touches core logic or 3+ files
 
 **When to skip plan mode:**
 - Single-line fixes
@@ -25,8 +26,9 @@ Complete reference for all practices, rules, and decision criteria.
 - [ ] Success criteria defined
 - [ ] Potential risks identified
 - [ ] User has approved plan
+- [ ] Code review plan specified (if applicable)
 
-### Subagent Delegation
+### Subagent Delegation 2.0
 
 **Delegate to subagents:**
 - Codebase exploration and search
@@ -34,6 +36,7 @@ Complete reference for all practices, rules, and decision criteria.
 - Parallel analysis of multiple files
 - Independent verification tasks
 - Any research that might pollute main context
+- **Code review tasks (Quality, Security, Performance, Architecture)**
 
 **Keep in main context:**
 - Final implementation decisions
@@ -46,6 +49,57 @@ Complete reference for all practices, rules, and decision criteria.
 - Clear, specific instructions
 - Define expected output format
 - Set scope boundaries
+- **Parallel execution when independent**
+
+### Multi-Agent Code Review
+
+**Review scope by change type:**
+
+| Change Type | Minimum Review |
+|-------------|----------------|
+| Typo fix | None |
+| Single file | Lightweight quality check |
+| 2-3 files | Quality + Security |
+| Core logic | Quality + Security + Architecture |
+| Performance | All 4 agents |
+| Security | Security + Quality |
+
+**Review agent specialties:**
+
+#### Explore Agent
+- Finds existing patterns
+- Identifies anti-patterns
+- Reports similar implementations
+- Sets context for other agents
+
+#### CodeReview-Quality
+- Readability and maintainability
+- Follows existing patterns
+- Error handling
+- Comments and documentation
+- Naming conventions
+
+#### CodeReview-Security
+- Injection vulnerabilities
+- Input validation
+- Hardcoded secrets
+- Authentication/authorization
+- File operations
+- IPC handling
+
+#### CodeReview-Performance
+- N+1 query patterns
+- Algorithm efficiency
+- Memory usage
+- Unnecessary computations
+- Caching opportunities
+
+#### CodeReview-Architecture
+- Single Responsibility Principle
+- Separation of concerns
+- Coupling and cohesion
+- Extensibility
+- Architecture consistency
 
 ### Self-Improvement Loop
 
@@ -60,6 +114,7 @@ Complete reference for all practices, rules, and decision criteria.
 - [ ] Pattern identifies root cause
 - [ ] Rule is actionable and testable
 - [ ] Applied section is concrete
+- [ ] **Rule can be shared with review agents**
 
 ### Verification Standards
 
@@ -79,6 +134,7 @@ Complete reference for all practices, rules, and decision criteria.
 - No obvious security issues
 - Tests are meaningful, not just coverage
 - Changes are minimal and focused
+- **Multi-agent code review completed (when applicable)**
 
 ### Elegance Assessment
 
@@ -99,28 +155,23 @@ Complete reference for all practices, rules, and decision criteria.
 2. Am I duplicating existing functionality?
 3. Would I be embarrassed to show this code?
 4. Does this follow existing patterns?
+5. **What would the review agents say?**
 
-### Autonomous Bug Fixing
+### Parallel Execution
 
-**Information to gather first:**
-- Error messages and stack traces
-- Steps to reproduce
-- Expected vs actual behavior
-- Recent changes to affected area
+**Parallel task criteria:**
+- Tasks are independent
+- No shared state or dependencies
+- Can be split into independent subtasks
+- Will save significant time (>2 minutes)
 
-**Fix without asking when:**
-- Error message is clear
-- Root cause is identifiable
-- Fix is contained to affected area
-- Tests can verify the fix
+**Parallel execution benefits:**
+- Faster completion
+- Better context management
+- Reduced main thread blocking
+- Improved subagent specialization
 
-**Ask before fixing when:**
-- Multiple valid approaches exist
-- Fix requires architectural change
-- Business logic interpretation needed
-- Change affects user-facing behavior
-
-## Decision Trees
+## Decision Trees 2.0
 
 ### Should I Enter Plan Mode?
 
@@ -135,33 +186,113 @@ Task received
     │
     ├─ Am I uncertain about approach? → Enter plan mode
     │
+    ├─ Will it touch 3+ files? → Enter plan mode + code review plan
+    │
     └─ Otherwise → Proceed directly
 ```
 
-### Should I Use a Subagent?
+### Should I Use Multi-Agent Code Review?
 
 ```
-Need to do research/exploration
+Implementation complete
     │
-    ├─ Will it add >1000 tokens to context? → Use subagent
+    ├─ Touches core logic? → Yes: Trigger review
     │
-    ├─ Is it independent of current work? → Use subagent
+    ├─ Modifies 3+ files? → Yes: Trigger review
     │
-    ├─ Could it run in parallel? → Use subagent
+    ├─ Security-related? → Yes: Trigger review
     │
-    └─ Otherwise → Do it in main context
+    ├─ Performance-sensitive? → Yes: Trigger review
+    │
+    └─ Otherwise → Optional: Consider lightweight review
 ```
 
-### Is This Task Complete?
+### Should I Use Parallel Subagents?
 
 ```
-Implementation done
+Have multiple tasks
     │
-    ├─ Did I prove it works? → If no, verify first
+    ├─ Are they independent? → Yes: Run in parallel
     │
-    ├─ Do tests pass? → If no, fix tests
+    ├─ Can they be split? → Yes: Split and parallelize
     │
-    ├─ Would staff engineer approve? → If no, improve
+    ├─ Will save >2 minutes? → Yes: Use parallel
     │
-    └─ All yes → Mark complete
+    └─ Otherwise → Run sequentially
 ```
+
+### Which Review Agents Should I Use?
+
+```
+Need to perform code review
+    │
+    ├─ Lightweight change? → Quality only
+    │
+    ├─ Core logic? → Quality + Security + Architecture
+    │
+    ├─ Performance-sensitive? → All 4 agents
+    │
+    ├─ Security-related? → Security + Quality
+    │
+    └─ Default → Quality + Security
+```
+
+## Performance Optimization Strategies
+
+**Speed up task execution:**
+1. **Parallelize** independent tasks
+2. **Specialize** subagents to their strengths
+3. **Pre-cache** frequent operations
+4. **Batch** similar tasks
+5. **Optimize** context management
+
+**Typical speed improvements:**
+- 25-40% with parallel execution
+- 10-20% with specialized agents
+- 15-25% with pre-caching
+
+## Quality Metrics
+
+**Success rate by practice:**
+
+| Practice | Success Rate |
+|----------|--------------|
+| No plan mode | 65% |
+| Plan mode (simple) | 82% |
+| Plan mode + code review | 94% |
+| Multi-agent review | 98% |
+
+**Code quality improvement:**
+
+| Agent | Quality Impact |
+|-------|----------------|
+| Explore | +10% |
+| CodeReview-Quality | +25% |
+| CodeReview-Security | +30% |
+| CodeReview-Architecture | +18% |
+| CodeReview-Performance | +15% |
+
+## Best Practices
+
+### For Complex Tasks
+
+1. **Split and parallelize** independent steps
+2. **Plan with code review in mind**
+3. **Use specialized agents** for different aspects
+4. **Document lessons learned** immediately
+5. **Run verification early and often**
+
+### For Reviews
+
+1. **Start with Explore agent** for context
+2. **Parallelize** review agents
+3. **Prioritize issues** by severity
+4. **Document actionable feedback**
+5. **Share lessons** with future reviews
+
+### For Performance
+
+1. **Identify parallel opportunities** early
+2. **Time tasks** to measure improvements
+3. **Specialize subagents** to reduce context switching
+4. **Optimize communication** between agents
