@@ -92,7 +92,9 @@ export function receiveAgentMessages(agentId: string): AgentMessage[] {
     for (const file of messageFiles) {
       const filePath = path.join(agentMessagesDir, file);
       try {
-        const data = safeJsonParse(fs.readFileSync(filePath, 'utf-8')) as AgentMessage;
+        const data = safeJsonParse(
+          fs.readFileSync(filePath, 'utf-8'),
+        ) as AgentMessage;
         messages.push(data);
         fs.unlinkSync(filePath);
       } catch (err) {
@@ -103,10 +105,7 @@ export function receiveAgentMessages(agentId: string): AgentMessage[] {
       }
     }
   } catch (err) {
-    logger.error(
-      { agentId, err },
-      'Error reading agent messages directory',
-    );
+    logger.error({ agentId, err }, 'Error reading agent messages directory');
   }
 
   // 更新消息状态为已送达
@@ -144,7 +143,9 @@ export function updateAgentMessageStatus(
 /**
  * 获取消息状态
  */
-export function getAgentMessageStatus(messageId: string): AgentMessage['status'] | null {
+export function getAgentMessageStatus(
+  messageId: string,
+): AgentMessage['status'] | null {
   return agentMessages.get(messageId)?.status || null;
 }
 

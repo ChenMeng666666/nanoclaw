@@ -1410,11 +1410,13 @@ export function createBotIdentity(identity: {
   botAvatar?: string;
   config?: Record<string, any>;
 }): void {
-  db.prepare(`
+  db.prepare(
+    `
     INSERT OR REPLACE INTO bot_identities (
       id, chat_jid, agent_id, bot_name, bot_avatar, config, is_active, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
-  `).run(
+  `,
+  ).run(
     identity.id,
     identity.chatJid,
     identity.agentId,
@@ -1430,19 +1432,21 @@ export function createBotIdentity(identity: {
  * 获取 Bot Identity
  */
 export function getBotIdentityByChatJid(chatJid: string) {
-  const row = db.prepare('SELECT * FROM bot_identities WHERE chat_jid = ?').get(
-    chatJid,
-  ) as {
-    id: string;
-    chat_jid: string;
-    agent_id: string;
-    bot_name: string;
-    bot_avatar?: string;
-    is_active: number;
-    config?: string;
-    created_at: string;
-    updated_at: string;
-  } | undefined;
+  const row = db
+    .prepare('SELECT * FROM bot_identities WHERE chat_jid = ?')
+    .get(chatJid) as
+    | {
+        id: string;
+        chat_jid: string;
+        agent_id: string;
+        bot_name: string;
+        bot_avatar?: string;
+        is_active: number;
+        config?: string;
+        created_at: string;
+        updated_at: string;
+      }
+    | undefined;
 
   if (!row) return null;
 
@@ -1535,11 +1539,13 @@ export function updateBotIdentity(
   params.push(id);
 
   if (fields.length > 1) {
-    db.prepare(`
+    db.prepare(
+      `
       UPDATE bot_identities
       SET ${fields.join(', ')}
       WHERE id = ?
-    `).run(...params);
+    `,
+    ).run(...params);
   }
 }
 
@@ -1569,11 +1575,13 @@ export function createCollaborationTask(task: {
   dependencies?: string[];
   context?: string;
 }): void {
-  db.prepare(`
+  db.prepare(
+    `
     INSERT OR REPLACE INTO collaboration_tasks (
       id, title, description, team_id, assigned_agents, status, priority, progress, dependencies, context, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
+  `,
+  ).run(
     task.id,
     task.title,
     task.description || null,
@@ -1593,23 +1601,25 @@ export function createCollaborationTask(task: {
  * 获取协作任务
  */
 export function getCollaborationTaskById(id: string) {
-  const row = db.prepare('SELECT * FROM collaboration_tasks WHERE id = ?').get(
-    id,
-  ) as {
-    id: string;
-    title: string;
-    description?: string;
-    team_id?: string;
-    assigned_agents: string;
-    status: string;
-    priority: string;
-    progress: number;
-    dependencies: string;
-    context?: string;
-    created_at: string;
-    updated_at: string;
-    completed_at?: string;
-  } | undefined;
+  const row = db
+    .prepare('SELECT * FROM collaboration_tasks WHERE id = ?')
+    .get(id) as
+    | {
+        id: string;
+        title: string;
+        description?: string;
+        team_id?: string;
+        assigned_agents: string;
+        status: string;
+        priority: string;
+        progress: number;
+        dependencies: string;
+        context?: string;
+        created_at: string;
+        updated_at: string;
+        completed_at?: string;
+      }
+    | undefined;
 
   if (!row) return null;
 
@@ -1734,11 +1744,13 @@ export function updateCollaborationTask(
   params.push(id);
 
   if (fields.length > 1) {
-    db.prepare(`
+    db.prepare(
+      `
       UPDATE collaboration_tasks
       SET ${fields.join(', ')}
       WHERE id = ?
-    `).run(...params);
+    `,
+    ).run(...params);
   }
 }
 
@@ -1764,11 +1776,13 @@ export function createTeamState(team: {
   leaderId?: string;
   collaborationMode?: 'hierarchical' | 'peer-to-peer' | 'swarm';
 }): void {
-  db.prepare(`
+  db.prepare(
+    `
     INSERT OR REPLACE INTO team_states (
       id, name, description, members, leader_id, collaboration_mode, status, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
-  `).run(
+  `,
+  ).run(
     team.id,
     team.name,
     team.description || null,
@@ -1784,19 +1798,19 @@ export function createTeamState(team: {
  * 获取团队状态
  */
 export function getTeamStateById(id: string) {
-  const row = db.prepare('SELECT * FROM team_states WHERE id = ?').get(
-    id,
-  ) as {
-    id: string;
-    name: string;
-    description?: string;
-    members: string;
-    leader_id?: string;
-    status: string;
-    collaboration_mode: string;
-    created_at: string;
-    updated_at: string;
-  } | undefined;
+  const row = db.prepare('SELECT * FROM team_states WHERE id = ?').get(id) as
+    | {
+        id: string;
+        name: string;
+        description?: string;
+        members: string;
+        leader_id?: string;
+        status: string;
+        collaboration_mode: string;
+        created_at: string;
+        updated_at: string;
+      }
+    | undefined;
 
   if (!row) return null;
 
@@ -1807,7 +1821,10 @@ export function getTeamStateById(id: string) {
     members: safeJsonParse(row.members) as string[],
     leaderId: row.leader_id,
     status: row.status as 'active' | 'inactive' | 'dissolved',
-    collaborationMode: row.collaboration_mode as 'hierarchical' | 'peer-to-peer' | 'swarm',
+    collaborationMode: row.collaboration_mode as
+      | 'hierarchical'
+      | 'peer-to-peer'
+      | 'swarm',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -1836,7 +1853,10 @@ export function getAllTeamStates() {
     members: safeJsonParse(row.members) as string[],
     leaderId: row.leader_id,
     status: row.status as 'active' | 'inactive' | 'dissolved',
-    collaborationMode: row.collaboration_mode as 'hierarchical' | 'peer-to-peer' | 'swarm',
+    collaborationMode: row.collaboration_mode as
+      | 'hierarchical'
+      | 'peer-to-peer'
+      | 'swarm',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));
@@ -1889,11 +1909,13 @@ export function updateTeamState(
   params.push(id);
 
   if (fields.length > 1) {
-    db.prepare(`
+    db.prepare(
+      `
       UPDATE team_states
       SET ${fields.join(', ')}
       WHERE id = ?
-    `).run(...params);
+    `,
+    ).run(...params);
   }
 }
 
@@ -1919,11 +1941,13 @@ export function createTeamCollaborationState(state: {
   progress?: number;
   activeAgents: string[];
 }): void {
-  db.prepare(`
+  db.prepare(
+    `
     INSERT OR REPLACE INTO team_collaboration_states (
       id, team_id, task_id, status, progress, active_agents, last_activity, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
+  `,
+  ).run(
     state.id,
     state.teamId,
     state.taskId || null,
@@ -1940,19 +1964,21 @@ export function createTeamCollaborationState(state: {
  * 获取团队协作状态
  */
 export function getTeamCollaborationStateById(id: string) {
-  const row = db.prepare('SELECT * FROM team_collaboration_states WHERE id = ?').get(
-    id,
-  ) as {
-    id: string;
-    team_id: string;
-    task_id?: string;
-    status: string;
-    progress: number;
-    active_agents: string;
-    last_activity: string;
-    created_at: string;
-    updated_at: string;
-  } | undefined;
+  const row = db
+    .prepare('SELECT * FROM team_collaboration_states WHERE id = ?')
+    .get(id) as
+    | {
+        id: string;
+        team_id: string;
+        task_id?: string;
+        status: string;
+        progress: number;
+        active_agents: string;
+        last_activity: string;
+        created_at: string;
+        updated_at: string;
+      }
+    | undefined;
 
   if (!row) return null;
 
@@ -2014,11 +2040,13 @@ export function updateTeamCollaborationState(
   params.push(id);
 
   if (fields.length > 1) {
-    db.prepare(`
+    db.prepare(
+      `
       UPDATE team_collaboration_states
       SET ${fields.join(', ')}
       WHERE id = ?
-    `).run(...params);
+    `,
+    ).run(...params);
   }
 }
 

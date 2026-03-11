@@ -53,7 +53,10 @@ export function createTeam(
     collaborationMode,
   });
 
-  logger.info({ teamId, name, memberCount: members?.length || 0 }, 'Team created');
+  logger.info(
+    { teamId, name, memberCount: members?.length || 0 },
+    'Team created',
+  );
   return teamId;
 }
 
@@ -174,7 +177,9 @@ export function getTeamMembers(teamId: string): string[] {
 /**
  * 获取团队协作模式
  */
-export function getCollaborationMode(teamId: string): TeamState['collaborationMode'] | null {
+export function getCollaborationMode(
+  teamId: string,
+): TeamState['collaborationMode'] | null {
   const team = getTeamStateById(teamId);
   return team ? team.collaborationMode : null;
 }

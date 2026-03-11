@@ -367,7 +367,8 @@ export const COLLABORATION_CONFIG = {
   // 智能体间通信配置
   interAgentCommunication: {
     enabled: validateConfig(
-      (process.env.COLLABORATION_ENABLE_INTER_AGENT_COMMUNICATION || 'true') === 'true',
+      (process.env.COLLABORATION_ENABLE_INTER_AGENT_COMMUNICATION || 'true') ===
+        'true',
       validateBoolean,
       true,
       'COLLABORATION_ENABLE_INTER_AGENT_COMMUNICATION',
@@ -389,7 +390,8 @@ export const COLLABORATION_CONFIG = {
   // 协作任务配置
   collaborationTasks: {
     enabled: validateConfig(
-      (process.env.COLLABORATION_ENABLE_COLLABORATION_TASKS || 'true') === 'true',
+      (process.env.COLLABORATION_ENABLE_COLLABORATION_TASKS || 'true') ===
+        'true',
       validateBoolean,
       true,
       'COLLABORATION_ENABLE_COLLABORATION_TASKS',
@@ -411,7 +413,8 @@ export const COLLABORATION_CONFIG = {
   // 团队协作配置
   teamCollaboration: {
     enabled: validateConfig(
-      (process.env.COLLABORATION_ENABLE_TEAM_COLLABORATION || 'true') === 'true',
+      (process.env.COLLABORATION_ENABLE_TEAM_COLLABORATION || 'true') ===
+        'true',
       validateBoolean,
       true,
       'COLLABORATION_ENABLE_TEAM_COLLABORATION',
