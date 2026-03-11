@@ -71,7 +71,8 @@ import net from 'net';
 // 检查端口是否可用
 async function checkPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const tester = net.createServer()
+    const tester = net
+      .createServer()
       .once('error', (err: NodeJS.ErrnoException) => {
         if (err.code === 'EADDRINUSE') {
           resolve(false);
@@ -142,11 +143,26 @@ function loadState(): void {
   lastTimestamp = getRouterState('last_timestamp') || '';
   const agentTs = getRouterState('last_agent_timestamp');
   try {
-    lastAgentTimestamp = agentTs
-      ? (safeJsonParse(agentTs) as Record<string, string>)
-      : {};
-  } catch {
-    logger.warn('Corrupted last_agent_timestamp in DB, resetting');
+    const parsed = agentTs ? safeJsonParse(agentTs) : null;
+    lastAgentTimestamp =
+      parsed && typeof parsed === 'object'
+        ? (parsed as Record<string, string>)
+        : {};
+    // 验证并清理无效的时间戳
+    for (const [jid, ts] of Object.entries(lastAgentTimestamp)) {
+      if (typeof ts !== 'string' || !ts) {
+        delete lastAgentTimestamp[jid];
+        logger.warn(
+          { jid, invalidTimestamp: ts },
+          'Removed invalid lastAgentTimestamp entry',
+        );
+      }
+    }
+  } catch (err) {
+    logger.warn(
+      { err },
+      'Corrupted last_agent_timestamp in DB, resetting to empty state',
+    );
     lastAgentTimestamp = {};
   }
   sessions = getAllSessions();
@@ -289,9 +305,14 @@ export function _setRegisteredGroups(
  * Process all pending messages for a group.
  * Called by the GroupQueue when it's this group's turn.
  */
-async function processGroupMessages(chatJid: string): Promise<boolean> {
-  const group = registeredGroups[chatJid];
-  if (!group) return true;
+async function processGroupMessagesWithTimeout(chatJid: string, timeoutMs: number = 300000): Promise<boolean> {
+  const timeoutPromise = new Promise<boolean>((_, reject) => {
+    setTimeout(() => reject(new Error('Message processing timed out')), timeoutMs);
+  });
+
+  const processingPromise = (async (): Promise<boolean> => {
+    const group = registeredGroups[chatJid];
+    if (!group) return true;
 
   const channel = findChannel(channels, chatJid);
   if (!channel) {
@@ -403,7 +424,19 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     return false;
   }
 
-  return true;
+    return true;
+  })();
+
+  return Promise.race([processingPromise, timeoutPromise])
+    .catch(err => {
+      logger.error({ chatJid, err }, 'Message processing failed');
+      return false;
+    });
+}
+
+// 暴露原函数接口保持兼容性
+async function processGroupMessages(chatJid: string): Promise<boolean> {
+  return processGroupMessagesWithTimeout(chatJid);
 }
 
 async function runAgent(
@@ -655,6 +688,7 @@ async function startMessageLoop(): Promise<void> {
               },
               'Enqueuing message check for new container',
             );
+            console.log(`DEBUG: Enqueuing check for chat ${chatJid} with ${messagesToSend.length} messages`);
             queue.enqueueMessageCheck(chatJid);
           }
         }

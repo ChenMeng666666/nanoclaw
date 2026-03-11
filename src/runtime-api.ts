@@ -59,7 +59,8 @@ const DEFAULT_OPTIONS: RuntimeAPIOptions = {
 // 检查端口是否可用
 function checkPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const tester = net.createServer()
+    const tester = net
+      .createServer()
       .once('error', (err: NodeJS.ErrnoException) => {
         if (err.code === 'EADDRINUSE') {
           resolve(false);
@@ -74,23 +75,22 @@ function checkPortAvailable(port: number): Promise<boolean> {
   });
 }
 
-// 获取使用指定端口的进程 PID
-async function getPIDUsingPort(port: number): Promise<number | null> {
-  try {
-    const result = await new Promise<string>((resolve, reject) => {
-      exec(`lsof -t -i :${port}`, (error, stdout) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve(stdout.trim());
-        }
-      });
-    });
-    const pid = parseInt(result, 10);
-    return isNaN(pid) ? null : pid;
-  } catch (err) {
-    return null;
+// 尝试找到可用的端口
+async function findAvailablePort(basePort: number, fallbacks: number[]): Promise<number> {
+  // 尝试主端口
+  if (await checkPortAvailable(basePort)) {
+    return basePort;
   }
+
+  // 尝试备用端口
+  for (const port of fallbacks) {
+    if (await checkPortAvailable(port)) {
+      logger.warn({ basePort, fallbackPort: port }, 'Primary port in use, using fallback port');
+      return port;
+    }
+  }
+
+  throw new Error(`All ports in range ${basePort} and fallbacks ${fallbacks} are in use`);
 }
 
 /**
@@ -107,39 +107,12 @@ export async function startRuntimeAPI(
     return http.createServer(() => {});
   }
 
-  // 检查端口可用性
-  const portAvailable = await checkPortAvailable(opts.port);
-  if (!portAvailable) {
-    logger.error(
-      { port: opts.port },
-      'Runtime API port is already in use. This will cause container communication failures.',
-    );
-
-    // 尝试杀死占用端口的进程（仅在开发环境）
-    if (process.env.NODE_ENV !== 'production') {
-      try {
-        const pid = await getPIDUsingPort(opts.port);
-        if (pid) {
-          logger.warn({ port: opts.port, pid }, 'Killing process using port');
-          process.kill(pid, 'SIGTERM');
-          // 等待进程终止
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          // 再次检查端口是否可用
-          const recheck = await checkPortAvailable(opts.port);
-          if (recheck) {
-            logger.info({ port: opts.port }, 'Port freed after killing process');
-          } else {
-            logger.error({ port: opts.port }, 'Failed to free port');
-            throw new Error(`Port ${opts.port} is already in use`);
-          }
-        }
-      } catch (err) {
-        logger.error({ port: opts.port, err }, 'Failed to kill process using port');
-        throw err;
-      }
-    } else {
-      throw new Error(`Port ${opts.port} is already in use`);
-    }
+  // 尝试找到可用的端口
+  try {
+    opts.port = await findAvailablePort(opts.port, [3457, 3458, 3459]);
+  } catch (err) {
+    logger.error({ err }, 'Failed to find available port for Runtime API');
+    throw err;
   }
 
   // 简单的 API Key 认证

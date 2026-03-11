@@ -94,15 +94,14 @@ export class TelegramChannel implements Channel {
   }
 
   private setupBotHandlers(bot: Bot, agentId: string): void {
-    // 构建该 agent 对应的 jid 集合，用于快速查找
-    const agentJids = new Set<string>();
-    const instances = getChannelInstancesForAgent(agentId);
-    for (const inst of instances) {
-      if (inst.jid) agentJids.add(inst.jid);
-    }
+    // 动态获取该 agent 对应的 jid 集合，用于快速查找
+    const getAgentJids = () => {
+      const instances = getChannelInstancesForAgent(agentId);
+      return new Set(instances.map(inst => inst.jid).filter(Boolean));
+    };
 
     logger.info(
-      { agentId, jids: Array.from(agentJids) },
+      { agentId, jids: Array.from(getAgentJids()) },
       'Telegram: Setting up bot handlers',
     );
 
@@ -241,10 +240,14 @@ export class TelegramChannel implements Channel {
         isGroup,
       );
 
-      // 关键检查：这个 bot 只处理它自己的 jid 消息
-      // 因为每个 bot 对应一个 agent，而 agent 的 jid 列表是独立的
+      // 动态获取 agentJids 并检查：这个 bot 只处理它自己的 jid 消息
+      const agentJids = getAgentJids();
       if (!agentJids.has(chatJid)) {
         // 消息不属于这个 agent，忽略（但 metadata 已记录）
+        logger.debug(
+          { chatJid, chatName, agentId },
+          'Telegram message not for this agent, ignoring',
+        );
         return;
       }
 
@@ -279,7 +282,8 @@ export class TelegramChannel implements Channel {
     const storeNonText = (ctx: any, placeholder: string) => {
       const chatJid = `tg:${ctx.chat.id}`;
 
-      // 同样检查是否属于这个 agent
+      // 动态获取 agentJids 并检查是否属于这个 agent
+      const agentJids = getAgentJids();
       if (!agentJids.has(chatJid)) return;
 
       const group = this.opts.registeredGroups()[chatJid];

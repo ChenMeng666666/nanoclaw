@@ -158,12 +158,17 @@ export class GroupQueue {
       clearInterval(state.healthMonitor);
     }
 
-    // 每10秒检查一次容器健康状态
+    // 每8秒检查一次容器健康状态（更频繁但不过度）
     state.healthMonitor = setInterval(async () => {
       try {
         if (!state.containerName) {
           this.stopHealthMonitor(groupJid);
           return;
+        }
+
+        // 检查进程是否还在运行
+        if (state.process && state.process.killed) {
+          throw new Error('Process already killed');
         }
 
         // 使用 docker inspect 检查容器状态
@@ -186,7 +191,7 @@ export class GroupQueue {
         this.stopHealthMonitor(groupJid);
         this.handleContainerFailure(groupJid);
       }
-    }, 10000); // 每10秒检查一次
+    }, 8000); // 每8秒检查一次
   }
 
   /**

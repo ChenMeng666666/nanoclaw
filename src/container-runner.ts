@@ -394,8 +394,8 @@ export async function runContainerAgent(
             outputChain = outputChain.then(() => onOutput(parsed));
           } catch (err) {
             logger.warn(
-              { group: group.name, error: err },
-              'Failed to parse streamed output chunk',
+              { group: group.name, error: err, rawOutput: jsonStr },
+              'Failed to parse streamed output chunk, skipping',
             );
           }
         }
