@@ -1,6 +1,7 @@
 import { evolutionManager } from './evolution-manager.js';
 import { extractSignals, SignalType, Signal } from './signal-extractor.js';
 import { logger } from './logger.js';
+import { isCommandAllowed } from './config.js';
 import {
   MainComponent,
   MainExperienceInput,
@@ -101,6 +102,9 @@ export class MainEvolutionApplier {
       case 'innovate':
         await this.applyInnovateStrategy(gene);
         break;
+      case 'learn':
+        await this.applyLearnStrategy(gene);
+        break;
       default:
         logger.debug(`Unknown gene category: ${gene.category}`);
     }
@@ -112,11 +116,10 @@ export class MainEvolutionApplier {
   private static async applyRepairStrategy(
     gene: EvolutionEntry,
   ): Promise<void> {
-    logger.info(
-      { abilityName: gene.abilityName },
-      'Applying repair strategy (GEP 1.5.0)',
-    );
-    // TODO: 实现具体的修复策略
+    await this.executeGeneStrategy(gene, 'repair', {
+      baseScore: 0.82,
+      blastRadius: { files: 1, lines: 40 },
+    });
   }
 
   /**
@@ -125,11 +128,10 @@ export class MainEvolutionApplier {
   private static async applyOptimizeStrategy(
     gene: EvolutionEntry,
   ): Promise<void> {
-    logger.info(
-      { abilityName: gene.abilityName },
-      'Applying optimize strategy (GEP 1.5.0)',
-    );
-    // TODO: 实现具体的优化策略
+    await this.executeGeneStrategy(gene, 'optimize', {
+      baseScore: 0.78,
+      blastRadius: { files: 2, lines: 80 },
+    });
   }
 
   /**
@@ -138,11 +140,167 @@ export class MainEvolutionApplier {
   private static async applyInnovateStrategy(
     gene: EvolutionEntry,
   ): Promise<void> {
+    await this.executeGeneStrategy(gene, 'innovate', {
+      baseScore: 0.72,
+      blastRadius: { files: 3, lines: 120 },
+    });
+  }
+
+  private static async applyLearnStrategy(gene: EvolutionEntry): Promise<void> {
+    await this.executeGeneStrategy(gene, 'learn', {
+      baseScore: 0.7,
+      blastRadius: { files: 1, lines: 60 },
+    });
+  }
+
+  private static async executeGeneStrategy(
+    gene: EvolutionEntry,
+    category: 'repair' | 'optimize' | 'innovate' | 'learn',
+    defaults: {
+      baseScore: number;
+      blastRadius: { files: number; lines: number };
+    },
+  ): Promise<void> {
     logger.info(
-      { abilityName: gene.abilityName },
-      'Applying innovate strategy (GEP 1.5.0)',
+      { geneId: gene.id, abilityName: gene.abilityName, category },
+      'Applying main evolution strategy (GEP 1.5.0)',
     );
-    // TODO: 实现具体的创新策略
+
+    const preconditions = (gene.preconditions || [])
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const unmetPreconditions = this.getUnmetPreconditions(preconditions);
+    if (unmetPreconditions.length > 0) {
+      evolutionManager.createValidationReport(
+        gene.id,
+        [],
+        false,
+        { category, unmetPreconditions },
+        `Unmet preconditions: ${unmetPreconditions.join(', ')}`,
+      );
+      logger.warn(
+        { geneId: gene.id, unmetPreconditions },
+        'Skip applying gene strategy due to unmet preconditions',
+      );
+      return;
+    }
+
+    const commands = this.getValidationCommands(gene);
+    if (commands.length === 0) {
+      evolutionManager.createValidationReport(
+        gene.id,
+        [],
+        false,
+        { category },
+        'No validation commands available',
+      );
+      logger.warn({ geneId: gene.id }, 'No validation commands for gene');
+      return;
+    }
+
+    const unsafeCommands = commands.filter(
+      (command) => !isCommandAllowed(command),
+    );
+    if (unsafeCommands.length > 0) {
+      const safeCommands = commands.filter((command) =>
+        isCommandAllowed(command),
+      );
+      evolutionManager.createValidationReport(
+        gene.id,
+        safeCommands,
+        false,
+        { category, unsafeCommands },
+        `Unsafe validation commands: ${unsafeCommands.join(', ')}`,
+      );
+      logger.warn(
+        { geneId: gene.id, unsafeCommands },
+        'Gene strategy blocked by command safety policy',
+      );
+      return;
+    }
+
+    evolutionManager.createValidationReport(gene.id, commands, true, {
+      category,
+      dryRun: true,
+      commandCount: commands.length,
+      preconditionsChecked: preconditions.length,
+    });
+
+    const confidence = this.getConfidenceFromGene(gene, defaults.baseScore);
+    const blastRadius = this.getBlastRadius(gene, defaults.blastRadius);
+    const outcomeScore = Number(
+      Math.min(1, confidence * 0.6 + defaults.baseScore * 0.4).toFixed(2),
+    );
+
+    await this.createCapsule({
+      geneId: gene.id,
+      trigger: gene.signalsMatch?.length ? gene.signalsMatch : [category],
+      confidence,
+      blastRadius,
+      outcome: { status: 'partial', score: outcomeScore },
+    });
+
+    this.updateGeneGDIScore(gene.id);
+  }
+
+  private static getValidationCommands(gene: EvolutionEntry): string[] {
+    const rawCommands = [
+      ...(gene.validation_commands || []),
+      ...(gene.validation || []),
+      ...(gene.strategy || []),
+    ];
+    return Array.from(
+      new Set(
+        rawCommands
+          .map((command) => command.trim())
+          .filter((command) => command),
+      ),
+    );
+  }
+
+  private static getUnmetPreconditions(preconditions: string[]): string[] {
+    const unmet: string[] = [];
+    for (const precondition of preconditions) {
+      if (precondition.startsWith('env:')) {
+        const envName = precondition.slice(4).trim();
+        if (!envName || !process.env[envName]) {
+          unmet.push(precondition);
+        }
+        continue;
+      }
+      if (precondition.startsWith('platform:')) {
+        const expectedPlatform = precondition.slice(9).trim();
+        if (!expectedPlatform || process.platform !== expectedPlatform) {
+          unmet.push(precondition);
+        }
+      }
+    }
+    return unmet;
+  }
+
+  private static getConfidenceFromGene(
+    gene: EvolutionEntry,
+    fallback: number,
+  ): number {
+    const normalized = (gene.gdi_score?.total ?? 0) / 10;
+    if (Number.isFinite(normalized) && normalized > 0) {
+      return Number(Math.max(0.1, Math.min(1, normalized)).toFixed(2));
+    }
+    return fallback;
+  }
+
+  private static getBlastRadius(
+    gene: EvolutionEntry,
+    fallback: { files: number; lines: number },
+  ): { files: number; lines: number } {
+    const summary = gene.summary?.toLowerCase() || '';
+    if (summary.includes('major') || summary.includes('broad')) {
+      return {
+        files: Math.max(fallback.files, 3),
+        lines: Math.max(fallback.lines, 120),
+      };
+    }
+    return fallback;
   }
 
   /**

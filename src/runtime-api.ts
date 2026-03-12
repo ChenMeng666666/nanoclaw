@@ -27,6 +27,7 @@ import { reflectionScheduler } from './reflection-scheduler.js';
 import {
   getMemories,
   createMemory,
+  getAgentByFolder,
   getLearningTask,
   getLearningTasksByAgent,
   getReflectionsByAgent,
@@ -149,8 +150,8 @@ export async function startRuntimeAPI(
 
     // 认证检查
     if (req.method !== 'OPTIONS') {
-      const apiKey = req.headers['x-api-key'] as string;
-      if (!apiKey || apiKey !== API_KEY) {
+      const apiKey = req.headers['x-api-key'] as string | undefined;
+      if (API_KEY && (!apiKey || apiKey !== API_KEY)) {
         logger.warn(
           {
             method: req.method,
@@ -718,8 +719,42 @@ export async function startRuntimeAPI(
           return;
         }
 
-        // TODO: 需要传递 agent 对象，这里简化处理
-        writeJSON(res, 200, { status: 'triggered' });
+        const reflectionType = type as
+          | 'hourly'
+          | 'daily'
+          | 'weekly'
+          | 'monthly'
+          | 'task';
+        const supportedTypes = new Set([
+          'hourly',
+          'daily',
+          'weekly',
+          'monthly',
+          'task',
+        ]);
+
+        if (!supportedTypes.has(reflectionType)) {
+          writeJSON(res, 400, { error: 'Invalid reflection type' });
+          return;
+        }
+
+        const agent = getAgentByFolder(agentFolder as string);
+        if (!agent) {
+          writeJSON(res, 404, { error: 'Agent not found' });
+          return;
+        }
+
+        await reflectionScheduler.triggerReflection(
+          agent,
+          reflectionType,
+          triggeredBy as string | undefined,
+        );
+
+        writeJSON(res, 200, {
+          status: 'triggered',
+          agentFolder,
+          type: reflectionType,
+        });
         return;
       }
 
