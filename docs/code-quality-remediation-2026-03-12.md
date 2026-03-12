@@ -82,6 +82,9 @@
 - `npm test -- --runInBand`
 - `npm test -- src/security.test.ts src/ipc-auth.test.ts src/container-runner.test.ts skills-engine/__tests__/path-remap.test.ts skills-engine/__tests__/rebase.test.ts skills-engine/__tests__/run-migrations.test.ts`
 
+- 专项回归结果：`6` 个测试文件、`76` 个用例，全部通过
+- 全量回归结果：当前环境仍有历史失败项（与本次整改无直接关系），主要集中在 `skills-engine/apply|customize|file-ops|merge` 与 `setup/platform` 的跨平台与超时问题
+
 说明：
 
 - 本次重点验证整改相关回归；完整全量回归建议在 CI 上补充 Linux + Windows 双平台矩阵执行。
