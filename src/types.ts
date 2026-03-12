@@ -216,6 +216,8 @@ export interface AdditionalMount {
 export interface ContainerConfig {
   additionalMounts?: AdditionalMount[];
   timeout?: number;
+  networkMode?: 'bridge' | 'none';
+  allowHostGateway?: boolean;
 }
 
 /**

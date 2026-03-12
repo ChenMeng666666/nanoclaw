@@ -27,7 +27,9 @@ import { reflectionScheduler } from './reflection-scheduler.js';
 import {
   getMemories,
   createMemory,
+  getLearningTask,
   getLearningTasksByAgent,
+  getReflectionsByAgent,
   createLearningTask,
   createReflection,
   updateLearningTask,
@@ -39,6 +41,7 @@ import {
 import { getAllTasks, getTasksForGroup } from './db.js';
 import { logger } from './logger.js';
 import { safeJsonParse } from './security.js';
+import { LocalLLMQueryExpansionProvider } from './query-expansion/local-llm-provider.js';
 import type {
   LearningNeed,
   DailyLearningPlan,
@@ -55,6 +58,10 @@ const DEFAULT_OPTIONS: RuntimeAPIOptions = {
   port: parseInt(process.env.RUNTIME_API_PORT || '3456', 10),
   enabled: process.env.RUNTIME_API_ENABLED !== 'false',
 };
+
+const learningAutomationState = new Set<string>();
+let learningNeedsLlmProvider: LocalLLMQueryExpansionProvider | null = null;
+let learningNeedsLlmInitPromise: Promise<void> | null = null;
 
 // 检查端口是否可用
 function checkPortAvailable(port: number): Promise<boolean> {
@@ -297,23 +304,7 @@ export async function startRuntimeAPI(
           return;
         }
 
-        // 模拟学习需求分析（实际需要更智能的分析）
-        const needs: LearningNeed[] = [
-          {
-            topic: '提升情绪化对话处理能力',
-            level: 'intermediate',
-            urgency: 'high',
-            estimatedTime: 2,
-            resources: ['https://example.com/emotional-intelligence'],
-          },
-          {
-            topic: '学习Python数据分析',
-            level: 'beginner',
-            urgency: 'medium',
-            estimatedTime: 3,
-            resources: ['https://example.com/python-data-analysis'],
-          },
-        ];
+        const needs = await analyzeLearningNeeds(String(agentFolder));
 
         writeJSON(res, 200, { needs });
         return;
@@ -331,27 +322,39 @@ export async function startRuntimeAPI(
           return;
         }
 
-        const needs = Array.isArray(learningNeeds) ? learningNeeds : [];
+        const explicitNeeds = normalizeLearningNeeds(learningNeeds);
         const agentFolderStr = String(agentFolder);
+        const derivedNeeds =
+          explicitNeeds.length > 0
+            ? explicitNeeds
+            : await analyzeLearningNeeds(agentFolderStr);
+        const needs =
+          derivedNeeds.length > 0
+            ? derivedNeeds
+            : [
+                {
+                  topic: '复盘最近学习任务',
+                  level: 'beginner',
+                  urgency: 'medium',
+                  estimatedTime: 1,
+                  resources: [],
+                } satisfies LearningNeed,
+              ];
 
-        // 模拟生成每日学习计划
         const plan: DailyLearningPlan = {
           id: `plan-${Date.now()}`,
           date: new Date().toISOString().split('T')[0],
           agentFolder: agentFolderStr,
-          tasks: needs.map((need: any, index: number) => ({
+          tasks: needs.map((need, index) => ({
             id: `task-${Date.now()}-${index}`,
             agentFolder: agentFolderStr,
-            description: need.topic || '',
+            description: need.topic,
             status: 'pending' as const,
             resources: need.resources,
             createdAt: new Date().toISOString(),
           })),
-          estimatedTime: needs.reduce(
-            (sum: number, need: any) => sum + (need.estimatedTime || 0),
-            0,
-          ),
-          priority: 'medium' as const,
+          estimatedTime: needs.reduce((sum, need) => sum + need.estimatedTime, 0),
+          priority: inferPlanPriority(needs),
         };
 
         writeJSON(res, 200, plan);
@@ -367,14 +370,7 @@ export async function startRuntimeAPI(
           return;
         }
 
-        // 模拟学习成果分析
-        const analysis = {
-          taskId,
-          knowledgeGained: ['情绪识别的关键信号', '用户表达模式的观察方法'],
-          difficulties: ['文字交流中难以捕捉语调'],
-          solutions: ['多观察用户的表达模式'],
-          suggestions: ['继续练习共情回应方法'],
-        };
+        const analysis = analyzeLearningOutcome(String(taskId));
 
         writeJSON(res, 200, analysis);
         return;
@@ -389,12 +385,10 @@ export async function startRuntimeAPI(
           return;
         }
 
-        // 模拟知识提取
-        const knowledge = [
-          '掌握了情绪识别的关键信号',
-          '学会了如何观察用户的表达模式',
-          '理解了文字交流中语调捕捉的困难',
-        ];
+        const knowledge = extractKnowledgePoints(
+          taskId ? String(taskId) : undefined,
+          reflectionId ? Number(reflectionId) : undefined,
+        );
 
         writeJSON(res, 200, { knowledgePoints: knowledge });
         return;
@@ -409,6 +403,7 @@ export async function startRuntimeAPI(
           return;
         }
 
+        learningAutomationState.add(String(agentFolder));
         writeJSON(res, 200, { status: 'started' });
         return;
       }
@@ -422,6 +417,7 @@ export async function startRuntimeAPI(
           return;
         }
 
+        learningAutomationState.delete(String(agentFolder));
         writeJSON(res, 200, { status: 'stopped' });
         return;
       }
@@ -434,7 +430,11 @@ export async function startRuntimeAPI(
           return;
         }
 
-        writeJSON(res, 200, { status: 'running' });
+        writeJSON(res, 200, {
+          status: learningAutomationState.has(agentFolder)
+            ? 'running'
+            : 'stopped',
+        });
         return;
       }
 
@@ -443,7 +443,7 @@ export async function startRuntimeAPI(
         req.method === 'POST'
       ) {
         const body = await readJSON(req);
-        const { agentFolder, type, startTime, endTime } = body;
+        const { agentFolder, type } = body;
 
         if (!agentFolder || !type) {
           writeJSON(res, 400, { error: 'Missing agentFolder or type' });
@@ -452,25 +452,10 @@ export async function startRuntimeAPI(
 
         const agentFolderStr = String(agentFolder);
 
-        // 模拟生成反思
-        const reflection: DetailedReflection = {
-          id: Date.now(),
-          agentFolder: agentFolderStr,
-          type: type as any,
-          content:
-            '今日学习了情绪识别技巧，掌握了关键信号，但文字交流中难以捕捉语调',
-          taskId: `task-${Date.now()}`,
-          completionTime: new Date().toISOString(),
-          actualDuration: 60,
-          knowledgeGained: ['情绪识别的关键信号'],
-          difficulties: ['文字交流中难以捕捉语调'],
-          solutions: ['多观察用户的表达模式'],
-          suggestions: ['继续练习共情回应方法'],
-          keyInsights: ["用户说'真的吗'多次可能表示怀疑"],
-          nextSteps: ['需要多观察用户的表达模式'],
-          rating: 4,
-          createdAt: new Date().toISOString(),
-        };
+        const reflection = await generateRuntimeReflection(
+          agentFolderStr,
+          String(type),
+        );
 
         writeJSON(res, 200, reflection);
         return;
@@ -489,23 +474,8 @@ export async function startRuntimeAPI(
         }
 
         const agentFolderStr = String(agentFolder);
-        const taskList = Array.isArray(tasks) ? tasks : [];
-
-        // 模拟生成每日总结
-        const summary: DailyLearningSummary = {
-          id: `summary-${Date.now()}`,
-          date: new Date().toISOString().split('T')[0],
-          agentFolder: agentFolderStr,
-          tasksCompleted: taskList.length || 2,
-          totalTimeSpent: 120,
-          knowledgePoints: ['情绪识别的关键信号', '用户表达模式的观察方法'],
-          achievements: ['掌握了情绪识别技巧'],
-          challenges: ['文字交流中难以捕捉语调'],
-          improvements: ['需要多练习共情回应方法'],
-          tomorrowPlan: ['学习共情回应方法'],
-          mood: 'good',
-          notes: '今日学习效果良好，但需要继续练习',
-        };
+        const taskList = Array.isArray(tasks) ? tasks : undefined;
+        const summary = await generateDailySummary(agentFolderStr, taskList);
 
         writeJSON(res, 200, summary);
         return;
@@ -1318,6 +1288,355 @@ export async function startRuntimeAPI(
 }
 
 // ===== 辅助函数 =====
+
+export function normalizeLearningNeeds(input: unknown): LearningNeed[] {
+  if (!Array.isArray(input)) return [];
+  const normalized: LearningNeed[] = [];
+  for (const item of input) {
+    if (!item || typeof item !== 'object') continue;
+    const record = item as Record<string, unknown>;
+    const topic = typeof record.topic === 'string' ? record.topic.trim() : '';
+    if (!topic) continue;
+    const level =
+      record.level === 'beginner' ||
+      record.level === 'intermediate' ||
+      record.level === 'advanced'
+        ? record.level
+        : 'beginner';
+    const urgency =
+      record.urgency === 'low' ||
+      record.urgency === 'medium' ||
+      record.urgency === 'high'
+        ? record.urgency
+        : 'medium';
+    const estimatedTime =
+      typeof record.estimatedTime === 'number' && record.estimatedTime > 0
+        ? Math.min(8, Math.max(1, Math.round(record.estimatedTime)))
+        : 1;
+    const resources = Array.isArray(record.resources)
+      ? record.resources.filter((r): r is string => typeof r === 'string')
+      : [];
+    normalized.push({ topic, level, urgency, estimatedTime, resources });
+  }
+  return normalized;
+}
+
+export function inferPlanPriority(
+  needs: LearningNeed[],
+): 'high' | 'medium' | 'low' {
+  if (needs.some((n) => n.urgency === 'high')) return 'high';
+  if (needs.some((n) => n.urgency === 'medium')) return 'medium';
+  return 'low';
+}
+
+export async function analyzeLearningNeeds(
+  agentFolder: string,
+): Promise<LearningNeed[]> {
+  const tasks = getLearningTasksByAgent(agentFolder);
+  const reflections = getReflectionsByAgent(agentFolder).slice(0, 12);
+  const needs: LearningNeed[] = [];
+  const seenTopics = new Set<string>();
+
+  const pushNeed = (need: LearningNeed): void => {
+    if (seenTopics.has(need.topic)) return;
+    seenTopics.add(need.topic);
+    needs.push(need);
+  };
+
+  for (const task of tasks.filter((t) => t.status === 'failed').slice(0, 3)) {
+    pushNeed({
+      topic: `复盘失败任务：${task.description.slice(0, 40)}`,
+      level: 'intermediate',
+      urgency: 'high',
+      estimatedTime: 2,
+      resources: task.resources || [],
+    });
+  }
+
+  for (const task of tasks.filter((t) => t.status === 'pending').slice(0, 3)) {
+    pushNeed({
+      topic: `推进待办任务：${task.description.slice(0, 40)}`,
+      level: 'beginner',
+      urgency: 'medium',
+      estimatedTime: 1,
+      resources: task.resources || [],
+    });
+  }
+
+  for (const reflection of reflections) {
+    const lines = reflection.content
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 6);
+    for (const line of lines) {
+      if (line.includes('困难') || line.includes('问题') || line.includes('改进')) {
+        pushNeed({
+          topic: `改进点：${line.replace(/^[-*]\s*/, '').slice(0, 40)}`,
+          level: 'intermediate',
+          urgency: 'medium',
+          estimatedTime: 1,
+          resources: [],
+        });
+      }
+    }
+    if (needs.length >= 6) break;
+  }
+
+  if (needs.length < 3) {
+    const memories = await memoryManager.searchMemories(
+      agentFolder,
+      '学习 反思 改进 困难',
+      8,
+    );
+    for (const memory of memories) {
+      const content = memory.content.trim();
+      if (!content) continue;
+      pushNeed({
+        topic: `知识巩固：${content.slice(0, 40)}`,
+        level: 'beginner',
+        urgency: 'low',
+        estimatedTime: 1,
+        resources: [],
+      });
+      if (needs.length >= 6) break;
+    }
+  }
+  const llmNeeds = await analyzeLearningNeedsWithLLM(agentFolder, needs);
+  for (const need of llmNeeds) {
+    pushNeed(need);
+  }
+
+  return needs.slice(0, 10);
+}
+
+export function analyzeLearningOutcome(taskId: string): {
+  taskId: string;
+  knowledgeGained: string[];
+  difficulties: string[];
+  solutions: string[];
+  suggestions: string[];
+} {
+  const task = getLearningTask(taskId);
+  if (!task) {
+    return {
+      taskId,
+      knowledgeGained: [],
+      difficulties: ['未找到对应学习任务'],
+      solutions: ['确认任务 ID 并重新提交'],
+      suggestions: ['在任务开始前调用 /api/learning/task/start'],
+    };
+  }
+
+  const reflections = getReflectionsByAgent(task.agentFolder)
+    .filter((r) => r.triggeredBy === taskId)
+    .slice(0, 3);
+  const reflectionTexts = reflections.map((r) => r.content);
+  const sourceText = [task.description, ...reflectionTexts].join('\n');
+  const points = splitToPoints(sourceText);
+
+  return {
+    taskId,
+    knowledgeGained: points.slice(0, 5),
+    difficulties: reflections.length
+      ? points.filter((p) => p.includes('困难') || p.includes('问题')).slice(0, 3)
+      : ['尚无任务反思，建议先完成任务并触发反思'],
+    solutions: points
+      .filter((p) => p.includes('解决') || p.includes('改进') || p.includes('优化'))
+      .slice(0, 3),
+    suggestions: [
+      task.status === 'completed' ? '将本次经验同步到进化库' : '先推进任务到 completed',
+      '补充可量化指标（耗时、质量评分）',
+    ],
+  };
+}
+
+export function extractKnowledgePoints(
+  taskId?: string,
+  reflectionId?: number,
+): string[] {
+  const points = new Set<string>();
+  if (taskId) {
+    const task = getLearningTask(taskId);
+    if (task) {
+      splitToPoints(task.description).forEach((point) => points.add(point));
+      const reflections = getReflectionsByAgent(task.agentFolder)
+        .filter(
+          (reflection) =>
+            reflection.triggeredBy === taskId ||
+            (reflectionId !== undefined && reflection.id === reflectionId),
+        )
+        .slice(0, 5);
+      for (const reflection of reflections) {
+        splitToPoints(reflection.content).forEach((point) => points.add(point));
+      }
+    }
+  }
+  return Array.from(points).slice(0, 10);
+}
+
+export async function generateRuntimeReflection(
+  agentFolder: string,
+  type: string,
+): Promise<DetailedReflection> {
+  const taskType = ['hourly', 'daily', 'weekly', 'monthly', 'task'].includes(type)
+    ? (type as 'hourly' | 'daily' | 'weekly' | 'monthly' | 'task')
+    : 'task';
+  const tasks = getLearningTasksByAgent(agentFolder).slice(0, 20);
+  const completedCount = tasks.filter((task) => task.status === 'completed').length;
+  const failedCount = tasks.filter((task) => task.status === 'failed').length;
+  const recentMemories = await memoryManager.searchMemories(
+    agentFolder,
+    '学习 任务 进展',
+    5,
+  );
+
+  const content = [
+    `反思类型：${taskType}`,
+    `已完成任务：${completedCount}，失败任务：${failedCount}`,
+    `重点观察：${recentMemories
+      .map((memory) => memory.content.slice(0, 30))
+      .join('；') || '暂无近期学习记忆'}`,
+    `下一步：优先处理失败任务并量化学习指标`,
+  ].join('\n');
+
+  const id = createReflection({
+    agentFolder,
+    type: taskType,
+    content,
+    triggeredBy: 'runtime-api',
+  });
+
+  return {
+    id,
+    agentFolder,
+    type: taskType,
+    content,
+    actualDuration: 30,
+    knowledgeGained: extractKnowledgePoints(undefined, undefined).slice(0, 3),
+    difficulties: failedCount > 0 ? ['存在失败任务待复盘'] : ['暂无明显阻塞'],
+    solutions: ['按优先级处理失败任务', '更新学习计划中的依赖关系'],
+    suggestions: ['每次任务完成后立即生成反思'],
+    keyInsights: [`完成率：${tasks.length === 0 ? 0 : Math.round((completedCount / tasks.length) * 100)}%`],
+    nextSteps: ['继续跟踪学习成果并记录到记忆系统'],
+    rating: failedCount > 0 ? 3 : 4,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+export async function generateDailySummary(
+  agentFolder: string,
+  providedTasks?: unknown[],
+): Promise<DailyLearningSummary> {
+  const allTasks = getLearningTasksByAgent(agentFolder);
+  const tasksCompleted = allTasks.filter((task) => task.status === 'completed');
+  const taskList =
+    providedTasks && providedTasks.length > 0
+      ? providedTasks
+      : tasksCompleted;
+  const reflections = getReflectionsByAgent(agentFolder, 'daily').slice(0, 3);
+  const memories = await memoryManager.searchMemories(agentFolder, '学习 总结', 8);
+  const knowledgePoints = new Set<string>();
+  for (const memory of memories) {
+    splitToPoints(memory.content).forEach((point) => knowledgePoints.add(point));
+  }
+
+  return {
+    id: `summary-${Date.now()}`,
+    date: new Date().toISOString().split('T')[0],
+    agentFolder,
+    tasksCompleted: taskList.length,
+    totalTimeSpent: taskList.length * 45,
+    knowledgePoints: Array.from(knowledgePoints).slice(0, 8),
+    achievements: tasksCompleted
+      .slice(0, 3)
+      .map((task) => `完成：${task.description.slice(0, 40)}`),
+    challenges: reflections.length
+      ? reflections.map((reflection) => reflection.content.slice(0, 40))
+      : ['暂无每日反思，建议补充 reflection/generate'],
+    improvements: ['统一任务优先级规则', '补充结果量化指标'],
+    tomorrowPlan: ['优先处理失败任务', '为高优先级需求分配固定学习时段'],
+    mood: tasksCompleted.length > 0 ? 'good' : 'average',
+    notes: '总结基于任务、反思与记忆自动生成',
+  };
+}
+
+export function splitToPoints(text: string): string[] {
+  return text
+    .split(/[\n。；;!！?？]/g)
+    .map((part) => part.replace(/^[-*]\s*/, '').trim())
+    .filter((part) => part.length >= 6)
+    .slice(0, 20);
+}
+
+async function getLearningNeedsLlmProvider(): Promise<LocalLLMQueryExpansionProvider | null> {
+  if (process.env.LEARNING_NEEDS_LLM_ENABLED !== 'true') {
+    return null;
+  }
+  const modelPath = process.env.LEARNING_NEEDS_LLM_MODEL_PATH;
+  if (!modelPath) {
+    logger.warn('LEARNING_NEEDS_LLM_ENABLED=true but model path is missing');
+    return null;
+  }
+  if (learningNeedsLlmProvider) return learningNeedsLlmProvider;
+  if (!learningNeedsLlmInitPromise) {
+    const provider = new LocalLLMQueryExpansionProvider({
+      modelPath,
+      modelType:
+        process.env.LEARNING_NEEDS_LLM_MODEL_TYPE === 'qwen3' ||
+        process.env.LEARNING_NEEDS_LLM_MODEL_TYPE === 'qwen3.5' ||
+        process.env.LEARNING_NEEDS_LLM_MODEL_TYPE === 'llama3'
+          ? process.env.LEARNING_NEEDS_LLM_MODEL_TYPE
+          : 'qwen3.5',
+      numVariants: 5,
+      temperature: 0.4,
+      maxTokens: 256,
+    });
+    learningNeedsLlmProvider = provider;
+    learningNeedsLlmInitPromise = provider
+      .initialize()
+      .then(() => undefined)
+      .catch((err) => {
+        logger.warn({ err }, 'Failed to initialize learning-needs LLM provider');
+        learningNeedsLlmProvider = null;
+      })
+      .finally(() => {
+        learningNeedsLlmInitPromise = null;
+      });
+  }
+  await learningNeedsLlmInitPromise;
+  return learningNeedsLlmProvider;
+}
+
+async function analyzeLearningNeedsWithLLM(
+  agentFolder: string,
+  baseNeeds: LearningNeed[],
+): Promise<LearningNeed[]> {
+  const provider = await getLearningNeedsLlmProvider();
+  if (!provider) return [];
+  const prompt = [
+    `agent=${agentFolder}`,
+    '请生成可执行的学习需求主题，中文短句，避免泛化。',
+    ...baseNeeds.map((need) => `- ${need.topic}`),
+  ].join('\n');
+  try {
+    const variants = await provider.generateVariants(prompt);
+    const topics = variants
+      .map((variant) => variant.replace(/^[-*0-9.\s]+/, '').trim())
+      .filter((topic) => topic.length >= 6)
+      .slice(0, 4);
+    return topics.map((topic) => ({
+      topic,
+      level: 'intermediate',
+      urgency: 'medium',
+      estimatedTime: 1,
+      resources: [],
+    }));
+  } catch (err) {
+    logger.warn({ err }, 'Learning-needs LLM analysis failed');
+    return [];
+  }
+}
 
 function readJSON(req: http.IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {

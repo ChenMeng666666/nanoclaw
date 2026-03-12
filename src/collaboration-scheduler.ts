@@ -9,13 +9,17 @@
 
 import {
   getAllCollaborationTasks,
+  getAllRegisteredGroups,
   updateCollaborationTask,
+  updateTask,
+  getTaskById,
   getCollaborationTaskById,
   getTeamStateById,
   createTeamCollaborationState,
   updateTeamCollaborationState,
   getTeamCollaborationStateById,
   createCollaborationTask,
+  createTask,
 } from './db.js';
 import { logger } from './logger.js';
 import { sendAgentMessage } from './agent-communication.js';
@@ -59,7 +63,7 @@ function assignTaskToAgents(
   task.assignedAgents.forEach((agentId, index) => {
     const role = index === 0 ? 'leader' : 'member';
     try {
-      sendAgentMessage(
+      const messageId = sendAgentMessage(
         'system',
         agentId,
         'task',
@@ -72,8 +76,9 @@ function assignTaskToAgents(
         }),
         { taskId: task.id, role },
       );
+      scheduleAgentWakeup(task, agentId, messageId);
       logger.debug(
-        { taskId: task.id, agentId, role },
+        { taskId: task.id, agentId, role, messageId },
         'Task notification sent to agent',
       );
     } catch (err) {
@@ -96,6 +101,67 @@ function assignTaskToAgents(
       activeAgents: task.assignedAgents,
     });
   }
+}
+
+export function scheduleAgentWakeup(
+  task: CollaborationTask,
+  agentId: string,
+  messageId: string,
+): void {
+  const registeredGroups = getAllRegisteredGroups();
+  const entry = Object.entries(registeredGroups).find(
+    ([, group]) => group.folder === agentId,
+  );
+  if (!entry) {
+    logger.warn({ taskId: task.id, agentId }, 'No registered group for agent');
+    return;
+  }
+
+  const [targetJid, targetGroup] = entry;
+  const wakeupId = `collab-wakeup-${task.id}-${agentId}`;
+  const now = new Date();
+  now.setSeconds(now.getSeconds() + 5);
+  const nextRun = now.toISOString();
+  const existingWakeupTask = getTaskById(wakeupId);
+  if (existingWakeupTask?.status === 'active') {
+    logger.info(
+      { taskId: task.id, agentId, wakeupId },
+      'Collaboration wakeup task already active, skip duplicate',
+    );
+    return;
+  }
+  if (existingWakeupTask) {
+    updateTask(wakeupId, {
+      prompt: `处理协作任务消息：taskId=${task.id} messageId=${messageId}，读取协作消息队列并推进任务。`,
+      schedule_type: 'once',
+      schedule_value: nextRun,
+      next_run: nextRun,
+      status: 'active',
+    });
+    logger.info(
+      { taskId: task.id, agentId, targetJid, wakeupId },
+      'Collaboration wakeup task reactivated',
+    );
+    return;
+  }
+
+  createTask({
+    id: wakeupId,
+    group_folder: targetGroup.folder,
+    chat_jid: targetJid,
+    prompt: `处理协作任务消息：taskId=${task.id} messageId=${messageId}，读取协作消息队列并推进任务。`,
+    schedule_type: 'once',
+    schedule_value: nextRun,
+    context_mode: 'isolated',
+    next_run: nextRun,
+    status: 'active',
+    created_at: new Date().toISOString(),
+  });
+
+  logger.info(
+    { taskId: task.id, agentId, targetJid, wakeupId },
+    'Collaboration wakeup task scheduled',
+  );
 }
 
 /**

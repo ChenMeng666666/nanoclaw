@@ -7,8 +7,10 @@ import fs from 'fs';
 import path from 'path';
 
 import {
+  CONTAINER_ALLOW_HOST_GATEWAY,
   CONTAINER_IMAGE,
   CONTAINER_MAX_OUTPUT_SIZE,
+  CONTAINER_NETWORK_MODE,
   CONTAINER_TIMEOUT,
   DATA_DIR,
   GROUPS_DIR,
@@ -255,8 +257,20 @@ function readSecrets(): Record<string, string> {
 function buildContainerArgs(
   mounts: VolumeMount[],
   containerName: string,
+  group: RegisteredGroup,
 ): string[] {
   const args: string[] = ['run', '-i', '--rm', '--name', containerName];
+
+  const networkMode = group.containerConfig?.networkMode || CONTAINER_NETWORK_MODE;
+  args.push('--network', networkMode);
+
+  const shouldAddHostGateway =
+    networkMode !== 'none' &&
+    process.platform === 'linux' &&
+    (group.containerConfig?.allowHostGateway ?? CONTAINER_ALLOW_HOST_GATEWAY);
+  if (shouldAddHostGateway) {
+    args.push('--add-host=host.docker.internal:host-gateway');
+  }
 
   // Pass host timezone so container's local time matches the user's
   args.push('-e', `TZ=${TIMEZONE}`);
@@ -298,7 +312,7 @@ export async function runContainerAgent(
   const mounts = buildVolumeMounts(group, input.isMain);
   const safeName = group.folder.replace(/[^a-zA-Z0-9-]/g, '-');
   const containerName = `nanoclaw-${safeName}-${Date.now()}`;
-  const containerArgs = buildContainerArgs(mounts, containerName);
+  const containerArgs = buildContainerArgs(mounts, containerName, group);
 
   logger.debug(
     {

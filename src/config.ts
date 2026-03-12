@@ -142,6 +142,20 @@ export const CONTAINER_IMAGE = validateConfig(
   'CONTAINER_IMAGE',
 );
 
+export const CONTAINER_NETWORK_MODE = validateConfig(
+  process.env.CONTAINER_NETWORK_MODE || 'bridge',
+  (v) => v === 'bridge' || v === 'none',
+  'bridge' as const,
+  'CONTAINER_NETWORK_MODE',
+);
+
+export const CONTAINER_ALLOW_HOST_GATEWAY = validateConfig(
+  (process.env.CONTAINER_ALLOW_HOST_GATEWAY || 'true') === 'true',
+  validateBoolean,
+  true,
+  'CONTAINER_ALLOW_HOST_GATEWAY',
+);
+
 export const CONTAINER_TIMEOUT = validateConfig(
   parseInt(process.env.CONTAINER_TIMEOUT || '1800000', 10),
   (v) => validateInteger(v, 30000, 3600000),

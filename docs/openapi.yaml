@@ -1,0 +1,1567 @@
+openapi: 3.0.0
+info:
+  title: NanoClaw Runtime API
+  version: 1.2.10
+  description: |
+    Host API for Container Agents.
+    Provides interfaces for Memory, Evolution, Learning, and Collaboration.
+    Base URL: http://host.docker.internal:3456
+    Runtime may fallback to ports 3457-3459 when 3456 is occupied.
+servers:
+  - url: http://host.docker.internal:3456
+    description: Default host access from inside container (macOS/Windows)
+  - url: http://172.17.0.1:3456
+    description: Default host access from inside container (Linux)
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    # --- Memory ---
+    Memory:
+      type: object
+      properties:
+        id:
+          type: string
+        agentFolder:
+          type: string
+        userJid:
+          type: string
+        level:
+          type: string
+          enum: [L1, L2, L3]
+        content:
+          type: string
+        importance:
+          type: number
+        accessCount:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+
+    # --- Learning ---
+    LearningNeed:
+      type: object
+      properties:
+        topic:
+          type: string
+        level:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        urgency:
+          type: string
+          enum: [high, medium, low]
+        estimatedTime:
+          type: number
+          description: Hours
+        resources:
+          type: array
+          items:
+            type: string
+
+    LearningTask:
+      type: object
+      properties:
+        id:
+          type: string
+        agentFolder:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [pending, in_progress, completed, failed]
+        resources:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    DailyLearningPlan:
+      type: object
+      properties:
+        id:
+          type: string
+        date:
+          type: string
+          format: date
+        agentFolder:
+          type: string
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearningTask'
+        estimatedTime:
+          type: number
+        priority:
+          type: string
+          enum: [high, medium, low]
+
+    DailyLearningSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        date:
+          type: string
+          format: date
+        agentFolder:
+          type: string
+        tasksCompleted:
+          type: number
+        totalTimeSpent:
+          type: number
+          description: Minutes
+        knowledgePoints:
+          type: array
+          items:
+            type: string
+        achievements:
+          type: array
+          items:
+            type: string
+        challenges:
+          type: array
+          items:
+            type: string
+        improvements:
+          type: array
+          items:
+            type: string
+        tomorrowPlan:
+          type: array
+          items:
+            type: string
+        mood:
+          type: string
+          enum: [great, good, average, bad]
+        notes:
+          type: string
+
+    DetailedReflection:
+      type: object
+      properties:
+        id:
+          type: number
+        agentFolder:
+          type: string
+        type:
+          type: string
+          enum: [hourly, daily, weekly, monthly, task]
+        content:
+          type: string
+        triggeredBy:
+          type: string
+        actualDuration:
+          type: number
+        knowledgeGained:
+          type: array
+          items:
+            type: string
+        difficulties:
+          type: array
+          items:
+            type: string
+        solutions:
+          type: array
+          items:
+            type: string
+        suggestions:
+          type: array
+          items:
+            type: string
+        keyInsights:
+          type: array
+          items:
+            type: string
+        nextSteps:
+          type: array
+          items:
+            type: string
+        rating:
+          type: number
+          enum: [1, 2, 3, 4, 5]
+        createdAt:
+          type: string
+          format: date-time
+
+    # --- Evolution ---
+    EvolutionEntry:
+      type: object
+      properties:
+        id:
+          type: number
+        abilityName:
+          type: string
+        content:
+          type: string
+        sourceAgentId:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [pending, reviewing, approved, rejected]
+        category:
+          type: string
+          enum: [repair, optimize, innovate, learn]
+
+    # --- Collaboration ---
+    AgentMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        fromAgentId:
+          type: string
+        toAgentId:
+          type: string
+        type:
+          type: string
+          enum: [message, task, notification, status]
+        content:
+          type: string
+        metadata:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [sent, delivered, read, failed]
+
+    CollaborationTask:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        teamId:
+          type: string
+        assignedAgents:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [pending, in_progress, completed, failed]
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+        progress:
+          type: number
+          minimum: 0
+          maximum: 100
+        dependencies:
+          type: array
+          items:
+            type: string
+        context:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    TeamState:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        members:
+          type: array
+          items:
+            type: string
+        leaderId:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, dissolved]
+        collaborationMode:
+          type: string
+          enum: [hierarchical, peer-to-peer, swarm]
+
+    BotIdentity:
+      type: object
+      properties:
+        id:
+          type: string
+        chatJid:
+          type: string
+        agentId:
+          type: string
+        botName:
+          type: string
+        botAvatar:
+          type: string
+        isActive:
+          type: boolean
+        config:
+          type: object
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  # ===== Memory API =====
+  /api/memory/search:
+    post:
+      summary: Search memories
+      tags: [Memory]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query, agentFolder]
+              properties:
+                query:
+                  type: string
+                agentFolder:
+                  type: string
+                userJid:
+                  type: string
+                limit:
+                  type: number
+                  default: 10
+      responses:
+        '200':
+          description: List of memories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  memories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Memory'
+
+  /api/memory/add:
+    post:
+      summary: Add a new memory
+      tags: [Memory]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentFolder, content]
+              properties:
+                agentFolder:
+                  type: string
+                content:
+                  type: string
+                level:
+                  type: string
+                  enum: [L1, L2, L3]
+                  default: L1
+                userJid:
+                  type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /api/memory/list:
+    get:
+      summary: List memories
+      tags: [Memory]
+      parameters:
+        - in: query
+          name: agentFolder
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: level
+          schema:
+            type: string
+            enum: [L1, L2, L3]
+        - in: query
+          name: userJid
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of memories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  memories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Memory'
+
+  # ===== Evolution API =====
+  /api/evolution/query:
+    post:
+      summary: Query evolution experience library
+      tags: [Evolution]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+                limit:
+                  type: number
+                  default: 20
+      responses:
+        '200':
+          description: List of experience entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EvolutionEntry'
+
+  /api/evolution/submit:
+    post:
+      summary: Submit new experience
+      tags: [Evolution]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [abilityName, content, sourceAgentId]
+              properties:
+                abilityName:
+                  type: string
+                content:
+                  type: string
+                sourceAgentId:
+                  type: string
+                description:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Submission successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: number
+                  status:
+                    type: string
+
+  /api/evolution/feedback:
+    post:
+      summary: Submit feedback for an experience
+      tags: [Evolution]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, agentId, comment, rating]
+              properties:
+                id:
+                  type: number
+                agentId:
+                  type: string
+                comment:
+                  type: string
+                rating:
+                  type: number
+                  minimum: 1
+                  maximum: 5
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /api/evolution/select-gene:
+    post:
+      summary: Select recommended genes based on signals
+      tags: [Evolution]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                signals:
+                  type: array
+                  items:
+                    type: string
+                category:
+                  type: string
+                  enum: [repair, optimize, innovate, learn]
+      responses:
+        '200':
+          description: Recommended genes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  category:
+                    type: string
+                  genes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EvolutionEntry'
+                  count:
+                    type: number
+
+  # ===== Learning API =====
+  /api/learning/analyze-needs:
+    post:
+      summary: Analyze learning needs for an agent
+      tags: [Learning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentFolder]
+              properties:
+                agentFolder:
+                  type: string
+      responses:
+        '200':
+          description: List of learning needs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  needs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LearningNeed'
+
+  /api/learning/generate-daily-plan:
+    post:
+      summary: Generate a daily learning plan
+      tags: [Learning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentFolder, learningNeeds]
+              properties:
+                agentFolder:
+                  type: string
+                learningNeeds:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/LearningNeed'
+                scheduleConfig:
+                  type: object
+      responses:
+        '200':
+          description: Generated plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyLearningPlan'
+
+  /api/learning/analyze-outcome:
+    post:
+      summary: Analyze the outcome of a learning task
+      tags: [Learning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [taskId]
+              properties:
+                taskId:
+                  type: string
+      responses:
+        '200':
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  taskId:
+                    type: string
+                  knowledgeGained:
+                    type: array
+                    items: { type: string }
+                  difficulties:
+                    type: array
+                    items: { type: string }
+                  solutions:
+                    type: array
+                    items: { type: string }
+                  suggestions:
+                    type: array
+                    items: { type: string }
+
+  /api/learning/extract-knowledge:
+    post:
+      summary: Extract knowledge points from task/reflection
+      tags: [Learning]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                taskId: { type: string }
+                reflectionId: { type: number }
+      responses:
+        '200':
+          description: Extracted points
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  knowledgePoints:
+                    type: array
+                    items: { type: string }
+
+  /api/learning/automation/start:
+    post:
+      summary: Start learning automation for an agent
+      tags: [Learning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentFolder]
+              properties:
+                agentFolder: { type: string }
+      responses:
+        '200':
+          description: Started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+
+  /api/learning/automation/stop:
+    post:
+      summary: Stop learning automation
+      tags: [Learning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentFolder]
+              properties:
+                agentFolder: { type: string }
+      responses:
+        '200':
+          description: Stopped
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+
+  /api/learning/automation/status:
+    get:
+      summary: Get automation status
+      tags: [Learning]
+      parameters:
+        - in: query
+          name: agentFolder
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [running, stopped]
+
+  /api/learning/reflection/generate:
+    post:
+      summary: Generate a reflection
+      tags: [Learning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentFolder, type]
+              properties:
+                agentFolder: { type: string }
+                type:
+                  type: string
+                  enum: [hourly, daily, weekly, monthly, task]
+      responses:
+        '200':
+          description: Generated reflection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailedReflection'
+
+  /api/learning/generate-daily-summary:
+    post:
+      summary: Generate daily learning summary
+      tags: [Learning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentFolder]
+              properties:
+                agentFolder: { type: string }
+                tasks:
+                  type: array
+                  items: { type: object }
+      responses:
+        '200':
+          description: Daily summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyLearningSummary'
+
+  /api/learning/tasks:
+    get:
+      summary: List learning tasks
+      tags: [Learning]
+      parameters:
+        - in: query
+          name: agentFolder
+          required: true
+          schema: { type: string }
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, in_progress, completed, failed]
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LearningTask'
+
+  /api/learning/task/create:
+    post:
+      summary: Create a learning task
+      tags: [Learning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentFolder, description]
+              properties:
+                agentFolder: { type: string }
+                description: { type: string }
+                resources:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+
+  /api/learning/plan/create:
+    post:
+      summary: Create a complex learning plan
+      tags: [Learning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentFolder, topic, goal]
+              properties:
+                agentFolder: { type: string }
+                topic: { type: string }
+                goal: { type: string }
+                phases:
+                  type: array
+                  items: { type: object }
+                resources:
+                  type: array
+                  items: { type: string }
+                estimatedDuration: { type: string }
+                chatJid: { type: string }
+      responses:
+        '200':
+          description: Plan created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  scheduledTaskIds:
+                    type: array
+                    items: { type: string }
+                  status: { type: string }
+                  message: { type: string }
+
+  /api/learning/task/complete:
+    post:
+      summary: Complete a learning task
+      tags: [Learning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentFolder, taskId]
+              properties:
+                agentFolder: { type: string }
+                taskId: { type: string }
+                phaseName: { type: string }
+                reflection: { type: string }
+                timeSpent: { type: number }
+      responses:
+        '200':
+          description: Completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  taskId: { type: string }
+                  status: { type: string }
+                  reflection: { type: string, nullable: true }
+
+  /api/learning/task/start:
+    post:
+      summary: Start a learning task
+      tags: [Learning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentFolder, taskId]
+              properties:
+                agentFolder: { type: string }
+                taskId: { type: string }
+                phaseName: { type: string }
+      responses:
+        '200':
+          description: Started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  taskId: { type: string }
+                  status: { type: string }
+
+  /api/learning/plans:
+    get:
+      summary: List learning plans (from memory)
+      tags: [Learning]
+      parameters:
+        - in: query
+          name: agentFolder
+          required: true
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        '200':
+          description: List of plans
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plans:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Memory'
+
+  /api/learning/result:
+    post:
+      summary: Submit learning result
+      tags: [Learning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentFolder, status]
+              properties:
+                taskId: { type: string }
+                agentFolder: { type: string }
+                metricBefore: { type: number }
+                metricAfter: { type: number }
+                metricName: { type: string }
+                status:
+                  type: string
+                  enum: [keep, discard, crash]
+                description: { type: string }
+                signals:
+                  type: array
+                  items: { type: string }
+                geneId: { type: string }
+                blastRadius:
+                  type: object
+                  properties:
+                    files: { type: number }
+                    lines: { type: number }
+      responses:
+        '200':
+          description: Recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: number }
+                  status: { type: string }
+
+  /api/learning/results:
+    get:
+      summary: Get learning results history
+      tags: [Learning]
+      parameters:
+        - in: query
+          name: agentFolder
+          required: true
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: number, default: 50 }
+      responses:
+        '200':
+          description: History
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items: { type: object }
+
+  /api/learning/system/version:
+    get:
+      summary: Get learning system version
+      tags: [Learning System]
+      responses:
+        '200':
+          description: Version info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version: { type: string }
+                  releaseDate: { type: string }
+                  features:
+                    type: array
+                    items: { type: string }
+
+  /api/learning/system/update:
+    post:
+      summary: Update learning system
+      tags: [Learning System]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentFolder]
+              properties:
+                agentFolder: { type: string }
+      responses:
+        '200':
+          description: Update result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  version: { type: string }
+                  message: { type: string }
+
+  /api/learning/system/diff:
+    get:
+      summary: Get system version diff
+      tags: [Learning System]
+      parameters:
+        - in: query
+          name: fromVersion
+          schema: { type: string }
+        - in: query
+          name: toVersion
+          schema: { type: string }
+      responses:
+        '200':
+          description: Diff info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  changes:
+                    type: array
+                    items: { type: object }
+                  migrationSteps:
+                    type: array
+                    items: { type: string }
+
+  # ===== Signals API =====
+  /api/signals/extract:
+    post:
+      summary: Extract signals from content
+      tags: [Signals]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string }
+                memorySnippet: { type: string }
+                language:
+                  type: string
+                  enum: [en, zh-CN, zh-TW, ja]
+      responses:
+        '200':
+          description: Extracted signals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signals:
+                    type: array
+                    items: { type: string }
+
+  # ===== Saturation API =====
+  /api/saturation/detect:
+    get:
+      summary: Detect learning saturation
+      tags: [Saturation]
+      parameters:
+        - in: query
+          name: agentFolder
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: number, default: 10 }
+      responses:
+        '200':
+          description: Saturation state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  state: { type: object }
+                  summary: { type: string }
+
+  # ===== Scheduled Tasks API =====
+  /api/scheduled/tasks:
+    get:
+      summary: List scheduled tasks
+      tags: [Scheduled Tasks]
+      parameters:
+        - in: query
+          name: groupFolder
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks:
+                    type: array
+                    items: { type: object }
+
+  # ===== Reflection Trigger API =====
+  /api/reflection/trigger:
+    post:
+      summary: Manually trigger reflection
+      tags: [Reflection]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentFolder, type]
+              properties:
+                agentFolder: { type: string }
+                type: { type: string }
+                triggeredBy: { type: string }
+      responses:
+        '200':
+          description: Triggered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+
+  # ===== Collaboration API =====
+  /api/collaboration/messages/send:
+    post:
+      summary: Send message to another agent
+      tags: [Collaboration]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fromAgentId, toAgentId, type, content]
+              properties:
+                fromAgentId: { type: string }
+                toAgentId: { type: string }
+                type:
+                  type: string
+                  enum: [message, task, notification, status]
+                content: { type: string }
+                metadata: { type: object }
+      responses:
+        '200':
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  status: { type: string }
+
+  /api/collaboration/messages/receive:
+    post:
+      summary: Receive messages for an agent
+      tags: [Collaboration]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentId]
+              properties:
+                agentId: { type: string }
+      responses:
+        '200':
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AgentMessage'
+
+  /api/collaboration/messages/status:
+    get:
+      summary: Get message status
+      tags: [Collaboration]
+      parameters:
+        - in: query
+          name: messageId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+
+  /api/collaboration/tasks:
+    get:
+      summary: List collaboration tasks
+      tags: [Collaboration]
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: teamId
+          schema: { type: string }
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CollaborationTask'
+
+  /api/collaboration/task/create:
+    post:
+      summary: Create collaboration task
+      tags: [Collaboration]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, assignedAgents]
+              properties:
+                title: { type: string }
+                description: { type: string }
+                teamId: { type: string }
+                assignedAgents:
+                  type: array
+                  items: { type: string }
+                status: { type: string }
+                priority: { type: string }
+                dependencies:
+                  type: array
+                  items: { type: string }
+                context: { type: string }
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  status: { type: string }
+
+  /api/collaboration/task/update:
+    post:
+      summary: Update collaboration task
+      tags: [Collaboration]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [taskId, updates]
+              properties:
+                taskId: { type: string }
+                updates: { type: object }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+
+  /api/collaboration/task/progress:
+    post:
+      summary: Update task progress
+      tags: [Collaboration]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [taskId, progress]
+              properties:
+                taskId: { type: string }
+                progress: { type: number }
+                status: { type: string }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+
+  /api/collaboration/teams:
+    get:
+      summary: List teams
+      tags: [Collaboration]
+      responses:
+        '200':
+          description: List of teams
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  teams:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TeamState'
+
+  /api/collaboration/team/create:
+    post:
+      summary: Create team
+      tags: [Collaboration]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                description: { type: string }
+                members:
+                  type: array
+                  items: { type: string }
+                collaborationMode: { type: string }
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  status: { type: string }
+
+  /api/collaboration/team/update:
+    post:
+      summary: Update team
+      tags: [Collaboration]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [teamId, updates]
+              properties:
+                teamId: { type: string }
+                updates: { type: object }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+
+  /api/collaboration/team/add-member:
+    post:
+      summary: Add member to team
+      tags: [Collaboration]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [teamId, agentId]
+              properties:
+                teamId: { type: string }
+                agentId: { type: string }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+
+  /api/collaboration/team/remove-member:
+    post:
+      summary: Remove member from team
+      tags: [Collaboration]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [teamId, agentId]
+              properties:
+                teamId: { type: string }
+                agentId: { type: string }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+
+  /api/collaboration/team/health:
+    get:
+      summary: Check team health
+      tags: [Collaboration]
+      parameters:
+        - in: query
+          name: teamId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Health stats
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/collaboration/bot-identity:
+    get:
+      summary: Get bot identity
+      tags: [Collaboration]
+      parameters:
+        - in: query
+          name: chatJid
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Identity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  identity:
+                    $ref: '#/components/schemas/BotIdentity'
+
+  /api/collaboration/bot-identity/create:
+    post:
+      summary: Create bot identity
+      tags: [Collaboration]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [chatJid, agentId, botName]
+              properties:
+                chatJid: { type: string }
+                agentId: { type: string }
+                botName: { type: string }
+                botAvatar: { type: string }
+                config: { type: object }
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  status: { type: string }

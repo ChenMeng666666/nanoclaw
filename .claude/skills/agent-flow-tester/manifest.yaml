@@ -1,0 +1,9 @@
+skill: agent-flow-tester
+version: 1.0.0
+description: 'Run NanoClaw agent flow tests for minimal, e2e, and full scenarios.'
+core_version: 1.2.10
+adds: []
+modifies: []
+conflicts: []
+depends: []
+test: 'npm run test:minimal'
