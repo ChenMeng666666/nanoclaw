@@ -3,6 +3,10 @@ import path from 'path';
 
 import { readState, writeState } from './state.js';
 
+function toPortablePath(relPath: string): string {
+  return relPath.replace(/\\/g, '/');
+}
+
 function isWithinRoot(rootPath: string, targetPath: string): boolean {
   return targetPath === rootPath || targetPath.startsWith(rootPath + path.sep);
 }
@@ -41,6 +45,36 @@ function toSafeProjectRelativePath(
     throw new Error(`Path remap points to project root: "${candidatePath}"`);
   }
 
+  const relativeCandidate = path.relative(root, resolved);
+  const segments = relativeCandidate.split(path.sep).filter(Boolean);
+  let logicalPath = root;
+  for (const segment of segments) {
+    logicalPath = path.join(logicalPath, segment);
+    let logicalStat: fs.Stats;
+    try {
+      logicalStat = fs.lstatSync(logicalPath);
+    } catch {
+      break;
+    }
+    if (logicalStat.isSymbolicLink()) {
+      const linkTarget = fs.readlinkSync(logicalPath);
+      const linkResolved = path.resolve(path.dirname(logicalPath), linkTarget);
+      const realLogical = fs.realpathSync(linkResolved);
+      if (!isWithinRoot(realRoot, realLogical)) {
+        throw new Error(
+          `Path remap escapes project root via symlink: "${candidatePath}"`,
+        );
+      }
+      continue;
+    }
+    const realLogical = fs.realpathSync(logicalPath);
+    if (!isWithinRoot(realRoot, realLogical)) {
+      throw new Error(
+        `Path remap escapes project root via symlink: "${candidatePath}"`,
+      );
+    }
+  }
+
   // Detect symlink escapes by resolving the nearest existing ancestor/symlink.
   const anchorPath = nearestExistingPathOrSymlink(resolved);
   const anchorStat = fs.lstatSync(anchorPath);
@@ -65,7 +99,7 @@ function toSafeProjectRelativePath(
     );
   }
 
-  return path.relative(realRoot, realResolved);
+  return toPortablePath(path.relative(realRoot, realResolved));
 }
 
 function sanitizeRemapEntries(

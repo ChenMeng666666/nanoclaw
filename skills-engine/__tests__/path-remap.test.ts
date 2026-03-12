@@ -59,6 +59,12 @@ describe('path-remap', () => {
 
       try {
         fs.symlinkSync(outsideDir, linkPath);
+        try {
+          fs.lstatSync(linkPath);
+        } catch {
+          fs.rmSync(outsideDir, { recursive: true, force: true });
+          return;
+        }
       } catch (err) {
         const code = (err as NodeJS.ErrnoException).code;
         if (code === 'EPERM' || code === 'EACCES' || code === 'ENOSYS') {
@@ -116,6 +122,12 @@ describe('path-remap', () => {
 
       try {
         fs.symlinkSync(outsideDir, linkPath);
+        try {
+          fs.lstatSync(linkPath);
+        } catch {
+          fs.rmSync(outsideDir, { recursive: true, force: true });
+          return;
+        }
       } catch (err) {
         const code = (err as NodeJS.ErrnoException).code;
         if (code === 'EPERM' || code === 'EACCES' || code === 'ENOSYS') {

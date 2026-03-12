@@ -128,9 +128,31 @@ npm run test:minimal && npm run test:full && npm run test:e2e
 
 # 运行所有测试
 npm run test
+
+# 质量整改回归（消息游标/安全/跨平台技能引擎）
+npm test -- src/security.test.ts src/ipc-auth.test.ts src/container-runner.test.ts skills-engine/__tests__/path-remap.test.ts skills-engine/__tests__/rebase.test.ts skills-engine/__tests__/run-migrations.test.ts
 ```
 
-### 3. 预期输出
+### 3. 质量整改专项检查
+
+1. **消息游标与重试**
+   - 验证失败回滚后可重试，不出现永久跳过
+   - 验证活跃容器写入失败时不提前推进业务游标
+
+2. **输入与内容安全**
+   - 验证 `sanitizeWebContent` 会清除 `<script>`、`javascript:`、内联事件
+   - 验证 `validateUserInput` 不误杀普通文本（如包含连字符）
+   - 验证经典注入模式（`' OR 1=1 --`）会被拦截
+
+3. **任务调度一致性**
+   - 验证 `update_task` 修改 `once` 时间后 `next_run` 同步更新
+   - 验证 `schedule_task/update_task` 对不安全 `prompt` 拒绝写入
+
+4. **跨平台兼容**
+   - Windows 环境下 `run-migrations` 与 `rebase` 测试可通过
+   - `path-remap` 产出路径统一为 `/` 风格，避免断言抖动
+
+### 4. 预期输出
 
 完整测试运行的预期输出示例：
 
@@ -149,7 +171,7 @@ npm run test
 === 完整Agent流程测试成功 ===
 ```
 
-### 4. 测试文件结构
+### 5. 测试文件结构
 
 ```
 tests/

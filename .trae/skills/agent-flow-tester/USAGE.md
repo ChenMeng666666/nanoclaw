@@ -38,6 +38,12 @@ npm run test:e2e
 npm run test:minimal && npm run test:full && npm run test:e2e
 ```
 
+### 7. 运行质量整改专项回归
+
+```bash
+npm test -- src/security.test.ts src/ipc-auth.test.ts src/container-runner.test.ts skills-engine/__tests__/path-remap.test.ts skills-engine/__tests__/rebase.test.ts skills-engine/__tests__/run-migrations.test.ts
+```
+
 ## 测试命令
 
 | 命令                   | 描述                             | 适用场景             |
@@ -46,6 +52,7 @@ npm run test:minimal && npm run test:full && npm run test:e2e
 | `npm run test:full`    | 运行完整 Agent 流程测试          | 全面验证、发布前检查 |
 | `npm run test:e2e`     | 运行端到端容器链路测试           | 容器联调、回归验证   |
 | `npm run test:run`     | 运行测试脚本（带环境检查）       | 完整流程测试         |
+| `npm test -- ...`      | 运行质量整改专项回归             | 安全与跨平台回归     |
 
 ## 测试内容
 
@@ -71,6 +78,13 @@ npm run test:minimal && npm run test:full && npm run test:e2e
 - ✅ 容器启动与消息流式输出链路（依赖 Docker + 模型凭证）
 - ✅ 任务快照与数据库一致性验证
 - ✅ 清理流程验证
+
+### 质量整改专项回归 (`npm test -- ...`)
+
+- ✅ 消息游标回滚与任务更新边界行为
+- ✅ Web 内容清洗与输入校验误杀保护
+- ✅ container-runner 配置 mock 完整性
+- ✅ path-remap/rebase/run-migrations 跨平台兼容
 
 ## 测试输出
 

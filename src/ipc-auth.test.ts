@@ -554,6 +554,40 @@ describe('schedule_task schedule types', () => {
 
     expect(getAllTasks()).toHaveLength(0);
   });
+
+  it('rejects invalid schedule_type', async () => {
+    await processTaskIpc(
+      {
+        type: 'schedule_task',
+        prompt: 'bad type',
+        schedule_type: 'weird' as any,
+        schedule_value: '2025-06-01T00:00:00',
+        targetJid: 'other@g.us',
+      },
+      'whatsapp_main',
+      true,
+      deps,
+    );
+
+    expect(getAllTasks()).toHaveLength(0);
+  });
+
+  it('rejects unsafe prompt during schedule_task', async () => {
+    await processTaskIpc(
+      {
+        type: 'schedule_task',
+        prompt: "x' OR 1=1 --",
+        schedule_type: 'once',
+        schedule_value: '2025-06-01T00:00:00',
+        targetJid: 'other@g.us',
+      },
+      'whatsapp_main',
+      true,
+      deps,
+    );
+
+    expect(getAllTasks()).toHaveLength(0);
+  });
 });
 
 // --- context_mode defaulting ---
@@ -632,6 +666,125 @@ describe('schedule_task context_mode', () => {
 
     const tasks = getAllTasks();
     expect(tasks[0].context_mode).toBe('isolated');
+  });
+});
+
+describe('update_task schedule recompute', () => {
+  it('recomputes next_run when updating once schedule', async () => {
+    createTask({
+      id: 'task-once-update',
+      group_folder: 'other-group',
+      chat_jid: 'other@g.us',
+      prompt: 'run once',
+      schedule_type: 'once',
+      schedule_value: '2025-06-01T00:00:00',
+      context_mode: 'isolated',
+      next_run: '2025-06-01T00:00:00.000Z',
+      status: 'active',
+      created_at: '2025-01-01T00:00:00.000Z',
+    });
+
+    await processTaskIpc(
+      {
+        type: 'update_task',
+        taskId: 'task-once-update',
+        schedule_value: '2025-07-01T12:30:00.000Z',
+      },
+      'other-group',
+      false,
+      deps,
+    );
+
+    const updated = getTaskById('task-once-update');
+    expect(updated?.next_run).toBe('2025-07-01T12:30:00.000Z');
+  });
+
+  it('rejects unsafe prompt during update_task', async () => {
+    createTask({
+      id: 'task-update-prompt',
+      group_folder: 'other-group',
+      chat_jid: 'other@g.us',
+      prompt: 'safe',
+      schedule_type: 'once',
+      schedule_value: '2025-06-01T00:00:00',
+      context_mode: 'isolated',
+      next_run: '2025-06-01T00:00:00.000Z',
+      status: 'active',
+      created_at: '2025-01-01T00:00:00.000Z',
+    });
+
+    await processTaskIpc(
+      {
+        type: 'update_task',
+        taskId: 'task-update-prompt',
+        prompt: 'SELECT * FROM users; DROP TABLE users;',
+      },
+      'other-group',
+      false,
+      deps,
+    );
+
+    const updated = getTaskById('task-update-prompt');
+    expect(updated?.prompt).toBe('safe');
+  });
+
+  it('rejects invalid interval during update_task', async () => {
+    createTask({
+      id: 'task-update-interval',
+      group_folder: 'other-group',
+      chat_jid: 'other@g.us',
+      prompt: 'safe',
+      schedule_type: 'interval',
+      schedule_value: '1000',
+      context_mode: 'isolated',
+      next_run: new Date(Date.now() + 1000).toISOString(),
+      status: 'active',
+      created_at: '2025-01-01T00:00:00.000Z',
+    });
+
+    const before = getTaskById('task-update-interval');
+    await processTaskIpc(
+      {
+        type: 'update_task',
+        taskId: 'task-update-interval',
+        schedule_value: '0',
+      },
+      'other-group',
+      false,
+      deps,
+    );
+
+    const updated = getTaskById('task-update-interval');
+    expect(updated?.schedule_value).toBe(before?.schedule_value);
+  });
+
+  it('rejects invalid schedule_type during update_task', async () => {
+    createTask({
+      id: 'task-update-type',
+      group_folder: 'other-group',
+      chat_jid: 'other@g.us',
+      prompt: 'safe',
+      schedule_type: 'once',
+      schedule_value: '2025-06-01T00:00:00',
+      context_mode: 'isolated',
+      next_run: '2025-06-01T00:00:00.000Z',
+      status: 'active',
+      created_at: '2025-01-01T00:00:00.000Z',
+    });
+
+    await processTaskIpc(
+      {
+        type: 'update_task',
+        taskId: 'task-update-type',
+        schedule_type: 'weird' as any,
+      },
+      'other-group',
+      false,
+      deps,
+    );
+
+    const updated = getTaskById('task-update-type');
+    expect(updated?.schedule_type).toBe('once');
   });
 });
 

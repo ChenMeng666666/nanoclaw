@@ -112,7 +112,11 @@ export function sanitizeWebContent(html: string): string {
   );
 
   // 转义潜在的恶意脚本
-  sanitized = sanitized.replace(/javascript:/gi, 'javascript:');
+  sanitized = sanitized.replace(/javascript:/gi, '');
+  sanitized = sanitized.replace(
+    /\son\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi,
+    '',
+  );
 
   return sanitized;
 }
@@ -245,9 +249,10 @@ export function validateUserInput(input: string): {
 
   // 检查 SQL 注入模式
   const sqlPatterns = [
-    /\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE)\b/i,
-    /\b(UNION|JOIN|WHERE|FROM|GROUP|ORDER|HAVING| LIMIT| OFFSET)\b/i,
-    /['";-]/, // 使用单个 -
+    /(?:'|")\s*(?:or|and)\s+\d+\s*=\s*\d+/i,
+    /\bunion\b[\s\S]{0,64}\bselect\b/i,
+    /;\s*(?:drop|truncate|delete|alter|create)\b/i,
+    /(?:'|")\s*--|;\s*--/,
   ];
 
   for (const pattern of sqlPatterns) {
@@ -259,9 +264,8 @@ export function validateUserInput(input: string): {
   // 检查 XSS 攻击模式
   const xssPatterns = [
     /<script[^>]*>[\s\S]*?<\/script>/i,
-    /on\w+="[^"]*"/i,
+    /on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/i,
     /javascript:/i,
-    /data:/i,
   ];
 
   for (const pattern of xssPatterns) {
@@ -278,14 +282,6 @@ export function validateUserInput(input: string): {
       issues.push(`Potential path traversal detected: ${pattern}`);
     }
   }
-
-  // 检查敏感数据泄露
-  const sensitiveIssues = detectSensitiveDataLeak(input);
-  issues.push(...sensitiveIssues);
-
-  // 检查意图验证
-  const intentIssues = validatePromptIntent(input).issues;
-  issues.push(...intentIssues);
 
   return {
     valid: issues.length === 0,

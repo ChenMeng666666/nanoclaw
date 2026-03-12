@@ -2,23 +2,33 @@
 import { execFileSync, execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 import { compareSemver } from '../skills-engine/state.js';
+
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 
 // Resolve tsx binary once to avoid npx race conditions across migrations
 function resolveTsx(): string {
   // Check local node_modules first
-  const local = path.resolve('node_modules/.bin/tsx');
-  if (fs.existsSync(local)) return local;
+  const local = path.resolve(scriptDir, '../node_modules/.bin/tsx');
+  if (fs.existsSync(local)) return 'tsx';
+  const localCmd = path.resolve(scriptDir, '../node_modules/.bin/tsx.cmd');
+  if (fs.existsSync(localCmd)) return 'tsx';
   // Fall back to whichever tsx is in PATH
   try {
-    return execSync('which tsx', { encoding: 'utf-8' }).trim();
+    const cmd = process.platform === 'win32' ? 'where tsx' : 'which tsx';
+    const resolved = execSync(cmd, { encoding: 'utf-8' })
+      .trim()
+      .split(/\r?\n/)[0];
+    if (process.platform === 'win32' && resolved.toLowerCase().endsWith('.cmd')) {
+      return 'tsx';
+    }
+    return resolved;
   } catch {
     return 'npx'; // last resort
   }
 }
-
-const tsxBin = resolveTsx();
 
 const fromVersion = process.argv[2];
 const toVersion = process.argv[3];
@@ -37,7 +47,36 @@ interface MigrationResult {
   error?: string;
 }
 
+interface TsxCommand {
+  command: string;
+  argsPrefix: string[];
+}
+
+function resolveTsxCommand(): TsxCommand {
+  const localCli = path.resolve(scriptDir, '../node_modules/tsx/dist/cli.mjs');
+  if (fs.existsSync(localCli)) {
+    return {
+      command: process.execPath,
+      argsPrefix: [localCli],
+    };
+  }
+
+  const resolved = resolveTsx();
+  if (resolved === 'npx') {
+    return {
+      command: 'npx',
+      argsPrefix: ['tsx'],
+    };
+  }
+
+  return {
+    command: resolved,
+    argsPrefix: [],
+  };
+}
+
 const results: MigrationResult[] = [];
+const tsxCommand = resolveTsxCommand();
 
 // Look for migrations in the new core
 const migrationsDir = path.join(newCorePath, 'migrations');
@@ -72,10 +111,8 @@ for (const version of migrationVersions) {
   }
 
   try {
-    const tsxArgs = tsxBin.endsWith('npx')
-      ? ['tsx', migrationIndex, projectRoot]
-      : [migrationIndex, projectRoot];
-    execFileSync(tsxBin, tsxArgs, {
+    const tsxArgs = [...tsxCommand.argsPrefix, migrationIndex, projectRoot];
+    execFileSync(tsxCommand.command, tsxArgs, {
       stdio: 'pipe',
       cwd: projectRoot,
       timeout: 120_000,

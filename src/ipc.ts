@@ -195,6 +195,15 @@ export async function processTaskIpc(
         data.schedule_value &&
         data.targetJid
       ) {
+        const promptValidation = validateUserInput(data.prompt);
+        if (!promptValidation.valid) {
+          logger.warn(
+            { sourceGroup, issues: promptValidation.issues },
+            'Blocked schedule_task due to unsafe prompt',
+          );
+          break;
+        }
+
         // Resolve the target group from JID
         const targetJid = data.targetJid as string;
         const targetGroupEntry = registeredGroups[targetJid];
@@ -219,6 +228,14 @@ export async function processTaskIpc(
         }
 
         const scheduleType = data.schedule_type as 'cron' | 'interval' | 'once';
+        if (
+          scheduleType !== 'cron' &&
+          scheduleType !== 'interval' &&
+          scheduleType !== 'once'
+        ) {
+          logger.warn({ scheduleType }, 'Invalid schedule type');
+          break;
+        }
 
         let nextRun: string | null = null;
         if (scheduleType === 'cron') {
@@ -355,7 +372,21 @@ export async function processTaskIpc(
         }
 
         const updates: Parameters<typeof updateTask>[1] = {};
-        if (data.prompt !== undefined) updates.prompt = data.prompt;
+        if (data.prompt !== undefined) {
+          const promptValidation = validateUserInput(data.prompt);
+          if (!promptValidation.valid) {
+            logger.warn(
+              {
+                taskId: data.taskId,
+                sourceGroup,
+                issues: promptValidation.issues,
+              },
+              'Blocked update_task due to unsafe prompt',
+            );
+            break;
+          }
+          updates.prompt = data.prompt;
+        }
         if (data.schedule_type !== undefined)
           updates.schedule_type = data.schedule_type as
             | 'cron'
@@ -365,11 +396,25 @@ export async function processTaskIpc(
           updates.schedule_value = data.schedule_value;
 
         // Recompute next_run if schedule changed
-        if (data.schedule_type || data.schedule_value) {
+        if (
+          data.schedule_type !== undefined ||
+          data.schedule_value !== undefined
+        ) {
           const updatedTask = {
             ...task,
             ...updates,
           };
+          if (
+            updatedTask.schedule_type !== 'cron' &&
+            updatedTask.schedule_type !== 'interval' &&
+            updatedTask.schedule_type !== 'once'
+          ) {
+            logger.warn(
+              { taskId: data.taskId, scheduleType: updatedTask.schedule_type },
+              'Invalid schedule type in task update',
+            );
+            break;
+          }
           if (updatedTask.schedule_type === 'cron') {
             try {
               const interval = CronExpressionParser.parse(
@@ -386,9 +431,24 @@ export async function processTaskIpc(
             }
           } else if (updatedTask.schedule_type === 'interval') {
             const ms = parseInt(updatedTask.schedule_value, 10);
-            if (!isNaN(ms) && ms > 0) {
-              updates.next_run = new Date(Date.now() + ms).toISOString();
+            if (isNaN(ms) || ms <= 0) {
+              logger.warn(
+                { taskId: data.taskId, value: updatedTask.schedule_value },
+                'Invalid interval in task update',
+              );
+              break;
             }
+            updates.next_run = new Date(Date.now() + ms).toISOString();
+          } else if (updatedTask.schedule_type === 'once') {
+            const date = new Date(updatedTask.schedule_value);
+            if (isNaN(date.getTime())) {
+              logger.warn(
+                { taskId: data.taskId, value: updatedTask.schedule_value },
+                'Invalid timestamp in task update',
+              );
+              break;
+            }
+            updates.next_run = date.toISOString();
           }
         }
 

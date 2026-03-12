@@ -1,4 +1,3 @@
-import { execFileSync } from 'child_process';
 import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
@@ -11,6 +10,39 @@ import { acquireLock } from './lock.js';
 import { mergeFile } from './merge.js';
 import { computeFileHash, readState, writeState } from './state.js';
 import type { RebaseResult } from './types.js';
+
+function toUnifiedPath(relPath: string): string {
+  return relPath.replace(/\\/g, '/');
+}
+
+function normalizeContent(content: string): string {
+  return content.replace(/\r\n/g, '\n');
+}
+
+function buildUnifiedPatch(
+  relPath: string,
+  oldContent: string,
+  newContent: string,
+  oldExists: boolean,
+  newExists: boolean,
+): string {
+  if (oldContent === newContent) {
+    return '';
+  }
+
+  const normalizedRelPath = toUnifiedPath(relPath);
+  const oldLines = normalizeContent(oldContent).split('\n');
+  const newLines = normalizeContent(newContent).split('\n');
+  const oldLabel = oldExists ? `a/${normalizedRelPath}` : '/dev/null';
+  const newLabel = newExists ? `b/${normalizedRelPath}` : '/dev/null';
+
+  const oldCount = oldLines.length;
+  const newCount = newLines.length;
+  const removed = oldLines.map((line) => `-${line}`).join('\n');
+  const added = newLines.map((line) => `+${line}`).join('\n');
+
+  return `--- ${oldLabel}\n+++ ${newLabel}\n@@ -1,${oldCount} +1,${newCount} @@\n${removed}\n${added}\n`;
+}
 
 function walkDir(dir: string, root: string): string[] {
   const results: string[] = [];
@@ -92,27 +124,23 @@ export async function rebase(newBasePath?: string): Promise<RebaseResult> {
         const basePath = path.join(baseAbsDir, relPath);
         const workingPath = path.join(projectRoot, relPath);
 
-        const oldPath = fs.existsSync(basePath) ? basePath : '/dev/null';
-        const newPath = fs.existsSync(workingPath) ? workingPath : '/dev/null';
+        const oldExists = fs.existsSync(basePath);
+        const newExists = fs.existsSync(workingPath);
 
-        if (oldPath === '/dev/null' && newPath === '/dev/null') continue;
+        if (!oldExists && !newExists) continue;
 
-        try {
-          const diff = execFileSync('diff', ['-ruN', oldPath, newPath], {
-            encoding: 'utf-8',
-          });
-          if (diff.trim()) {
-            combinedPatch += diff;
-            filesInPatch++;
-          }
-        } catch (err: unknown) {
-          const execErr = err as { status?: number; stdout?: string };
-          if (execErr.status === 1 && execErr.stdout) {
-            combinedPatch += execErr.stdout;
-            filesInPatch++;
-          } else {
-            throw err;
-          }
+        const oldContent = oldExists ? fs.readFileSync(basePath, 'utf-8') : '';
+        const newContent = newExists ? fs.readFileSync(workingPath, 'utf-8') : '';
+        const diff = buildUnifiedPatch(
+          relPath,
+          oldContent,
+          newContent,
+          oldExists,
+          newExists,
+        );
+        if (diff.trim()) {
+          combinedPatch += diff;
+          filesInPatch++;
         }
       }
 

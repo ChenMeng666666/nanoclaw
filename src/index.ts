@@ -110,6 +110,7 @@ async function checkSystemDependencies() {
 import { MainEvolutionApplier } from './main-evolution-applier.js';
 import {
   validateUserInput,
+  sanitizeWebContent,
   sanitizeObject,
   safeJsonParse,
 } from './security.js';
@@ -338,7 +339,7 @@ async function processGroupMessagesWithTimeout(
     if (missedMessages.length === 0) return true;
 
     // For non-main groups, check if trigger is required and present
-    if (!isMainGroup && group.requiresTrigger !== false) {
+    if (!isMainGroup && group.requiresTrigger === true) {
       const allowlistCfg = loadSenderAllowlist();
       const hasTrigger = missedMessages.some(
         (m) =>
@@ -349,13 +350,7 @@ async function processGroupMessagesWithTimeout(
     }
 
     const prompt = formatMessages(missedMessages, TIMEZONE);
-
-    // Advance cursor so the piping path in startMessageLoop won't re-fetch
-    // these messages. Save the old cursor so we can roll back on error.
-    const previousCursor = lastAgentTimestamp[chatJid] || '';
-    lastAgentTimestamp[chatJid] =
-      missedMessages[missedMessages.length - 1].timestamp;
-    saveState();
+    const newCursor = missedMessages[missedMessages.length - 1].timestamp;
 
     logger.info(
       { group: group.name, messageCount: missedMessages.length },
@@ -418,21 +413,23 @@ async function processGroupMessagesWithTimeout(
       // If we already sent output to the user, don't roll back the cursor —
       // the user got their response and re-processing would send duplicates.
       if (outputSentToUser) {
+        lastAgentTimestamp[chatJid] = newCursor;
+        saveState();
         logger.warn(
           { group: group.name },
           'Agent error after output was sent, skipping cursor rollback to prevent duplicates',
         );
         return true;
       }
-      // Roll back cursor so retries can re-process these messages
-      saveState();
       logger.warn(
         { group: group.name },
-        'Agent error, rolled back message cursor for retry',
+        'Agent error, keeping cursor unchanged for retry',
       );
       return false;
     }
 
+    lastAgentTimestamp[chatJid] = newCursor;
+    saveState();
     return true;
   })();
 
@@ -555,10 +552,6 @@ async function startMessageLoop(): Promise<void> {
         logger.info({ count: messages.length }, 'New messages');
         logger.debug({ messages }, '=== New messages ===');
 
-        // Advance the "seen" cursor for all messages immediately
-        lastTimestamp = newTimestamp;
-        saveState();
-
         // Deduplicate messages by group and content
         const messagesByGroup = new Map<string, NewMessage[]>();
         for (const msg of messages) {
@@ -574,7 +567,8 @@ async function startMessageLoop(): Promise<void> {
           }
 
           // 安全检查：验证用户输入是否包含潜在恶意内容
-          const inputValidation = validateUserInput(msg.content);
+          const sanitizedContent = sanitizeWebContent(msg.content);
+          const inputValidation = validateUserInput(sanitizedContent);
           if (!inputValidation.valid) {
             logger.warn(
               {
@@ -587,11 +581,16 @@ async function startMessageLoop(): Promise<void> {
             continue;
           }
 
+          const safeMessage =
+            sanitizedContent === msg.content
+              ? msg
+              : { ...msg, content: sanitizedContent };
+
           const existing = messagesByGroup.get(msg.chat_jid);
           if (existing) {
-            existing.push(msg);
+            existing.push(safeMessage);
           } else {
-            messagesByGroup.set(msg.chat_jid, [msg]);
+            messagesByGroup.set(msg.chat_jid, [safeMessage]);
           }
         }
 
@@ -684,9 +683,6 @@ async function startMessageLoop(): Promise<void> {
               );
           } else {
             // No active container — enqueue for a new one
-            // 先更新 cursor，防止下次循环重复处理
-            lastAgentTimestamp[chatJid] = newCursor;
-            saveState();
             logger.debug(
               {
                 chatJid,
@@ -702,6 +698,9 @@ async function startMessageLoop(): Promise<void> {
             queue.enqueueMessageCheck(chatJid);
           }
         }
+
+        lastTimestamp = newTimestamp;
+        saveState();
       }
     } catch (err) {
       logger.error({ err }, 'Error in message loop');
