@@ -26,6 +26,18 @@ npm run test:minimal
 npm run test:full
 ```
 
+### 5. 运行容器链路测试
+
+```bash
+npm run test:e2e
+```
+
+### 6. 运行全链路回归（推荐）
+
+```bash
+npm run test:minimal && npm run test:full && npm run test:e2e
+```
+
 ## 测试命令
 
 | 命令                   | 描述                             | 适用场景             |
@@ -48,11 +60,17 @@ npm run test:full
 ### 完整测试 (`test:full`)
 
 - ✅ 所有最小化测试内容
-- ✅ 容器启动和执行
-- ✅ 智能体响应验证
-- ✅ 任务快照生成
-- ✅ 数据库操作验证
-- ✅ 端到端流程验证
+- ✅ 记忆固化强校验（L2 候选迁移到 L3）
+- ✅ 学习计划主动触发定时任务与执行日志
+- ✅ 进化经验上传后主动审核状态校验
+- ✅ 任务流程链路（记忆检索→进化检索→外部学习→执行→上传经验）
+- ✅ 并发记忆/并发进化访问压测与数据清理
+
+### 端到端测试 (`test:e2e`)
+
+- ✅ 容器启动与消息流式输出链路（依赖 Docker + 模型凭证）
+- ✅ 任务快照与数据库一致性验证
+- ✅ 清理流程验证
 
 ## 测试输出
 
@@ -139,9 +157,10 @@ const TEST_GROUP = {
 ## 注意事项
 
 1. **网络连接**：测试需要网络连接来调用 API
-2. **Docker资源**：确保Docker有足够的内存和CPU
+2. **Docker资源**：确保 Docker 有足够的内存和 CPU
 3. **Runtime API 鉴权**：需配置 `RUNTIME_API_KEY`，并通过 `X-API-Key` 访问 Runtime API
-4. **清理数据**：测试后会自动清理，但建议手动检查
+4. **容器模型凭证**：`test:e2e` 需配置 `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` / `CLAUDE_CODE_OAUTH_TOKEN`
+5. **清理数据**：测试后会自动清理，但建议手动检查
 
 ## 开发流程
 

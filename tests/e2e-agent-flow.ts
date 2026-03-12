@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { join } from 'path';
+import { execSync } from 'child_process';
 import {
   initDatabase,
   createTask,
@@ -19,14 +20,22 @@ import { startSchedulerLoop, computeNextRun } from '../src/task-scheduler.js';
 import { MemoryManager } from '../src/memory-manager.js';
 import { EvolutionManager } from '../src/evolution-manager.js';
 import { logger } from '../src/logger.js';
+import { readEnvFile } from '../src/env.js';
 import { RegisteredGroup } from '../src/types.js';
-import { TestDataFactory, TestDatabaseHelper, TestAssertions } from './test-utils.js';
+import {
+  TestDataFactory,
+  TestDatabaseHelper,
+  TestAssertions,
+} from './test-utils.js';
 
 // 测试配置
 const TEST_GROUP: RegisteredGroup = TestDataFactory.createTestGroup('test');
 
 // 测试任务配置
-const TEST_TASK = TestDataFactory.createTestTask(TEST_GROUP.folder, 'test-task-1');
+const TEST_TASK = TestDataFactory.createTestTask(
+  TEST_GROUP.folder,
+  'test-task-1',
+);
 
 // 全局变量
 let memoryManager: MemoryManager;
@@ -42,7 +51,10 @@ async function testCompleteAgentFlow() {
 
     // 创建测试 agent
     logger.debug('创建测试 agent');
-    const testAgent = TestDataFactory.createTestAgent(TEST_GROUP.folder, 'test-agent');
+    const testAgent = TestDataFactory.createTestAgent(
+      TEST_GROUP.folder,
+      'test-agent',
+    );
     await TestDatabaseHelper.setupTestAgent(testAgent);
 
     // 2. 测试记忆管理
@@ -51,7 +63,7 @@ async function testCompleteAgentFlow() {
     await memoryManager.addMemory(
       TEST_GROUP.folder,
       '测试记忆内容：NanoClaw架构包含主进程、消息循环、容器调度',
-      'L2'
+      'L2',
     );
 
     // 3. 测试进化系统
@@ -62,12 +74,17 @@ async function testCompleteAgentFlow() {
       '测试完整agent流程：初始化数据库→配置测试agent→创建记忆→提交进化经验→创建定时任务→生成任务快照→验证数据完整性→清理测试数据。这个流程涵盖了NanoClaw系统的主要功能点，验证了从数据初始化到最终清理的完整生命周期。',
       testAgent.id,
       '测试NanoClaw完整agent流程',
-      ['测试', '流程验证', 'agent']
+      ['测试', '流程验证', 'agent'],
     );
     logger.info(`   经验已提交（ID: ${experienceId}）`);
 
     // 手动批准经验以便查询能找到
-    await evolutionManager.reviewExperience(experienceId, 'test-reviewer', true, '测试用自动批准');
+    await evolutionManager.reviewExperience(
+      experienceId,
+      'test-reviewer',
+      true,
+      '测试用自动批准',
+    );
 
     // 4. 测试定时任务
     logger.info('4. 测试定时任务');
@@ -96,8 +113,64 @@ async function testCompleteAgentFlow() {
     writeTasksSnapshot(TEST_GROUP.folder, TEST_GROUP.isMain!, allTasks);
     logger.info(`   任务快照创建成功`);
 
-    // 6. 直接测试容器运行（跳过，因为需要Docker）
-    logger.info('6. 跳过容器运行测试（需要Docker环境）');
+    logger.info('6. 测试容器启动与消息链路');
+    const hasDocker = (() => {
+      try {
+        execSync('docker info', { stdio: 'ignore' });
+        return true;
+      } catch {
+        return false;
+      }
+    })();
+    const envFileSecrets = readEnvFile([
+      'CLAUDE_CODE_OAUTH_TOKEN',
+      'ANTHROPIC_API_KEY',
+      'ANTHROPIC_AUTH_TOKEN',
+    ]);
+    const hasApiCredential = Boolean(
+      process.env.ANTHROPIC_API_KEY ||
+      process.env.ANTHROPIC_AUTH_TOKEN ||
+      process.env.CLAUDE_CODE_OAUTH_TOKEN ||
+      envFileSecrets.CLAUDE_CODE_OAUTH_TOKEN ||
+      envFileSecrets.ANTHROPIC_API_KEY ||
+      envFileSecrets.ANTHROPIC_AUTH_TOKEN,
+    );
+    if (!hasDocker || !hasApiCredential) {
+      logger.warn(
+        {
+          hasDocker,
+          hasApiCredential,
+        },
+        '容器链路测试已跳过，缺少Docker或模型凭证',
+      );
+    } else {
+      let streamedOutputCount = 0;
+      const containerInput: ContainerInput = {
+        prompt: '请回复: E2E_CONTAINER_OK',
+        groupFolder: TEST_GROUP.folder,
+        chatJid: 'test:container-e2e',
+        isMain: false,
+      };
+      const containerResult = await runContainerAgent(
+        TEST_GROUP,
+        containerInput,
+        () => undefined,
+        async (output) => {
+          if (output.status === 'success' && output.result !== null) {
+            streamedOutputCount += 1;
+          }
+        },
+      );
+      if (containerResult.status !== 'success') {
+        throw new Error(
+          `容器链路测试失败: ${containerResult.error || 'unknown error'}`,
+        );
+      }
+      if (streamedOutputCount === 0) {
+        throw new Error('容器链路测试失败: 未收到流式输出');
+      }
+      logger.info('   容器启动与消息链路验证成功');
+    }
 
     // 7. 验证记忆和经验
     logger.info('7. 验证记忆和经验');
@@ -106,7 +179,7 @@ async function testCompleteAgentFlow() {
     const memories = await memoryManager.searchMemories(
       TEST_GROUP.folder,
       '测试记忆',
-      5
+      5,
     );
     logger.info(`   找到相关记忆：${memories.length}个`);
     if (memories.length === 0) {
@@ -138,7 +211,9 @@ async function testCompleteAgentFlow() {
     // 清理进化经验（需要先删除，避免外键约束）
     const db = TestDatabaseHelper.getDatabase();
     if (db) {
-      db.prepare('DELETE FROM evolution_log WHERE source_agent_id = ?').run(testAgent.id);
+      db.prepare('DELETE FROM evolution_log WHERE source_agent_id = ?').run(
+        testAgent.id,
+      );
     }
 
     // 清理测试 agent
@@ -152,7 +227,6 @@ async function testCompleteAgentFlow() {
     logger.info('   测试数据清理成功');
 
     logger.info('=== 测试完成 ===');
-
   } catch (error) {
     logger.error('=== 测试失败 ===');
     logger.error(error);
@@ -170,4 +244,6 @@ async function testCompleteAgentFlow() {
 }
 
 // 运行测试
-testCompleteAgentFlow().then(() => process.exit(0)).catch(() => process.exit(1));
+testCompleteAgentFlow()
+  .then(() => process.exit(0))
+  .catch(() => process.exit(1));
