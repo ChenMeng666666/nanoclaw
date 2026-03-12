@@ -55,7 +55,9 @@ describe('collaboration scheduler wakeup', () => {
     scheduleAgentWakeup(task, 'agent-a', 'msg-1');
     scheduleAgentWakeup(task, 'agent-a', 'msg-2');
 
-    const all = getAllTasks().filter((item) => item.id === 'collab-wakeup-task-2-agent-a');
+    const all = getAllTasks().filter(
+      (item) => item.id === 'collab-wakeup-task-2-agent-a',
+    );
     expect(all).toHaveLength(1);
     expect(all[0].status).toBe('active');
   });

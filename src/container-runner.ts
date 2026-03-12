@@ -261,7 +261,8 @@ function buildContainerArgs(
 ): string[] {
   const args: string[] = ['run', '-i', '--rm', '--name', containerName];
 
-  const networkMode = group.containerConfig?.networkMode || CONTAINER_NETWORK_MODE;
+  const networkMode =
+    group.containerConfig?.networkMode || CONTAINER_NETWORK_MODE;
   args.push('--network', networkMode);
 
   const shouldAddHostGateway =

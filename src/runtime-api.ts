@@ -353,7 +353,10 @@ export async function startRuntimeAPI(
             resources: need.resources,
             createdAt: new Date().toISOString(),
           })),
-          estimatedTime: needs.reduce((sum, need) => sum + need.estimatedTime, 0),
+          estimatedTime: needs.reduce(
+            (sum, need) => sum + need.estimatedTime,
+            0,
+          ),
           priority: inferPlanPriority(needs),
         };
 
@@ -1370,7 +1373,11 @@ export async function analyzeLearningNeeds(
       .filter(Boolean)
       .slice(0, 6);
     for (const line of lines) {
-      if (line.includes('困难') || line.includes('问题') || line.includes('改进')) {
+      if (
+        line.includes('困难') ||
+        line.includes('问题') ||
+        line.includes('改进')
+      ) {
         pushNeed({
           topic: `改进点：${line.replace(/^[-*]\s*/, '').slice(0, 40)}`,
           level: 'intermediate',
@@ -1439,13 +1446,19 @@ export function analyzeLearningOutcome(taskId: string): {
     taskId,
     knowledgeGained: points.slice(0, 5),
     difficulties: reflections.length
-      ? points.filter((p) => p.includes('困难') || p.includes('问题')).slice(0, 3)
+      ? points
+          .filter((p) => p.includes('困难') || p.includes('问题'))
+          .slice(0, 3)
       : ['尚无任务反思，建议先完成任务并触发反思'],
     solutions: points
-      .filter((p) => p.includes('解决') || p.includes('改进') || p.includes('优化'))
+      .filter(
+        (p) => p.includes('解决') || p.includes('改进') || p.includes('优化'),
+      )
       .slice(0, 3),
     suggestions: [
-      task.status === 'completed' ? '将本次经验同步到进化库' : '先推进任务到 completed',
+      task.status === 'completed'
+        ? '将本次经验同步到进化库'
+        : '先推进任务到 completed',
       '补充可量化指标（耗时、质量评分）',
     ],
   };
@@ -1479,11 +1492,15 @@ export async function generateRuntimeReflection(
   agentFolder: string,
   type: string,
 ): Promise<DetailedReflection> {
-  const taskType = ['hourly', 'daily', 'weekly', 'monthly', 'task'].includes(type)
+  const taskType = ['hourly', 'daily', 'weekly', 'monthly', 'task'].includes(
+    type,
+  )
     ? (type as 'hourly' | 'daily' | 'weekly' | 'monthly' | 'task')
     : 'task';
   const tasks = getLearningTasksByAgent(agentFolder).slice(0, 20);
-  const completedCount = tasks.filter((task) => task.status === 'completed').length;
+  const completedCount = tasks.filter(
+    (task) => task.status === 'completed',
+  ).length;
   const failedCount = tasks.filter((task) => task.status === 'failed').length;
   const recentMemories = await memoryManager.searchMemories(
     agentFolder,
@@ -1494,9 +1511,10 @@ export async function generateRuntimeReflection(
   const content = [
     `反思类型：${taskType}`,
     `已完成任务：${completedCount}，失败任务：${failedCount}`,
-    `重点观察：${recentMemories
-      .map((memory) => memory.content.slice(0, 30))
-      .join('；') || '暂无近期学习记忆'}`,
+    `重点观察：${
+      recentMemories.map((memory) => memory.content.slice(0, 30)).join('；') ||
+      '暂无近期学习记忆'
+    }`,
     `下一步：优先处理失败任务并量化学习指标`,
   ].join('\n');
 
@@ -1517,7 +1535,9 @@ export async function generateRuntimeReflection(
     difficulties: failedCount > 0 ? ['存在失败任务待复盘'] : ['暂无明显阻塞'],
     solutions: ['按优先级处理失败任务', '更新学习计划中的依赖关系'],
     suggestions: ['每次任务完成后立即生成反思'],
-    keyInsights: [`完成率：${tasks.length === 0 ? 0 : Math.round((completedCount / tasks.length) * 100)}%`],
+    keyInsights: [
+      `完成率：${tasks.length === 0 ? 0 : Math.round((completedCount / tasks.length) * 100)}%`,
+    ],
     nextSteps: ['继续跟踪学习成果并记录到记忆系统'],
     rating: failedCount > 0 ? 3 : 4,
     createdAt: new Date().toISOString(),
@@ -1531,14 +1551,18 @@ export async function generateDailySummary(
   const allTasks = getLearningTasksByAgent(agentFolder);
   const tasksCompleted = allTasks.filter((task) => task.status === 'completed');
   const taskList =
-    providedTasks && providedTasks.length > 0
-      ? providedTasks
-      : tasksCompleted;
+    providedTasks && providedTasks.length > 0 ? providedTasks : tasksCompleted;
   const reflections = getReflectionsByAgent(agentFolder, 'daily').slice(0, 3);
-  const memories = await memoryManager.searchMemories(agentFolder, '学习 总结', 8);
+  const memories = await memoryManager.searchMemories(
+    agentFolder,
+    '学习 总结',
+    8,
+  );
   const knowledgePoints = new Set<string>();
   for (const memory of memories) {
-    splitToPoints(memory.content).forEach((point) => knowledgePoints.add(point));
+    splitToPoints(memory.content).forEach((point) =>
+      knowledgePoints.add(point),
+    );
   }
 
   return {
@@ -1597,7 +1621,10 @@ async function getLearningNeedsLlmProvider(): Promise<LocalLLMQueryExpansionProv
       .initialize()
       .then(() => undefined)
       .catch((err) => {
-        logger.warn({ err }, 'Failed to initialize learning-needs LLM provider');
+        logger.warn(
+          { err },
+          'Failed to initialize learning-needs LLM provider',
+        );
         learningNeedsLlmProvider = null;
       })
       .finally(() => {
