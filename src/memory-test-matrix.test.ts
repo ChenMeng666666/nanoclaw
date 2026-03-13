@@ -25,6 +25,7 @@ import {
 } from './db-agents.js';
 import { MemoryManager } from './memory-manager.js';
 import { MEMORY_CONFIG } from './config.js';
+import { BM25Index } from './hybrid-search.js';
 
 describe('memory test matrix', () => {
   beforeEach(() => {
@@ -226,5 +227,37 @@ describe('memory test matrix', () => {
       rows[0].content.includes('alpha cache strategy for query ranking'),
     ).toBe(true);
     expect(rows[0].qualityScore).toBeDefined();
+  });
+
+  it('caps hybrid candidate search limit by API max limit', async () => {
+    const now = new Date().toISOString();
+    createMemory({
+      id: 'm-limit-1',
+      agentFolder: 'agent-memory-matrix',
+      userJid: 'u-matrix',
+      scope: 'user',
+      level: 'L2',
+      content: 'alpha search candidate',
+      embedding: [1, 0, 0],
+      importance: 0.6,
+      sourceType: 'direct',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const spy = vi.spyOn(BM25Index.prototype, 'searchWithScores');
+    const manager = new MemoryManager();
+    await manager.searchMemoriesDetailed(
+      'agent-memory-matrix',
+      'alpha',
+      MEMORY_CONFIG.api.maxLimit + 20,
+      'u-matrix',
+    );
+
+    const calledLimits = spy.mock.calls.map((call) => call[1]);
+    expect(calledLimits.every((v) => v <= MEMORY_CONFIG.api.maxLimit)).toBe(
+      true,
+    );
+    spy.mockRestore();
   });
 });

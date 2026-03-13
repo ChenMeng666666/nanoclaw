@@ -404,7 +404,10 @@ export class MemoryManager {
       return [];
     }
     const queryVariants = this.generateQueryVariants(query);
-    const searchLimit = Math.max(limit * 3, MEMORY_CONFIG.api.maxLimit);
+    const searchLimit = Math.min(
+      Math.max(limit * 3, limit),
+      MEMORY_CONFIG.api.maxLimit,
+    );
     const bm25Index = new BM25Index();
     for (const memory of memories) {
       bm25Index.addDocument(memory.id, memory.content);

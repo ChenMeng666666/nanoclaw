@@ -62,6 +62,15 @@ describe('BM25Index', () => {
     expect(results).toEqual([]); // doc1 已删除，不应该匹配
   });
 
+  it('should recalculate average length correctly after removal', () => {
+    index.addDocument('doc1', 'alpha alpha alpha alpha alpha alpha');
+    index.addDocument('doc2', 'beta');
+    index.removeDocument('doc1');
+
+    expect((index as any).docCount).toBe(1);
+    expect((index as any).avgDocLength).toBe(1);
+  });
+
   it('should update documents', () => {
     index.addDocument('doc1', 'the cat sat on the mat');
     index.addDocument('doc1', 'the dog ran in the park'); // 更新

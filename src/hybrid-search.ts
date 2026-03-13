@@ -82,7 +82,9 @@ export class BM25Index {
       0,
     );
     this.docCount = this.documents.size - 1;
-    this.avgDocLength = this.docCount > 0 ? totalLength / this.docCount : 0;
+    const nextTotalLength = Math.max(0, totalLength - oldLength);
+    this.avgDocLength =
+      this.docCount > 0 ? nextTotalLength / this.docCount : 0;
 
     // 移除文档长度
     this.docLengths.delete(id);

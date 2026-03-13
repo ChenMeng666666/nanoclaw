@@ -25,7 +25,7 @@ import {
 } from '../hybrid-search.js';
 import { generateEmbedding as generateEmbeddingFromProvider } from '../embedding-providers/registry.js';
 import { sharedStateManager } from './shared-state.js';
-import { ASSISTANT_NAME } from '../config.js';
+import { ASSISTANT_NAME, MEMORY_CONFIG } from '../config.js';
 
 // 嵌入缓存（避免重复计算）
 const embeddingCache = new Map<
@@ -172,8 +172,8 @@ export class DefaultContextEngine implements ContextEngine {
         id: this.generateMemoryId(),
         agentFolder: this.agentFolder,
         userJid: message.sender,
-        sessionId: context.sessionId || message.chat_jid,
-        scope: context.sessionId || message.chat_jid ? 'session' : 'user',
+        sessionId: context.sessionId,
+        scope: context.sessionId ? 'session' : 'user',
         level: 'L2',
         content,
         embedding,
@@ -578,7 +578,10 @@ export class DefaultContextEngine implements ContextEngine {
           llmVariants instanceof Promise ? await llmVariants : llmVariants;
 
         if (resolvedVariants && resolvedVariants.length > 0) {
-          return [text, ...resolvedVariants].slice(0, 5);
+          return [text, ...resolvedVariants].slice(
+            0,
+            MEMORY_CONFIG.retrieval.queryVariantLimit,
+          );
         }
       } catch (err) {
         logger.warn(
@@ -628,7 +631,7 @@ export class DefaultContextEngine implements ContextEngine {
     }
 
     // 限制变体数量
-    return variants.slice(0, 5);
+    return variants.slice(0, MEMORY_CONFIG.retrieval.queryVariantLimit);
   }
 
   /**
@@ -717,12 +720,20 @@ export class DefaultContextEngine implements ContextEngine {
     let result = text;
     for (const [word, synList] of Object.entries(synonyms)) {
       const regex = new RegExp(`\\b${word}\\b`, 'g');
-      // 随机选择一个同义词替换
-      const replacement = synList[Math.floor(Math.random() * synList.length)];
+      const replacement = this.selectDeterministicSynonym(word, synList);
       result = result.replace(regex, replacement);
     }
 
     return result;
+  }
+
+  private selectDeterministicSynonym(word: string, candidates: string[]): string {
+    if (candidates.length === 0) {
+      return word;
+    }
+    const hash = crypto.createHash('sha256').update(word).digest();
+    const index = hash[0] % candidates.length;
+    return candidates[index];
   }
 
   /**
