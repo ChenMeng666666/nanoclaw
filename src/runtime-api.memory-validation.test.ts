@@ -9,6 +9,7 @@ import { _initTestDatabase } from './db.js';
 import { createAgent } from './db-agents.js';
 import { startRuntimeAPI } from './runtime-api.js';
 import { MEMORY_CONFIG } from './config.js';
+import { memoryManager } from './memory-manager.js';
 
 describe('runtime api memory validation', () => {
   let server: import('http').Server | null = null;
@@ -45,6 +46,7 @@ describe('runtime api memory validation', () => {
     }
     delete process.env.RUNTIME_API_KEY;
     delete process.env.RUNTIME_API_ENABLED;
+    vi.restoreAllMocks();
   });
 
   it('rejects invalid level and invalid limit', async () => {
@@ -188,5 +190,71 @@ describe('runtime api memory validation', () => {
     expect(response.status).toBe(200);
     expect(body.memories?.length).toBeGreaterThan(0);
     expect(body.memories?.[0]?.explain?.scores?.final).toBeTypeOf('number');
+  });
+
+  it('enforces memory api rate limiting', async () => {
+    const headers = {
+      'content-type': 'application/json',
+      'x-api-key': 'test-key',
+      'x-forwarded-for': `rate-limit-${Date.now()}`,
+    };
+    const total = 160;
+    let limited = false;
+    for (let i = 0; i < total; i++) {
+      const response = await fetch(
+        `${baseUrl}/api/memory/list?agentFolder=agent-runtime-api-memory`,
+        {
+          method: 'GET',
+          headers,
+        },
+      );
+      if (response.status === 429) {
+        const body = (await response.json()) as { code?: string };
+        expect(body.code).toBe('RATE_LIMIT_EXCEEDED');
+        limited = true;
+        break;
+      }
+    }
+    expect(limited).toBe(true);
+  });
+
+  it('rejects excessive concurrent memory searches', async () => {
+    vi.spyOn(memoryManager, 'searchMemoriesDetailed').mockImplementation(
+      async () =>
+        await new Promise((resolve) =>
+          setTimeout(
+            () => resolve([]),
+            MEMORY_CONFIG.api.searchTimeoutMs - 400,
+          ),
+        ),
+    );
+    const headers = {
+      'content-type': 'application/json',
+      'x-api-key': 'test-key',
+      'x-forwarded-for': `concurrency-${Date.now()}`,
+    };
+    const requests = Array.from(
+      { length: MEMORY_CONFIG.api.maxConcurrentSearches + 2 },
+      () =>
+        fetch(`${baseUrl}/api/memory/search`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            agentFolder: 'agent-runtime-api-memory',
+            query: 'parallel load',
+            limit: 3,
+          }),
+        }),
+    );
+    const responses = await Promise.all(requests);
+    const rejected = responses.filter((item) => item.status === 429);
+    expect(rejected.length).toBeGreaterThan(0);
+    if (rejected.length > 0) {
+      const payload = (await rejected[0].json()) as { code?: string };
+      expect(
+        payload.code === 'MEMORY_SEARCH_CONCURRENCY_LIMIT' ||
+          payload.code === 'RATE_LIMIT_EXCEEDED',
+      ).toBe(true);
+    }
   });
 });

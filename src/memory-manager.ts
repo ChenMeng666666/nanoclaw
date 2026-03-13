@@ -341,14 +341,56 @@ export class MemoryManager {
    */
   async migrateMemories(): Promise<number> {
     const allMemories = [...getAllMemories('L1'), ...getAllMemories('L2')];
-    let migratedCount = 0;
-
     for (const memory of allMemories) {
       this.applyLifecycleGovernance(memory);
-      const migration = this.shouldMigrateMemory(memory);
-      if (migration.should) {
-        await this.migrateMemory(memory, migration.targetLevel!);
-        migratedCount += 1;
+    }
+    const migrationPlans = allMemories
+      .map((memory) => ({
+        memory,
+        decision: this.shouldMigrateMemory(memory),
+      }))
+      .filter(
+        (
+          item,
+        ): item is {
+          memory: Memory;
+          decision: { should: true; targetLevel: 'L2' | 'L3' };
+        } => item.decision.should && Boolean(item.decision.targetLevel),
+      );
+    if (migrationPlans.length === 0) {
+      return 0;
+    }
+    let migratedCount = 0;
+    const batchSize = MEMORY_CONFIG.retrieval.migrationBatchSize;
+    const concurrency = MEMORY_CONFIG.retrieval.migrationConcurrency;
+    for (
+      let batchStart = 0;
+      batchStart < migrationPlans.length;
+      batchStart += batchSize
+    ) {
+      const batch = migrationPlans.slice(batchStart, batchStart + batchSize);
+      for (let i = 0; i < batch.length; i += concurrency) {
+        const chunk = batch.slice(i, i + concurrency);
+        const results = await Promise.allSettled(
+          chunk.map((item) =>
+            this.migrateMemory(item.memory, item.decision.targetLevel),
+          ),
+        );
+        for (const result of results) {
+          if (result.status === 'fulfilled') {
+            migratedCount += 1;
+          } else {
+            logger.warn(
+              {
+                err:
+                  result.reason instanceof Error
+                    ? result.reason.message
+                    : String(result.reason),
+              },
+              'Memory migration task failed',
+            );
+          }
+        }
       }
     }
     return migratedCount;
@@ -416,36 +458,57 @@ export class MemoryManager {
     const vectorScoreMap = new Map<string, number>();
     const allBm25Ids: string[] = [];
     const allVectorIds: string[] = [];
-    for (const variant of queryVariants) {
-      const bm25Results = bm25Index.searchWithScores(variant, searchLimit);
-      for (const item of bm25Results) {
-        const current = bm25ScoreMap.get(item.id) ?? 0;
-        if (item.score > current) {
-          bm25ScoreMap.set(item.id, item.score);
+    const vectorCandidates = this.selectVectorCandidates(memories, searchLimit);
+    const variantBatchSize = MEMORY_CONFIG.retrieval.variantBatchSize;
+    for (
+      let start = 0;
+      start < queryVariants.length;
+      start += variantBatchSize
+    ) {
+      const variantBatch = queryVariants.slice(start, start + variantBatchSize);
+      const batchResults = await Promise.all(
+        variantBatch.map(async (variant) => {
+          const bm25Results = bm25Index.searchWithScores(variant, searchLimit);
+          const queryEmbedding = await generateEmbedding(variant);
+          if (queryEmbedding.length === 0) {
+            return {
+              bm25Results,
+              vectorResults: [] as Array<{ id: string; score: number }>,
+            };
+          }
+          const vectorResults = vectorCandidates
+            .filter(
+              (m) =>
+                m.embedding && m.embedding.length === queryEmbedding.length,
+            )
+            .map((memory) => ({
+              id: memory.id,
+              score: this.cosineSimilarity(queryEmbedding, memory.embedding!),
+            }))
+            .filter(
+              (item) =>
+                item.score >= MEMORY_CONFIG.retrieval.vectorSearchMinScore,
+            )
+            .sort((a, b) => b.score - a.score)
+            .slice(0, searchLimit);
+          return { bm25Results, vectorResults };
+        }),
+      );
+      for (const result of batchResults) {
+        for (const item of result.bm25Results) {
+          const current = bm25ScoreMap.get(item.id) ?? 0;
+          if (item.score > current) {
+            bm25ScoreMap.set(item.id, item.score);
+          }
+          allBm25Ids.push(item.id);
         }
-        allBm25Ids.push(item.id);
-      }
-      const queryEmbedding = await generateEmbedding(variant);
-      if (queryEmbedding.length === 0) {
-        continue;
-      }
-      const vectorResults = memories
-        .filter(
-          (m) => m.embedding && m.embedding.length === queryEmbedding.length,
-        )
-        .map((memory) => ({
-          id: memory.id,
-          score: this.cosineSimilarity(queryEmbedding, memory.embedding!),
-        }))
-        .filter((item) => item.score > 0)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, searchLimit);
-      for (const item of vectorResults) {
-        const current = vectorScoreMap.get(item.id) ?? 0;
-        if (item.score > current) {
-          vectorScoreMap.set(item.id, item.score);
+        for (const item of result.vectorResults) {
+          const current = vectorScoreMap.get(item.id) ?? 0;
+          if (item.score > current) {
+            vectorScoreMap.set(item.id, item.score);
+          }
+          allVectorIds.push(item.id);
         }
-        allVectorIds.push(item.id);
       }
     }
     const uniqueBm25 = [...new Set(allBm25Ids)];
@@ -463,7 +526,7 @@ export class MemoryManager {
     );
     const queryTerms = this.extractKeywords(query);
     const scoredHits = [...new Set([...uniqueBm25, ...uniqueVector])]
-      .map((id) => {
+      .map((id): MemorySearchHit | null => {
         const memory = memoryMap.get(id);
         if (!memory) {
           return null;
@@ -509,9 +572,9 @@ export class MemoryManager {
             level: memory.level,
             tags: memory.tags,
           },
-        } satisfies MemorySearchHit;
+        };
       })
-      .filter((item): item is MemorySearchHit => Boolean(item))
+      .filter((item): item is MemorySearchHit => item !== null)
       .sort((a, b) => b.explain.scores.final - a.explain.scores.final)
       .slice(0, limit);
     for (const hit of scoredHits) {
@@ -879,6 +942,74 @@ export class MemoryManager {
     }
 
     return { should: false };
+  }
+
+  private selectVectorCandidates(memories: Memory[], limit: number): Memory[] {
+    if (memories.length <= limit) {
+      return memories;
+    }
+    const candidateLimit = Math.min(
+      memories.length,
+      Math.max(
+        limit * MEMORY_CONFIG.retrieval.vectorCandidateMultiplier,
+        limit,
+      ),
+    );
+    const hotTarget = Math.max(
+      1,
+      Math.floor(candidateLimit * MEMORY_CONFIG.retrieval.hotCandidateRatio),
+    );
+    const coldTarget = Math.max(0, candidateLimit - hotTarget);
+    const hot = memories
+      .filter((memory) => this.isHotMemory(memory))
+      .sort((a, b) => this.rankMemoryHotness(b) - this.rankMemoryHotness(a))
+      .slice(0, hotTarget);
+    const hotIds = new Set(hot.map((memory) => memory.id));
+    const cold = memories
+      .filter((memory) => !hotIds.has(memory.id))
+      .sort((a, b) => this.rankMemoryHotness(b) - this.rankMemoryHotness(a))
+      .slice(0, coldTarget);
+    return [...hot, ...cold];
+  }
+
+  private isHotMemory(memory: Memory): boolean {
+    if (memory.level === 'L1') {
+      return true;
+    }
+    if (memory.level === 'L2' && memory.accessCount >= 2) {
+      return true;
+    }
+    const anchor = memory.lastAccessedAt || memory.updatedAt;
+    const timestamp = new Date(anchor).getTime();
+    if (Number.isNaN(timestamp)) {
+      return false;
+    }
+    const hotWindowMs =
+      MEMORY_CONFIG.retrieval.hotMemoryWindowDays * 24 * 60 * 60 * 1000;
+    return Date.now() - timestamp <= hotWindowMs;
+  }
+
+  private rankMemoryHotness(memory: Memory): number {
+    const anchor = memory.lastAccessedAt || memory.updatedAt;
+    const timestamp = new Date(anchor).getTime();
+    const recencyScore = Number.isNaN(timestamp)
+      ? 0
+      : Math.max(
+          0,
+          1 -
+            (Date.now() - timestamp) /
+              (MEMORY_CONFIG.retrieval.hotMemoryWindowDays *
+                24 *
+                60 *
+                60 *
+                1000),
+        );
+    return (
+      (memory.accessCount || 0) * 0.4 +
+      (memory.importance || 0) * 0.25 +
+      (memory.qualityScore || 0) * 0.2 +
+      recencyScore * 0.15
+    );
   }
 
   private async migrateMemory(

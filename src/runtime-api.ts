@@ -42,7 +42,11 @@ import {
 import { getAllTasks, getTasksForGroup } from './db.js';
 import { logger } from './logger.js';
 import { safeJsonParse } from './security.js';
-import { MEMORY_CONFIG, RUNTIME_API_CONFIG } from './config.js';
+import {
+  MEMORY_CONFIG,
+  RUNTIME_API_CONFIG,
+  SECURITY_CONFIG,
+} from './config.js';
 import { LocalLLMQueryExpansionProvider } from './query-expansion/local-llm-provider.js';
 import type {
   LearningNeed,
@@ -74,6 +78,11 @@ const MEMORY_MESSAGE_TYPES = new Set([
   'code',
   'document',
 ]);
+const memoryRateBucket = new Map<
+  string,
+  { count: number; windowStart: number }
+>();
+const MEMORY_RATE_BUCKET_MAX_KEYS = 20000;
 
 // 检查端口是否可用
 function checkPortAvailable(port: number): Promise<boolean> {
@@ -127,6 +136,7 @@ export async function startRuntimeAPI(
   options: Partial<RuntimeAPIOptions> = {},
 ): Promise<http.Server> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
+  let inFlightMemorySearches = 0;
 
   if (!opts.enabled) {
     logger.info('Runtime API disabled');
@@ -197,6 +207,20 @@ export async function startRuntimeAPI(
     const path = url.pathname;
 
     try {
+      if (
+        isMemoryApiPath(path) &&
+        SECURITY_CONFIG.networkSecurity.enableRateLimiting
+      ) {
+        const clientId = resolveClientIdentity(req);
+        if (!consumeRateLimitToken(clientId, Date.now())) {
+          throw createApiError(
+            429,
+            'RATE_LIMIT_EXCEEDED',
+            'Too many memory API requests',
+          );
+        }
+      }
+
       // ===== 记忆 API =====
 
       if (path === '/api/memory/search' && req.method === 'POST') {
@@ -221,7 +245,15 @@ export async function startRuntimeAPI(
         const tags = parseOptionalStringArray(body.tags, 'tags');
         const normalizedScope = normalizeMemoryScope(scope, sessionId);
 
-        const hits = await memoryManager.searchMemoriesDetailed(
+        if (inFlightMemorySearches >= MEMORY_CONFIG.api.maxConcurrentSearches) {
+          throw createApiError(
+            429,
+            'MEMORY_SEARCH_CONCURRENCY_LIMIT',
+            'too many concurrent memory searches',
+          );
+        }
+        inFlightMemorySearches += 1;
+        const searchPromise = memoryManager.searchMemoriesDetailed(
           agentFolder,
           query,
           limit,
@@ -233,6 +265,18 @@ export async function startRuntimeAPI(
             messageType,
             tags,
           },
+        );
+        searchPromise.finally(() => {
+          inFlightMemorySearches = Math.max(0, inFlightMemorySearches - 1);
+        });
+        const hits = await withTimeout(
+          searchPromise,
+          MEMORY_CONFIG.api.searchTimeoutMs,
+          createApiError(
+            504,
+            'MEMORY_SEARCH_TIMEOUT',
+            `memory search timeout after ${MEMORY_CONFIG.api.searchTimeoutMs}ms`,
+          ),
         );
 
         writeJSON(res, 200, {
@@ -1981,6 +2025,82 @@ function parseMemoryLimit(value: unknown): number {
     );
   }
   return value;
+}
+
+function isMemoryApiPath(path: string): boolean {
+  return (
+    path === '/api/memory/search' ||
+    path === '/api/memory/add' ||
+    path === '/api/memory/list'
+  );
+}
+
+function resolveClientIdentity(req: http.IncomingMessage): string {
+  if (RUNTIME_API_CONFIG.trustProxy) {
+    const xForwardedFor = req.headers['x-forwarded-for'];
+    if (typeof xForwardedFor === 'string') {
+      const forwarded = xForwardedFor.split(',')[0]?.trim();
+      if (forwarded) {
+        return forwarded;
+      }
+    }
+  }
+  return req.socket.remoteAddress || 'unknown';
+}
+
+function consumeRateLimitToken(clientId: string, now: number): boolean {
+  const windowMs = SECURITY_CONFIG.networkSecurity.rateLimitWindow;
+  const maxCount = SECURITY_CONFIG.networkSecurity.rateLimit;
+  if (memoryRateBucket.size > MEMORY_RATE_BUCKET_MAX_KEYS) {
+    cleanupRateLimitBucket(now, windowMs);
+  }
+  const current = memoryRateBucket.get(clientId);
+  if (!current || now - current.windowStart >= windowMs) {
+    memoryRateBucket.set(clientId, { count: 1, windowStart: now });
+    return true;
+  }
+  if (current.count >= maxCount) {
+    return false;
+  }
+  current.count += 1;
+  memoryRateBucket.set(clientId, current);
+  return true;
+}
+
+function cleanupRateLimitBucket(now: number, windowMs: number): void {
+  for (const [key, value] of memoryRateBucket.entries()) {
+    if (now - value.windowStart > windowMs * 2) {
+      memoryRateBucket.delete(key);
+    }
+  }
+  if (memoryRateBucket.size > MEMORY_RATE_BUCKET_MAX_KEYS) {
+    const entries = [...memoryRateBucket.entries()].sort(
+      (a, b) => a[1].windowStart - b[1].windowStart,
+    );
+    const removeCount = memoryRateBucket.size - MEMORY_RATE_BUCKET_MAX_KEYS;
+    for (let i = 0; i < removeCount; i++) {
+      memoryRateBucket.delete(entries[i][0]);
+    }
+  }
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutError: Error,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(timeoutError), timeoutMs);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
 }
 
 interface ApiError extends Error {

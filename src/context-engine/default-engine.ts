@@ -481,19 +481,32 @@ export class DefaultContextEngine implements ContextEngine {
     // 对每个查询变体执行搜索，然后合并结果
     const allBm25Results: string[] = [];
     const allVectorResults: string[] = [];
-
-    for (const query of queryVariants) {
-      // BM25 搜索
-      const bm25Results = this.bm25Index.search(query, limit * 2);
-      allBm25Results.push(...bm25Results);
-
-      // 向量搜索
-      const vectorResults = await this.vectorSearch(
-        query,
-        limit * 2,
-        scopedMemories,
+    const vectorCandidates = this.selectVectorCandidates(
+      scopedMemories,
+      limit * 2,
+    );
+    const variantBatchSize = MEMORY_CONFIG.retrieval.variantBatchSize;
+    for (
+      let start = 0;
+      start < queryVariants.length;
+      start += variantBatchSize
+    ) {
+      const variantBatch = queryVariants.slice(start, start + variantBatchSize);
+      const batchResults = await Promise.all(
+        variantBatch.map(async (query) => {
+          const bm25Results = this.bm25Index.search(query, limit * 2);
+          const vectorResults = await this.vectorSearch(
+            query,
+            limit * 2,
+            vectorCandidates,
+          );
+          return { bm25Results, vectorResults };
+        }),
       );
-      allVectorResults.push(...vectorResults);
+      for (const result of batchResults) {
+        allBm25Results.push(...result.bm25Results);
+        allVectorResults.push(...result.vectorResults);
+      }
     }
 
     // 去重
@@ -830,11 +843,81 @@ export class DefaultContextEngine implements ContextEngine {
         id: memory.id,
         score: this.cosineSimilarity(queryEmbedding, memory.embedding!),
       }))
-      .filter((item) => item.score > 0)
+      .filter(
+        (item) => item.score >= MEMORY_CONFIG.retrieval.vectorSearchMinScore,
+      )
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
 
     return scored.map((s) => s.id);
+  }
+
+  private selectVectorCandidates(memories: Memory[], limit: number): Memory[] {
+    if (memories.length <= limit) {
+      return memories;
+    }
+    const candidateLimit = Math.min(
+      memories.length,
+      Math.max(
+        limit * MEMORY_CONFIG.retrieval.vectorCandidateMultiplier,
+        limit,
+      ),
+    );
+    const hotTarget = Math.max(
+      1,
+      Math.floor(candidateLimit * MEMORY_CONFIG.retrieval.hotCandidateRatio),
+    );
+    const coldTarget = Math.max(0, candidateLimit - hotTarget);
+    const hot = memories
+      .filter((memory) => this.isHotMemory(memory))
+      .sort((a, b) => this.rankMemoryHotness(b) - this.rankMemoryHotness(a))
+      .slice(0, hotTarget);
+    const hotIds = new Set(hot.map((memory) => memory.id));
+    const cold = memories
+      .filter((memory) => !hotIds.has(memory.id))
+      .sort((a, b) => this.rankMemoryHotness(b) - this.rankMemoryHotness(a))
+      .slice(0, coldTarget);
+    return [...hot, ...cold];
+  }
+
+  private isHotMemory(memory: Memory): boolean {
+    if (memory.level === 'L1') {
+      return true;
+    }
+    if (memory.level === 'L2' && memory.accessCount >= 2) {
+      return true;
+    }
+    const anchor = memory.lastAccessedAt || memory.updatedAt;
+    const timestamp = new Date(anchor).getTime();
+    if (Number.isNaN(timestamp)) {
+      return false;
+    }
+    const hotWindowMs =
+      MEMORY_CONFIG.retrieval.hotMemoryWindowDays * 24 * 60 * 60 * 1000;
+    return Date.now() - timestamp <= hotWindowMs;
+  }
+
+  private rankMemoryHotness(memory: Memory): number {
+    const anchor = memory.lastAccessedAt || memory.updatedAt;
+    const timestamp = new Date(anchor).getTime();
+    const recencyScore = Number.isNaN(timestamp)
+      ? 0
+      : Math.max(
+          0,
+          1 -
+            (Date.now() - timestamp) /
+              (MEMORY_CONFIG.retrieval.hotMemoryWindowDays *
+                24 *
+                60 *
+                60 *
+                1000),
+        );
+    return (
+      (memory.accessCount || 0) * 0.4 +
+      (memory.importance || 0) * 0.25 +
+      (memory.qualityScore || 0) * 0.2 +
+      recencyScore * 0.15
+    );
   }
 
   private getMemoriesByIds(ids: string[], memories: Memory[]): Memory[] {

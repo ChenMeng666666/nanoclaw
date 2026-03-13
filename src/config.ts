@@ -214,6 +214,12 @@ export const RUNTIME_API_CONFIG = {
   port: parseInt(process.env.RUNTIME_API_PORT || '3456', 10),
   fallbackPorts: [3457, 3458, 3459],
   portCheckTimeout: 5000,
+  trustProxy: validateConfig(
+    (process.env.RUNTIME_API_TRUST_PROXY || 'false') === 'true',
+    validateBoolean,
+    false,
+    'RUNTIME_API_TRUST_PROXY',
+  ),
 };
 
 export const MEMORY_CONFIG = {
@@ -262,6 +268,54 @@ export const MEMORY_CONFIG = {
       (v) => typeof v === 'number' && v >= 0 && v <= 1,
       0.85,
       'MEMORY_CONFLICT_MERGE_THRESHOLD',
+    ),
+    vectorCandidateMultiplier: validateConfig(
+      parseInt(process.env.MEMORY_VECTOR_CANDIDATE_MULTIPLIER || '6', 10),
+      (v) => validateInteger(v, 2, 20),
+      6,
+      'MEMORY_VECTOR_CANDIDATE_MULTIPLIER',
+    ),
+    hotCandidateRatio: validateConfig(
+      parseFloat(process.env.MEMORY_HOT_CANDIDATE_RATIO || '0.8'),
+      (v) => typeof v === 'number' && v >= 0.1 && v <= 1,
+      0.8,
+      'MEMORY_HOT_CANDIDATE_RATIO',
+    ),
+    hotMemoryWindowDays: validateConfig(
+      parseInt(process.env.MEMORY_HOT_MEMORY_WINDOW_DAYS || '14', 10),
+      (v) => validateInteger(v, 1, 3650),
+      14,
+      'MEMORY_HOT_MEMORY_WINDOW_DAYS',
+    ),
+    vectorSearchMinScore: validateConfig(
+      parseFloat(process.env.MEMORY_VECTOR_SEARCH_MIN_SCORE || '0.05'),
+      (v) => typeof v === 'number' && v >= -1 && v <= 1,
+      0.05,
+      'MEMORY_VECTOR_SEARCH_MIN_SCORE',
+    ),
+    variantBatchSize: validateConfig(
+      parseInt(process.env.MEMORY_VARIANT_BATCH_SIZE || '2', 10),
+      (v) => validateInteger(v, 1, 10),
+      2,
+      'MEMORY_VARIANT_BATCH_SIZE',
+    ),
+    queryTimeoutMs: validateConfig(
+      parseInt(process.env.MEMORY_QUERY_TIMEOUT_MS || '2500', 10),
+      (v) => validateInteger(v, 200, 60000),
+      2500,
+      'MEMORY_QUERY_TIMEOUT_MS',
+    ),
+    migrationBatchSize: validateConfig(
+      parseInt(process.env.MEMORY_MIGRATION_BATCH_SIZE || '50', 10),
+      (v) => validateInteger(v, 1, 1000),
+      50,
+      'MEMORY_MIGRATION_BATCH_SIZE',
+    ),
+    migrationConcurrency: validateConfig(
+      parseInt(process.env.MEMORY_MIGRATION_CONCURRENCY || '4', 10),
+      (v) => validateInteger(v, 1, 20),
+      4,
+      'MEMORY_MIGRATION_CONCURRENCY',
     ),
     rerankWeights: {
       fused: validateConfig(
@@ -326,6 +380,18 @@ export const MEMORY_CONFIG = {
       (v) => validateInteger(v, 1, 1000),
       50,
       'MEMORY_API_MAX_LIMIT',
+    ),
+    searchTimeoutMs: validateConfig(
+      parseInt(process.env.MEMORY_API_SEARCH_TIMEOUT_MS || '2500', 10),
+      (v) => validateInteger(v, 200, 60000),
+      2500,
+      'MEMORY_API_SEARCH_TIMEOUT_MS',
+    ),
+    maxConcurrentSearches: validateConfig(
+      parseInt(process.env.MEMORY_API_MAX_CONCURRENT_SEARCHES || '6', 10),
+      (v) => validateInteger(v, 1, 200),
+      6,
+      'MEMORY_API_MAX_CONCURRENT_SEARCHES',
     ),
   },
 };
