@@ -18,6 +18,7 @@ import {
   deleteMemory,
   getUserMemories,
 } from '../db-agents.js';
+import { getMessagesSince } from '../db.js';
 import {
   BM25Index,
   reciprocalRankFusion,
@@ -25,6 +26,7 @@ import {
 } from '../hybrid-search.js';
 import { generateEmbedding as generateEmbeddingFromProvider } from '../embedding-providers/registry.js';
 import { sharedStateManager } from './shared-state.js';
+import { ASSISTANT_NAME } from '../config.js';
 
 // 嵌入缓存（避免重复计算）
 const embeddingCache = new Map<
@@ -461,6 +463,15 @@ export class DefaultContextEngine implements ContextEngine {
 
     // 构建查询文本
     const recentContent = messages.map((m) => m.content).join(' ');
+    if (!recentContent.trim()) {
+      return {
+        agentFolder: this.agentFolder,
+        userJid,
+        messages,
+        memories: [],
+        timestamp: new Date().toISOString(),
+      };
+    }
 
     // 查询扩展：生成多个查询变体
     const queryVariants = await this.generateQueryVariants(recentContent);
@@ -773,9 +784,7 @@ export class DefaultContextEngine implements ContextEngine {
   }
 
   private getRecentMessages(chatJid: string, limit: number): NewMessage[] {
-    // 从上下文或数据库获取最近消息
-    // 这里简化实现，实际应该从 db.ts 获取
-    return [];
+    return getMessagesSince(chatJid, '', ASSISTANT_NAME, limit);
   }
 
   private async vectorSearch(

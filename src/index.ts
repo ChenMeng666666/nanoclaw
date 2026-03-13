@@ -60,6 +60,8 @@ import { Channel, NewMessage, RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
 import { reflectionScheduler } from './reflection-scheduler.js';
 import { contextEngineRegistry } from './context-engine/registry.js';
+import './context-engine/default-engine.js';
+import type { ContextEngine } from './context-engine/interface.js';
 import { memoryManager } from './memory-manager.js';
 import { LocalLLMQueryExpansionProvider } from './query-expansion/local-llm-provider.js';
 import { startRuntimeAPI } from './runtime-api.js';
@@ -369,7 +371,34 @@ async function processGroupMessagesWithTimeout(
       }
     }
 
-    const prompt = formatMessages(missedMessages, TIMEZONE);
+    let contextEngine: ContextEngine | null = null;
+    let prompt = formatMessages(missedMessages, TIMEZONE);
+    try {
+      contextEngine = await contextEngineRegistry.getEngine(group.folder);
+      const assembledContext = await contextEngine.assemble(chatJid, 20);
+      const ingestTimestamp = new Date().toISOString();
+      await Promise.all(
+        missedMessages.map((message) =>
+          contextEngine!.ingest(message, {
+            ...assembledContext,
+            agentFolder: group.folder,
+            sessionId: sessions[group.folder],
+            userJid: message.sender,
+            messages: [message],
+            timestamp: ingestTimestamp,
+          }),
+        ),
+      );
+      if (assembledContext.memories.length > 0) {
+        const memoryBlock = assembledContext.memories
+          .slice(0, 8)
+          .map((memory, index) => `${index + 1}. ${memory.content}`)
+          .join('\n');
+        prompt = `[相关记忆]\n${memoryBlock}\n\n${prompt}`;
+      }
+    } catch (err) {
+      logger.warn({ chatJid, err }, 'ContextEngine pipeline failed, fallback');
+    }
     const newCursor = missedMessages[missedMessages.length - 1].timestamp;
 
     logger.info(
@@ -394,6 +423,7 @@ async function processGroupMessagesWithTimeout(
     await channel.setTyping?.(chatJid, true);
     let hadError = false;
     let outputSentToUser = false;
+    let responseText = '';
 
     const output = await runAgent(group, prompt, chatJid, async (result) => {
       // Streaming output callback — called for each agent result
@@ -411,6 +441,7 @@ async function processGroupMessagesWithTimeout(
         if (text) {
           await channel.sendMessage(chatJid, text);
           outputSentToUser = true;
+          responseText += responseText ? `\n${text}` : text;
           queue.markOutputSent(chatJid);
         }
         // Only reset idle timer on actual results, not session-update markers (result: null)
@@ -428,6 +459,16 @@ async function processGroupMessagesWithTimeout(
 
     await channel.setTyping?.(chatJid, false);
     if (idleTimer) clearTimeout(idleTimer);
+    if (contextEngine) {
+      try {
+        await contextEngine.afterTurn({
+          response: responseText,
+          sessionId: sessions[group.folder],
+        });
+      } catch (err) {
+        logger.warn({ chatJid, err }, 'ContextEngine afterTurn failed');
+      }
+    }
 
     if (output === 'error' || hadError) {
       // If we already sent output to the user, don't roll back the cursor —
