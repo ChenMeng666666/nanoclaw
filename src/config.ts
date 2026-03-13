@@ -223,6 +223,14 @@ export const RUNTIME_API_CONFIG = {
 };
 
 export const MEMORY_CONFIG = {
+  runtime: {
+    mainPipeline: validateConfig(
+      process.env.MEMORY_MAIN_PIPELINE || 'context_engine',
+      (v) => ['context_engine', 'memory_manager'].includes(v),
+      'context_engine',
+      'MEMORY_MAIN_PIPELINE',
+    ) as 'context_engine' | 'memory_manager',
+  },
   migration: {
     l1ToL2MinAccessCount: validateConfig(
       parseInt(process.env.MEMORY_L1_TO_L2_MIN_ACCESS_COUNT || '3', 10),

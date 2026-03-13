@@ -199,7 +199,10 @@ export class DefaultContextEngine implements ContextEngine {
 
     logger.info(
       {
+        pipelineRoute: 'context_engine',
+        pipelineStage: 'ingest',
         agentFolder: this.agentFolder,
+        sessionId: context.sessionId,
         userJid: message.sender,
         chunkCount: chunks.length,
       },
@@ -456,12 +459,16 @@ export class DefaultContextEngine implements ContextEngine {
   /**
    * 3. assemble - 构建上下文（混合检索核心）
    */
-  async assemble(chatJid: string, limit: number): Promise<Context> {
+  async assemble(
+    chatJid: string,
+    limit: number,
+    sessionId?: string,
+  ): Promise<Context> {
     // 获取最近消息
     const messages = this.getRecentMessages(chatJid, limit);
     const userJid = messages[0]?.sender;
-    const sessionId = chatJid;
-    const scopedMemories = this.getScopedMemories(userJid, sessionId);
+    const effectiveSessionId = sessionId || chatJid;
+    const scopedMemories = this.getScopedMemories(userJid, effectiveSessionId);
 
     // 构建查询文本
     const recentContent = messages.map((m) => m.content).join(' ');
@@ -472,6 +479,7 @@ export class DefaultContextEngine implements ContextEngine {
         messages,
         memories: [],
         timestamp: new Date().toISOString(),
+        sessionId: effectiveSessionId,
       };
     }
 
@@ -534,6 +542,7 @@ export class DefaultContextEngine implements ContextEngine {
       messages,
       memories,
       timestamp: new Date().toISOString(),
+      sessionId: effectiveSessionId,
     };
   }
 

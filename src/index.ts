@@ -7,6 +7,7 @@ import {
   ASSISTANT_NAME,
   EVOLUTION_CONFIG,
   IDLE_TIMEOUT,
+  MEMORY_CONFIG,
   POLL_INTERVAL,
   TIMEZONE,
   TRIGGER_PATTERN,
@@ -351,6 +352,8 @@ async function processGroupMessagesWithTimeout(
     }
 
     const isMainGroup = group.isMain === true;
+    const sessionId = sessions[group.folder];
+    const memoryPipelineRoute = MEMORY_CONFIG.runtime.mainPipeline;
 
     const sinceTimestamp = lastAgentTimestamp[chatJid] || '';
     const missedMessages = getMessagesSince(
@@ -378,31 +381,45 @@ async function processGroupMessagesWithTimeout(
 
     let contextEngine: ContextEngine | null = null;
     let prompt = formatMessages(missedMessages, TIMEZONE);
-    try {
-      contextEngine = await contextEngineRegistry.getEngine(group.folder);
-      const assembledContext = await contextEngine.assemble(chatJid, 20);
-      const ingestTimestamp = new Date().toISOString();
-      await Promise.all(
-        missedMessages.map((message) =>
-          contextEngine!.ingest(message, {
-            ...assembledContext,
-            agentFolder: group.folder,
-            sessionId: sessions[group.folder],
-            userJid: message.sender,
-            messages: [message],
-            timestamp: ingestTimestamp,
-          }),
-        ),
-      );
-      if (assembledContext.memories.length > 0) {
-        const memoryBlock = assembledContext.memories
-          .slice(0, 8)
-          .map((memory, index) => `${index + 1}. ${memory.content}`)
-          .join('\n');
-        prompt = `[相关记忆]\n${memoryBlock}\n\n${prompt}`;
+    if (memoryPipelineRoute === 'context_engine') {
+      try {
+        contextEngine = await contextEngineRegistry.getEngine(group.folder);
+        const assembledContext = await contextEngine.assemble(
+          chatJid,
+          20,
+          sessionId,
+        );
+        const ingestTimestamp = new Date().toISOString();
+        await Promise.all(
+          missedMessages.map((message) =>
+            contextEngine!.ingest(message, {
+              ...assembledContext,
+              agentFolder: group.folder,
+              sessionId,
+              userJid: message.sender,
+              messages: [message],
+              timestamp: ingestTimestamp,
+            }),
+          ),
+        );
+        if (assembledContext.memories.length > 0) {
+          const memoryBlock = assembledContext.memories
+            .slice(0, 8)
+            .map((memory, index) => `${index + 1}. ${memory.content}`)
+            .join('\n');
+          prompt = `[相关记忆]\n${memoryBlock}\n\n${prompt}`;
+        }
+      } catch (err) {
+        logger.warn(
+          { chatJid, agentFolder: group.folder, sessionId, err },
+          'ContextEngine pipeline failed, fallback',
+        );
       }
-    } catch (err) {
-      logger.warn({ chatJid, err }, 'ContextEngine pipeline failed, fallback');
+    } else {
+      logger.warn(
+        { chatJid, agentFolder: group.folder, sessionId, memoryPipelineRoute },
+        'Unsupported memory pipeline route, skipping context injection',
+      );
     }
     const newCursor = missedMessages[missedMessages.length - 1].timestamp;
 
@@ -474,7 +491,7 @@ async function processGroupMessagesWithTimeout(
       try {
         await contextEngine.afterTurn({
           response: responseText,
-          sessionId: sessions[group.folder],
+          sessionId,
         });
       } catch (err) {
         logger.warn({ chatJid, err }, 'ContextEngine afterTurn failed');

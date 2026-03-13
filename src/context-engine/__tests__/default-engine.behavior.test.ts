@@ -93,4 +93,12 @@ describe('default context engine behavior', () => {
       MEMORY_CONFIG.retrieval.queryVariantLimit,
     );
   });
+
+  it('keeps provided sessionId as retrieval scope', async () => {
+    const engine = await createDefaultContextEngine(
+      'agent-default-engine-behavior',
+    );
+    const context = await engine.assemble('chat-c', 10, 'session-c');
+    expect(context.sessionId).toBe('session-c');
+  });
 });

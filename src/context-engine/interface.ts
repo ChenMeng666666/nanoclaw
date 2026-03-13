@@ -7,7 +7,7 @@ import type { Context, CompactResult, TurnResult } from './types.js';
  * 生命周期：
  * 1. bootstrap(agentFolder) - agent 容器启动时初始化
  * 2. ingest(message, context) - 新消息到达时，决定存储哪些记忆
- * 3. assemble(chatJid, limit) - 构建 agent 上下文，检索相关记忆
+ * 3. assemble(chatJid, limit, sessionId?) - 构建 agent 上下文，检索相关记忆
  * 4. compact(session) - 上下文过长时压缩会话历史
  * 5. afterTurn(result) - 对话结束后处理新记忆
  */
@@ -30,9 +30,14 @@ export interface ContextEngine {
    * 构建 agent 上下文，在发送 prompt 前调用
    * @param chatJid - 聊天 JID
    * @param limit - 最大消息/记忆数量
+   * @param sessionId - 会话 ID（可选）
    * @returns 完整的上下文
    */
-  assemble(chatJid: string, limit: number): Promise<Context>;
+  assemble(
+    chatJid: string,
+    limit: number,
+    sessionId?: string,
+  ): Promise<Context>;
 
   /**
    * 压缩会话历史，当上下文过长时调用

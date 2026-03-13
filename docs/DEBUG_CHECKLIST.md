@@ -34,6 +34,27 @@ grep -E 'Connected to WhatsApp|Connection closed|connection.*close' logs/nanocla
 grep 'groupCount' logs/nanoclaw.log | tail -3
 ```
 
+## Memory Pipeline Runbook (P2)
+
+```bash
+# 1. 确认主链路路线（应为 context_engine）
+grep -E 'MEMORY_MAIN_PIPELINE' .env .env.local 2>/dev/null
+
+# 2. 检查主链路注入是否生效
+grep -E 'Memory ingested|ContextEngine pipeline failed|Unsupported memory pipeline route' logs/nanoclaw.log | tail -20
+
+# 3. 检查迁移任务是否正常
+grep -E 'Memory migration task completed|Memory migration task failed' logs/nanoclaw.log | tail -20
+
+# 4. 回滚演练：仅验证配置，不重启服务
+echo "MEMORY_MAIN_PIPELINE=memory_manager"
+```
+
+主链路规范：
+- 生产消息主链路固定为 `ContextEngine.assemble/ingest/afterTurn`
+- `MemoryManager` 仅承担 Runtime API + 持久化 + 迁移任务
+- 若观察到 `Unsupported memory pipeline route`，说明配置与代码事实不一致，需先修复配置再排障
+
 ## Session Transcript Branching
 
 ```bash
