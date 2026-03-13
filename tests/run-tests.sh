@@ -28,26 +28,16 @@ fi
 
 echo "npm 版本: $(npm --version)"
 
-# 检查Docker
-if ! command -v docker &> /dev/null; then
-    echo -e "${RED}错误: 未找到Docker${NC}"
-    exit 1
-fi
-
-echo "Docker 版本: $(docker --version)"
-
-# 检查Docker服务
-if ! docker info &> /dev/null; then
-    echo -e "${RED}错误: Docker服务未启动${NC}"
-    exit 1
-fi
-
-echo "Docker 服务状态: 正常"
-
-# 检查项目是否已构建
-if [ ! -d "dist" ]; then
-    echo -e "${YELLOW}警告: 项目未构建，正在执行构建${NC}"
-    npm run build
+# 检查Docker（仅提示，不阻断）
+if command -v docker &> /dev/null; then
+    echo "Docker 版本: $(docker --version)"
+    if docker info &> /dev/null; then
+        echo "Docker 服务状态: 正常"
+    else
+        echo -e "${YELLOW}警告: Docker服务未启动，容器链路将由测试内部自动跳过${NC}"
+    fi
+else
+    echo -e "${YELLOW}警告: 未找到Docker，容器链路将由测试内部自动跳过${NC}"
 fi
 
 # 清理旧的测试数据（如果存在）
@@ -58,7 +48,7 @@ mkdir -p groups/test/logs
 
 # 运行测试
 echo -e "${GREEN}运行完整流程测试${NC}"
-node dist/tests/e2e-agent-flow.js
+npx tsx tests/e2e-agent-flow.ts
 
 # 验证任务快照
 echo -e "\n${GREEN}验证任务快照${NC}"

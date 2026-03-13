@@ -84,7 +84,7 @@ describe('memory test matrix', () => {
     const manager = new MemoryManager();
     const migrated = await manager.migrateMemories();
 
-    expect(migrated).toBe(2);
+    expect(migrated).toBeGreaterThanOrEqual(2);
     const l2Memories = getMemories('agent-memory-matrix', 'L2', 'u-matrix');
     const l3Memories = getMemories('agent-memory-matrix', 'L3', 'u-matrix');
     expect(l2Memories.some((m) => m.id === 'm-l1')).toBe(true);

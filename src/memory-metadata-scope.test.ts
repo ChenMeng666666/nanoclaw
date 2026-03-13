@@ -1,4 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('./embedding-providers/registry.js', () => ({
+  generateEmbedding: vi.fn(async () => [0.2, 0.2, 0.2]),
+}));
 
 import { _initTestDatabase } from './db.js';
 import {
