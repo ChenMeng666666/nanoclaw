@@ -45,10 +45,9 @@ describe('GroupQueue', () => {
     const processMessages = vi.fn(async (groupJid: string) => {
       concurrentCount++;
       maxConcurrent = Math.max(maxConcurrent, concurrentCount);
-      // Simulate async work
       await new Promise((resolve) => setTimeout(resolve, 100));
       concurrentCount--;
-      return true;
+      return groupJid.length > 0;
     });
 
     queue.setProcessMessagesFn(processMessages);
@@ -76,7 +75,7 @@ describe('GroupQueue', () => {
       maxActive = Math.max(maxActive, activeCount);
       await new Promise<void>((resolve) => completionCallbacks.push(resolve));
       activeCount--;
-      return true;
+      return groupJid.endsWith('@g.us');
     });
 
     queue.setProcessMessagesFn(processMessages);
@@ -108,13 +107,12 @@ describe('GroupQueue', () => {
 
     const processMessages = vi.fn(async (groupJid: string) => {
       if (executionOrder.length === 0) {
-        // First call: block until we release it
         await new Promise<void>((resolve) => {
           resolveFirst = resolve;
         });
       }
       executionOrder.push('messages');
-      return true;
+      return groupJid === 'group1@g.us';
     });
 
     queue.setProcessMessagesFn(processMessages);
@@ -171,7 +169,7 @@ describe('GroupQueue', () => {
   // --- Shutdown prevents new enqueues ---
 
   it('prevents new enqueues after shutdown', async () => {
-    const processMessages = vi.fn(async () => true);
+    const processMessages = vi.fn(async (groupJid: string) => groupJid !== '');
     queue.setProcessMessagesFn(processMessages);
 
     await queue.shutdown(1000);
@@ -265,7 +263,9 @@ describe('GroupQueue', () => {
 
     // Scheduler poll re-discovers the same task while it's running —
     // this must be silently dropped
-    const dupFn = vi.fn(async () => {});
+    const dupFn = vi.fn(async () => {
+      throw new Error('duplicate task should not execute');
+    });
     queue.enqueueTask('group1@g.us', 'task-1', dupFn);
     await vi.advanceTimersByTimeAsync(10);
 
@@ -286,11 +286,11 @@ describe('GroupQueue', () => {
     const fs = await import('fs');
     let resolveProcess: () => void;
 
-    const processMessages = vi.fn(async () => {
+    const processMessages = vi.fn(async (groupJid: string) => {
       await new Promise<void>((resolve) => {
         resolveProcess = resolve;
       });
-      return true;
+      return groupJid === 'group1@g.us';
     });
 
     queue.setProcessMessagesFn(processMessages);
@@ -308,7 +308,7 @@ describe('GroupQueue', () => {
     );
 
     // Enqueue a task while container is active but NOT idle
-    const taskFn = vi.fn(async () => {});
+    const taskFn = vi.fn(async () => 'task-ready');
     queue.enqueueTask('group1@g.us', 'task-1', taskFn);
 
     // _close should NOT have been written (container is working, not idle)
@@ -326,11 +326,11 @@ describe('GroupQueue', () => {
     const fs = await import('fs');
     let resolveProcess: () => void;
 
-    const processMessages = vi.fn(async () => {
+    const processMessages = vi.fn(async (groupJid: string) => {
       await new Promise<void>((resolve) => {
         resolveProcess = resolve;
       });
-      return true;
+      return groupJid === 'group1@g.us';
     });
 
     queue.setProcessMessagesFn(processMessages);
@@ -352,7 +352,7 @@ describe('GroupQueue', () => {
     const writeFileSync = vi.mocked(fs.default.writeFileSync);
     writeFileSync.mockClear();
 
-    const taskFn = vi.fn(async () => {});
+    const taskFn = vi.fn(async () => 'task-ready');
     queue.enqueueTask('group1@g.us', 'task-1', taskFn);
 
     // _close SHOULD have been written (container is idle)
@@ -369,11 +369,11 @@ describe('GroupQueue', () => {
     const fs = await import('fs');
     let resolveProcess: () => void;
 
-    const processMessages = vi.fn(async () => {
+    const processMessages = vi.fn(async (groupJid: string) => {
       await new Promise<void>((resolve) => {
         resolveProcess = resolve;
       });
-      return true;
+      return groupJid === 'group1@g.us';
     });
 
     queue.setProcessMessagesFn(processMessages);
@@ -396,7 +396,7 @@ describe('GroupQueue', () => {
     const writeFileSync = vi.mocked(fs.default.writeFileSync);
     writeFileSync.mockClear();
 
-    const taskFn = vi.fn(async () => {});
+    const taskFn = vi.fn(async () => 'task-ready');
     queue.enqueueTask('group1@g.us', 'task-1', taskFn);
 
     const closeWrites = writeFileSync.mock.calls.filter(
@@ -442,11 +442,11 @@ describe('GroupQueue', () => {
     existsSync.mockImplementation(() => existsStates.shift() ?? false);
 
     let resolveProcess: () => void;
-    const processMessages = vi.fn(async () => {
+    const processMessages = vi.fn(async (groupJid: string) => {
       await new Promise<void>((resolve) => {
         resolveProcess = resolve;
       });
-      return true;
+      return groupJid === 'group1@g.us';
     });
     queue.setProcessMessagesFn(processMessages);
 
@@ -504,7 +504,7 @@ describe('GroupQueue', () => {
     const writeFileSync = vi.mocked(fs.default.writeFileSync);
     writeFileSync.mockClear();
 
-    const taskFn = vi.fn(async () => {});
+    const taskFn = vi.fn(async () => 'task-ready');
     queue.enqueueTask('group1@g.us', 'task-1', taskFn);
 
     let closeWrites = writeFileSync.mock.calls.filter(

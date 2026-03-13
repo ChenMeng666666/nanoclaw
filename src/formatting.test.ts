@@ -220,8 +220,14 @@ describe('trigger gating (requiresTrigger interaction)', () => {
     requiresTrigger: boolean | undefined,
     messages: NewMessage[],
   ): boolean {
-    if (!shouldRequireTrigger(isMainGroup, requiresTrigger)) return true;
-    return messages.some((m) => TRIGGER_PATTERN.test(m.content.trim()));
+    const requiresTriggerCheck = shouldRequireTrigger(
+      isMainGroup,
+      requiresTrigger,
+    );
+    const hasTrigger = messages.some((m) =>
+      TRIGGER_PATTERN.test(m.content.trim()),
+    );
+    return !requiresTriggerCheck || hasTrigger;
   }
 
   it('main group always processes (no trigger needed)', () => {

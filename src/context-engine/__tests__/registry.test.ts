@@ -3,9 +3,11 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ContextEngineRegistry } from '../registry.js';
+import { createDefaultContextEngine } from '../default-engine.js';
 import type { ContextEngine } from '../interface.js';
 import type { Context, CompactResult, TurnResult } from '../types.js';
 import { NewMessage } from '../../types.js';
+import { _initTestDatabase } from '../../db.js';
 
 // 测试用的 Mock ContextEngine
 class MockContextEngine implements ContextEngine {
@@ -47,6 +49,7 @@ describe('ContextEngineRegistry', () => {
   let registry: ContextEngineRegistry;
 
   beforeEach(() => {
+    _initTestDatabase();
     registry = new ContextEngineRegistry();
   });
 
@@ -126,5 +129,17 @@ describe('ContextEngineRegistry', () => {
     expect(engine1).toBeDefined();
     expect(engine2).toBeDefined();
     expect(engine1).not.toBe(engine2); // 不同 agent 应该有不同的实例
+  });
+
+  it('should bootstrap the default engine factory', async () => {
+    registry.register('default-real', createDefaultContextEngine);
+    registry.useDefaultEngine('default-real');
+
+    const engine = await registry.getEngine('agent-real-bootstrap');
+    const context = await engine.assemble('tg:100200300', 3);
+
+    expect(context.agentFolder).toBe('agent-real-bootstrap');
+    expect(Array.isArray(context.messages)).toBe(true);
+    expect(Array.isArray(context.memories)).toBe(true);
   });
 });

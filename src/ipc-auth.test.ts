@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import {
   _initTestDatabase,
@@ -36,6 +36,11 @@ const THIRD_GROUP: RegisteredGroup = {
 
 let groups: Record<string, RegisteredGroup>;
 let deps: IpcDeps;
+let sendMessageMock: ReturnType<typeof vi.fn>;
+let registerGroupMock: ReturnType<typeof vi.fn>;
+let syncGroupsMock: ReturnType<typeof vi.fn>;
+let writeGroupsSnapshotMock: ReturnType<typeof vi.fn>;
+let getAvailableGroupsMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   _initTestDatabase();
@@ -51,17 +56,22 @@ beforeEach(() => {
   setRegisteredGroup('other@g.us', OTHER_GROUP);
   setRegisteredGroup('third@g.us', THIRD_GROUP);
 
+  sendMessageMock = vi.fn(async () => {});
+  registerGroupMock = vi.fn((jid: string, group: RegisteredGroup) => {
+    groups[jid] = group;
+    setRegisteredGroup(jid, group);
+  });
+  syncGroupsMock = vi.fn(async () => {});
+  getAvailableGroupsMock = vi.fn(() => []);
+  writeGroupsSnapshotMock = vi.fn(() => {});
+
   deps = {
-    sendMessage: async () => {},
+    sendMessage: sendMessageMock,
     registeredGroups: () => groups,
-    registerGroup: (jid, group) => {
-      groups[jid] = group;
-      setRegisteredGroup(jid, group);
-      // Mock the fs.mkdirSync that registerGroup does
-    },
-    syncGroups: async () => {},
-    getAvailableGroups: () => [],
-    writeGroupsSnapshot: () => {},
+    registerGroup: registerGroupMock,
+    syncGroups: syncGroupsMock,
+    getAvailableGroups: getAvailableGroupsMock,
+    writeGroupsSnapshot: writeGroupsSnapshotMock,
   };
 });
 
@@ -377,7 +387,29 @@ describe('refresh_groups authorization', () => {
       false,
       deps,
     );
-    // If we got here without error, the auth gate worked
+    expect(syncGroupsMock).not.toHaveBeenCalled();
+    expect(writeGroupsSnapshotMock).not.toHaveBeenCalled();
+  });
+
+  it('main group triggers refresh and writes snapshot', async () => {
+    getAvailableGroupsMock.mockReturnValueOnce([
+      { jid: 'main@g.us', name: 'Main', source: 'telegram' },
+    ]);
+
+    await processTaskIpc(
+      { type: 'refresh_groups' },
+      'whatsapp_main',
+      true,
+      deps,
+    );
+
+    expect(syncGroupsMock).toHaveBeenCalledWith(true);
+    expect(writeGroupsSnapshotMock).toHaveBeenCalledWith(
+      'whatsapp_main',
+      true,
+      [{ jid: 'main@g.us', name: 'Main', source: 'telegram' }],
+      expect.any(Set),
+    );
   });
 });
 
@@ -858,6 +890,14 @@ describe('register_group success', () => {
     expect(group!.name).toBe('New Group');
     expect(group!.folder).toBe('new-group');
     expect(group!.trigger).toBe('@Andy');
+    expect(registerGroupMock).toHaveBeenCalledWith(
+      'new@g.us',
+      expect.objectContaining({
+        name: 'New Group',
+        folder: 'new-group',
+        trigger: '@Andy',
+      }),
+    );
   });
 
   it('register_group rejects request with missing fields', async () => {

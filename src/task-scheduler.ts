@@ -299,6 +299,7 @@ async function runTask(
 }
 
 let schedulerRunning = false;
+let schedulerTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function startSchedulerLoop(deps: SchedulerDependencies): void {
   if (schedulerRunning) {
@@ -325,6 +326,10 @@ export function startSchedulerLoop(deps: SchedulerDependencies): void {
   }
 
   const loop = async () => {
+    if (!schedulerRunning) {
+      return;
+    }
+
     try {
       const dueTasks = getDueTasks();
       if (dueTasks.length > 0) {
@@ -346,7 +351,9 @@ export function startSchedulerLoop(deps: SchedulerDependencies): void {
       logger.error({ err }, 'Error in scheduler loop');
     }
 
-    setTimeout(loop, SCHEDULER_POLL_INTERVAL);
+    if (schedulerRunning) {
+      schedulerTimer = setTimeout(loop, SCHEDULER_POLL_INTERVAL);
+    }
   };
 
   loop();
@@ -355,4 +362,8 @@ export function startSchedulerLoop(deps: SchedulerDependencies): void {
 /** @internal - for tests only. */
 export function _resetSchedulerLoopForTests(): void {
   schedulerRunning = false;
+  if (schedulerTimer) {
+    clearTimeout(schedulerTimer);
+    schedulerTimer = null;
+  }
 }

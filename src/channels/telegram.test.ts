@@ -183,6 +183,21 @@ function createTextCtx(overrides: {
   };
 }
 
+function createTextCtxFromRawUpdate(update: any) {
+  return createTextCtx({
+    chatId: update.message.chat.id,
+    chatType: update.message.chat.type,
+    chatTitle: update.message.chat.title,
+    text: update.message.text,
+    fromId: update.message.from.id,
+    firstName: update.message.from.first_name,
+    username: update.message.from.username,
+    messageId: update.message.message_id,
+    date: update.message.date,
+    entities: update.message.entities,
+  });
+}
+
 function createMediaCtx(overrides: {
   chatId?: number;
   chatType?: string;
@@ -329,6 +344,44 @@ describe('TelegramChannel', () => {
           sender_name: 'Alice',
           content: 'Hello everyone',
           is_from_me: false,
+        }),
+      );
+    });
+
+    it('replays a raw Telegram update payload', async () => {
+      const opts = createTestOpts();
+      const channel = new TelegramChannel(opts);
+      await channel.connect();
+
+      const rawUpdate = {
+        update_id: 990001,
+        message: {
+          message_id: 88,
+          date: 1704067200,
+          text: '@andy_ai_bot ping',
+          entities: [{ type: 'mention', offset: 0, length: 12 }],
+          chat: { id: 100200300, type: 'group', title: 'Replay Group' },
+          from: { id: 24001, first_name: 'ReplayUser', username: 'replay_u' },
+        },
+      };
+
+      const ctx = createTextCtxFromRawUpdate(rawUpdate);
+      await triggerTextMessage(ctx);
+
+      expect(opts.onChatMetadata).toHaveBeenCalledWith(
+        'tg:100200300',
+        '2024-01-01T00:00:00.000Z',
+        'Replay Group',
+        'telegram',
+        true,
+      );
+      expect(opts.onMessage).toHaveBeenCalledWith(
+        'tg:100200300',
+        expect.objectContaining({
+          id: '88',
+          sender: '24001',
+          sender_name: 'ReplayUser',
+          content: '@Andy @andy_ai_bot ping',
         }),
       );
     });
