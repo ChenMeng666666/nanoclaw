@@ -704,11 +704,13 @@ export class EvolutionManager {
     if (!gene) return;
 
     const daysSinceCreation = this.getDaysSinceCreation(gene.createdAt);
+    const promotionThreshold = this.resolveGdiPromotionThreshold();
+    const staleThreshold = Math.max(1, Math.min(10, promotionThreshold * 0.5));
 
     let status: 'promoted' | 'stale' | 'archived';
-    if (gdiScore.total >= 7 && daysSinceCreation < 30) {
+    if (gdiScore.total >= promotionThreshold && daysSinceCreation < 30) {
       status = 'promoted';
-    } else if (gdiScore.total >= 3 && daysSinceCreation < 90) {
+    } else if (gdiScore.total >= staleThreshold && daysSinceCreation < 90) {
       status = 'stale';
     } else {
       status = 'archived';
@@ -850,9 +852,12 @@ export class EvolutionManager {
           existingEmbedding,
         );
 
-        // 阈值判断
         const isSameAuthor = existing.source_agent_id === authorId;
-        const threshold = isSameAuthor ? 0.92 : 0.95;
+        const threshold = this.normalizeSimilarityThreshold(
+          isSameAuthor
+            ? EVOLUTION_CONFIG.duplicateThreshold.sameAuthor
+            : EVOLUTION_CONFIG.duplicateThreshold.differentAuthor,
+        );
 
         if (similarity >= threshold) {
           return {
@@ -1063,6 +1068,24 @@ export class EvolutionManager {
   private calculateSuccessfulValidationCount(geneId: number): number {
     const reports = getValidationReportsByGeneId(geneId);
     return reports.filter((report) => report.success).length;
+  }
+
+  private normalizeSimilarityThreshold(value: number): number {
+    if (!Number.isFinite(value)) {
+      return 0.95;
+    }
+    return Math.min(1, Math.max(0, value));
+  }
+
+  private resolveGdiPromotionThreshold(): number {
+    const threshold = EVOLUTION_CONFIG.gdiPromotionThreshold;
+    if (!Number.isFinite(threshold)) {
+      return 7;
+    }
+    if (threshold <= 10) {
+      return Math.max(0, threshold);
+    }
+    return Math.min(10, Math.max(0, threshold / 10));
   }
 
   /**

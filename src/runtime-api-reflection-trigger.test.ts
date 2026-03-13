@@ -52,6 +52,7 @@ describe('runtime-api reflection trigger endpoint', () => {
       server = null;
     }
     delete process.env.NODE_ENV;
+    delete process.env.RUNTIME_API_ALLOW_NO_AUTH;
   });
 
   it('triggers reflection for a valid agent and type', async () => {
@@ -135,7 +136,7 @@ describe('runtime-api reflection trigger endpoint', () => {
     expect(mocks.triggerReflection).not.toHaveBeenCalled();
   });
 
-  it('accepts requests without api key when env key is missing in non-production', async () => {
+  it('accepts requests without api key when explicitly enabling no-auth mode', async () => {
     if (server) {
       await new Promise<void>((resolve) => {
         server!.close(() => resolve());
@@ -144,7 +145,7 @@ describe('runtime-api reflection trigger endpoint', () => {
     }
 
     delete process.env.RUNTIME_API_KEY;
-    process.env.NODE_ENV = 'development';
+    process.env.RUNTIME_API_ALLOW_NO_AUTH = 'true';
 
     server = await startRuntimeAPI({ port: 3476, enabled: true });
     await new Promise<void>((resolve) => {

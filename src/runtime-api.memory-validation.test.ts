@@ -10,6 +10,7 @@ import { createAgent } from './db-agents.js';
 import { startRuntimeAPI } from './runtime-api.js';
 import { MEMORY_CONFIG } from './config.js';
 import { memoryManager } from './memory-manager.js';
+import { evolutionManager } from './evolution-manager.js';
 
 describe('runtime api memory validation', () => {
   let server: import('http').Server | null = null;
@@ -379,6 +380,122 @@ describe('runtime api memory validation', () => {
     }
   });
 
+  it('rejects invalid evolution api payloads', async () => {
+    const headers = {
+      'content-type': 'application/json',
+      'x-api-key': 'test-key',
+      'x-forwarded-for': `evolution-validation-${Date.now()}`,
+    };
+    const invalidLimit = await fetch(`${baseUrl}/api/evolution/query`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        query: 'evolution limit validation',
+        limit: MEMORY_CONFIG.api.maxLimit + 1,
+      }),
+    });
+    const invalidLimitBody = (await invalidLimit.json()) as { code?: string };
+
+    const invalidSubmitTags = await fetch(`${baseUrl}/api/evolution/submit`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        abilityName: 'invalid tags',
+        content: 'payload',
+        sourceAgentId: 'agent-runtime-api-memory',
+        tags: 'not-an-array',
+      }),
+    });
+    const invalidSubmitTagsBody = (await invalidSubmitTags.json()) as {
+      code?: string;
+    };
+
+    const invalidRating = await fetch(`${baseUrl}/api/evolution/feedback`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        id: 1,
+        agentId: 'agent-runtime-api-memory',
+        comment: 'rating check',
+        rating: 9,
+      }),
+    });
+    const invalidRatingBody = (await invalidRating.json()) as { code?: string };
+
+    expect(invalidLimit.status).toBe(400);
+    expect(invalidLimitBody.code).toBe('INVALID_LIMIT');
+    expect(invalidSubmitTags.status).toBe(400);
+    expect(invalidSubmitTagsBody.code).toBe('INVALID_TAGS');
+    expect(invalidRating.status).toBe(400);
+    expect(invalidRatingBody.code).toBe('INVALID_RATING');
+  });
+
+  it('enforces evolution api rate limiting', async () => {
+    const headers = {
+      'content-type': 'application/json',
+      'x-api-key': 'test-key',
+      'x-forwarded-for': `evolution-rate-limit-${Date.now()}`,
+    };
+    const total = 160;
+    let limited = false;
+    for (let i = 0; i < total; i++) {
+      const response = await fetch(`${baseUrl}/api/evolution/query`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          query: `evolution-rate-${i}`,
+          limit: 1,
+        }),
+      });
+      if (response.status === 429) {
+        const body = (await response.json()) as { code?: string };
+        expect(body.code).toBe('RATE_LIMIT_EXCEEDED');
+        limited = true;
+        break;
+      }
+    }
+    expect(limited).toBe(true);
+  });
+
+  it('rejects excessive concurrent evolution queries', async () => {
+    vi.spyOn(evolutionManager, 'queryExperience').mockImplementation(
+      async () =>
+        await new Promise((resolve) =>
+          setTimeout(
+            () => resolve([]),
+            MEMORY_CONFIG.api.searchTimeoutMs - 400,
+          ),
+        ),
+    );
+    const headers = {
+      'content-type': 'application/json',
+      'x-api-key': 'test-key',
+      'x-forwarded-for': `evolution-concurrency-${Date.now()}`,
+    };
+    const requests = Array.from(
+      { length: MEMORY_CONFIG.api.maxConcurrentSearches + 2 },
+      () =>
+        fetch(`${baseUrl}/api/evolution/query`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            query: 'evolution parallel load',
+            limit: 3,
+          }),
+        }),
+    );
+    const responses = await Promise.all(requests);
+    const rejected = responses.filter((item) => item.status === 429);
+    expect(rejected.length).toBeGreaterThan(0);
+    if (rejected.length > 0) {
+      const payload = (await rejected[0].json()) as { code?: string };
+      expect(
+        payload.code === 'EVOLUTION_QUERY_CONCURRENCY_LIMIT' ||
+          payload.code === 'RATE_LIMIT_EXCEEDED',
+      ).toBe(true);
+    }
+  });
+
   it('fails startup when runtime api key is missing by default', async () => {
     if (server) {
       await new Promise<void>((resolve) => {
@@ -415,6 +532,7 @@ describe('runtime api memory validation', () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        'x-forwarded-for': `evolution-no-auth-${Date.now()}`,
       },
       body: JSON.stringify({
         query: 'no-auth-health-check',

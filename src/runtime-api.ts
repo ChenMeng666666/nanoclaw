@@ -137,6 +137,8 @@ export async function startRuntimeAPI(
 ): Promise<http.Server> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   let inFlightMemorySearches = 0;
+  let inFlightEvolutionQueries = 0;
+  memoryRateBucket.clear();
 
   if (!opts.enabled) {
     logger.info('Runtime API disabled');
@@ -210,7 +212,7 @@ export async function startRuntimeAPI(
 
     try {
       if (
-        isMemoryApiPath(path) &&
+        isRateLimitedApiPath(path) &&
         SECURITY_CONFIG.networkSecurity.enableRateLimiting
       ) {
         const clientId = resolveClientIdentity(req);
@@ -218,7 +220,7 @@ export async function startRuntimeAPI(
           throw createApiError(
             429,
             'RATE_LIMIT_EXCEEDED',
-            'Too many memory API requests',
+            'Too many runtime API requests',
           );
         }
       }
@@ -434,12 +436,36 @@ export async function startRuntimeAPI(
 
       if (path === '/api/evolution/query' && req.method === 'POST') {
         const body = await readJSON(req);
-        const { query, tags, limit = 20 } = body;
+        const query = parseRequiredString(body.query, 'query');
+        const tags = parseOptionalStringArray(body.tags, 'tags');
+        const limit = parseEvolutionLimit(body.limit);
 
-        const entries = await evolutionManager.queryExperience(
-          query as string,
-          tags as string[] | undefined,
-          limit as number,
+        if (
+          inFlightEvolutionQueries >= MEMORY_CONFIG.api.maxConcurrentSearches
+        ) {
+          throw createApiError(
+            429,
+            'EVOLUTION_QUERY_CONCURRENCY_LIMIT',
+            'too many concurrent evolution queries',
+          );
+        }
+        inFlightEvolutionQueries += 1;
+        const queryPromise = evolutionManager.queryExperience(
+          query,
+          tags,
+          limit,
+        );
+        queryPromise.finally(() => {
+          inFlightEvolutionQueries = Math.max(0, inFlightEvolutionQueries - 1);
+        });
+        const entries = await withTimeout(
+          queryPromise,
+          MEMORY_CONFIG.api.searchTimeoutMs,
+          createApiError(
+            504,
+            'EVOLUTION_QUERY_TIMEOUT',
+            `evolution query timeout after ${MEMORY_CONFIG.api.searchTimeoutMs}ms`,
+          ),
         );
 
         writeJSON(res, 200, { entries });
@@ -448,19 +474,24 @@ export async function startRuntimeAPI(
 
       if (path === '/api/evolution/submit' && req.method === 'POST') {
         const body = await readJSON(req);
-        const { abilityName, content, sourceAgentId, description, tags } = body;
-
-        if (!abilityName || !content || !sourceAgentId) {
-          writeJSON(res, 400, { error: 'Missing required fields' });
-          return;
-        }
+        const abilityName = parseRequiredString(
+          body.abilityName,
+          'abilityName',
+        );
+        const content = parseRequiredString(body.content, 'content');
+        const sourceAgentId = parseRequiredString(
+          body.sourceAgentId,
+          'sourceAgentId',
+        );
+        const description = parseOptionalString(body.description);
+        const tags = parseOptionalStringArray(body.tags, 'tags');
 
         const id = await evolutionManager.submitExperience(
-          abilityName as string,
-          content as string,
-          sourceAgentId as string,
-          description as string | undefined,
-          tags as string[] | undefined,
+          abilityName,
+          content,
+          sourceAgentId,
+          description,
+          tags,
         );
 
         writeJSON(res, 200, { id, status: 'submitted' });
@@ -469,19 +500,17 @@ export async function startRuntimeAPI(
 
       if (path === '/api/evolution/feedback' && req.method === 'POST') {
         const body = await readJSON(req);
-        const { id, agentId, comment, rating } = body;
-
-        if (!id || !agentId || !comment || !rating) {
-          writeJSON(res, 400, { error: 'Missing required fields' });
-          return;
-        }
-
-        await evolutionManager.submitFeedback(
-          id as number,
-          agentId as string,
-          comment as string,
-          rating as number,
+        const id = parseRequiredIntegerInRange(
+          body.id,
+          'id',
+          1,
+          Number.MAX_SAFE_INTEGER,
         );
+        const agentId = parseRequiredString(body.agentId, 'agentId');
+        const comment = parseRequiredString(body.comment, 'comment');
+        const rating = parseRequiredIntegerInRange(body.rating, 'rating', 1, 5);
+
+        await evolutionManager.submitFeedback(id, agentId, comment, rating);
 
         writeJSON(res, 200, { success: true });
         return;
@@ -2083,6 +2112,37 @@ function parseMemoryLimit(value: unknown): number {
   return value;
 }
 
+function parseEvolutionLimit(value: unknown): number {
+  const defaultLimit = 20;
+  if (value === undefined) {
+    return defaultLimit;
+  }
+  const parsed = parseOptionalIntegerInRange(
+    value,
+    'limit',
+    MEMORY_CONFIG.api.minLimit,
+    MEMORY_CONFIG.api.maxLimit,
+  );
+  return parsed ?? defaultLimit;
+}
+
+function parseRequiredIntegerInRange(
+  value: unknown,
+  field: string,
+  min: number,
+  max: number,
+): number {
+  const parsed = parseOptionalIntegerInRange(value, field, min, max);
+  if (parsed === undefined) {
+    throw createApiError(
+      400,
+      `INVALID_${field.toUpperCase()}`,
+      `${field} is required`,
+    );
+  }
+  return parsed;
+}
+
 function isMemoryApiPath(path: string): boolean {
   return (
     path === '/api/memory/search' ||
@@ -2092,6 +2152,18 @@ function isMemoryApiPath(path: string): boolean {
     path === '/api/memory/release/control' ||
     path === '/api/memory/release/rollback'
   );
+}
+
+function isEvolutionApiPath(path: string): boolean {
+  return (
+    path === '/api/evolution/query' ||
+    path === '/api/evolution/submit' ||
+    path === '/api/evolution/feedback'
+  );
+}
+
+function isRateLimitedApiPath(path: string): boolean {
+  return isMemoryApiPath(path) || isEvolutionApiPath(path);
 }
 
 function parseOptionalIntegerInRange(

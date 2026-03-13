@@ -93,11 +93,11 @@
 **目标**：让配置真正驱动行为，并补齐接口防线。  
 **完成定义**：关键阈值可调且生效，API 输入边界完整可测。
 
-- [ ] (P1) 将 duplicate 阈值改为统一读取配置，不再硬编码
-- [ ] (P1) 将 GDI 晋升阈值接入自动晋升或候选筛选流程
-- [ ] (P1) 将 metrics 快照间隔接入调度器并可观测
-- [ ] (P1) 为 evolution API 增加与 memory API 同等级参数校验
-- [ ] (P1) 为 evolution API 增加限流/并发保护与异常码规范
+- [x] (P1) 将 duplicate 阈值改为统一读取配置，不再硬编码
+- [x] (P1) 将 GDI 晋升阈值接入自动晋升或候选筛选流程
+- [x] (P1) 将 metrics 快照间隔接入调度器并可观测
+- [x] (P1) 为 evolution API 增加与 memory API 同等级参数校验
+- [x] (P1) 为 evolution API 增加限流/并发保护与异常码规范
 
 ## Phase 2：记忆主链路收敛（P2）
 
@@ -130,11 +130,11 @@
 - [x] 增加关键失败可观测性
 
 ### P1
-- [ ] 配置化 duplicate 阈值消费
-- [ ] 接入 GDI 晋升阈值逻辑
-- [ ] 接入指标快照调度配置
-- [ ] 加固 evolution API 参数校验
-- [ ] 增加 evolution API 限流与并发保护
+- [x] 配置化 duplicate 阈值消费
+- [x] 接入 GDI 晋升阈值逻辑
+- [x] 接入指标快照调度配置
+- [x] 加固 evolution API 参数校验
+- [x] 增加 evolution API 限流与并发保护
 
 ### P2
 - [ ] 选型并冻结记忆唯一主链路

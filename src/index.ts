@@ -5,6 +5,7 @@ import { execSync } from 'child_process';
 
 import {
   ASSISTANT_NAME,
+  EVOLUTION_CONFIG,
   IDLE_TIMEOUT,
   POLL_INTERVAL,
   TIMEZONE,
@@ -65,6 +66,7 @@ import type { ContextEngine } from './context-engine/interface.js';
 import { memoryManager } from './memory-manager.js';
 import { LocalLLMQueryExpansionProvider } from './query-expansion/local-llm-provider.js';
 import { startRuntimeAPI } from './runtime-api.js';
+import { evolutionManager } from './evolution-manager.js';
 import net from 'net';
 
 // 检查端口是否可用
@@ -1046,6 +1048,13 @@ async function main(): Promise<void> {
     },
     60 * 60 * 1000,
   );
+  const evolutionMetricsInterval = setInterval(() => {
+    try {
+      evolutionManager.saveEcosystemMetrics();
+    } catch (err) {
+      logger.error({ err }, 'Evolution metrics snapshot task failed');
+    }
+  }, EVOLUTION_CONFIG.metricsSnapshotInterval);
 
   // 初始化主项目进化系统
   logger.info('Main evolution system initialized');
@@ -1095,6 +1104,7 @@ async function main(): Promise<void> {
     // 停止记忆定时任务
     clearInterval(memoryPersistInterval);
     clearInterval(memoryMigrateInterval);
+    clearInterval(evolutionMetricsInterval);
 
     // 关闭运行时 API
     await new Promise<void>((resolve) => {
