@@ -727,7 +727,10 @@ export class DefaultContextEngine implements ContextEngine {
     return result;
   }
 
-  private selectDeterministicSynonym(word: string, candidates: string[]): string {
+  private selectDeterministicSynonym(
+    word: string,
+    candidates: string[],
+  ): string {
     if (candidates.length === 0) {
       return word;
     }

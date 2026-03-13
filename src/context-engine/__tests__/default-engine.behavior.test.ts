@@ -23,7 +23,9 @@ describe('default context engine behavior', () => {
   });
 
   it('stores user scope when sessionId is absent', async () => {
-    const engine = await createDefaultContextEngine('agent-default-engine-behavior');
+    const engine = await createDefaultContextEngine(
+      'agent-default-engine-behavior',
+    );
     await engine.ingest(
       {
         id: 'm-1',
@@ -48,7 +50,9 @@ describe('default context engine behavior', () => {
   });
 
   it('stores session scope when sessionId is provided', async () => {
-    const engine = await createDefaultContextEngine('agent-default-engine-behavior');
+    const engine = await createDefaultContextEngine(
+      'agent-default-engine-behavior',
+    );
     await engine.ingest(
       {
         id: 'm-2',
@@ -74,7 +78,9 @@ describe('default context engine behavior', () => {
   });
 
   it('uses deterministic synonyms and configured variant limit', async () => {
-    const engine = await createDefaultContextEngine('agent-default-engine-behavior');
+    const engine = await createDefaultContextEngine(
+      'agent-default-engine-behavior',
+    );
     const base = '系统 方法 使用 代码';
     const replaced1 = engine.replaceSynonyms(base);
     const replaced2 = engine.replaceSynonyms(base);
