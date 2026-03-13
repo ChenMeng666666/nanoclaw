@@ -55,6 +55,26 @@ echo "MEMORY_MAIN_PIPELINE=memory_manager"
 - `MemoryManager` 仅承担 Runtime API + 持久化 + 迁移任务
 - 若观察到 `Unsupported memory pipeline route`，说明配置与代码事实不一致，需先修复配置再排障
 
+## Evolution + Memory Drill Runbook (P3)
+
+```bash
+# 1. 统一看板健康检查
+curl -s -H "x-api-key: $RUNTIME_API_KEY" "http://127.0.0.1:${RUNTIME_API_PORT:-3456}/api/governance/metrics/dashboard?timelineLimit=12"
+
+# 2. 晋升失败演练：检查失败原因码与审计日志
+grep -E 'Capsule|promote|promotion|failure|reasonCode' logs/nanoclaw.log | tail -50
+sqlite3 store/messages.db "SELECT created_at, action, resource_type, details FROM audit_log WHERE resource_type IN ('evolution','capsule') ORDER BY id DESC LIMIT 20;"
+
+# 3. 检索退化演练：检查召回质量指标
+curl -s -H "x-api-key: $RUNTIME_API_KEY" "http://127.0.0.1:${RUNTIME_API_PORT:-3456}/api/memory/metrics/dashboard?timelineLimit=24"
+
+# 4. 迁移异常演练：检查迁移任务日志
+grep -E 'Memory migration task completed|Memory migration task failed|migration' logs/nanoclaw.log | tail -30
+
+# 5. 回滚演练：查看最近 release control 快照
+sqlite3 store/messages.db "SELECT operation_id, operation_type, status, timestamp FROM operation_snapshots WHERE operation_type LIKE 'memory_release_control%' ORDER BY id DESC LIMIT 10;"
+```
+
 ## Session Transcript Branching
 
 ```bash

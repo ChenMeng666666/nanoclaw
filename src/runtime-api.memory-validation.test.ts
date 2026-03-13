@@ -248,6 +248,88 @@ describe('runtime api memory validation', () => {
     expect(Array.isArray(body.timeline)).toBe(true);
   });
 
+  it('returns evolution dashboard metrics', async () => {
+    await fetch(`${baseUrl}/api/evolution/submit`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': 'test-key',
+      },
+      body: JSON.stringify({
+        abilityName: 'dashboard-evolution-entry',
+        content: 'dashboard evolution content',
+        sourceAgentId: 'agent-runtime-api-memory',
+      }),
+    });
+    evolutionManager.saveEcosystemMetrics();
+
+    const response = await fetch(
+      `${baseUrl}/api/evolution/metrics/dashboard?timelineLimit=5`,
+      {
+        method: 'GET',
+        headers: {
+          'x-api-key': 'test-key',
+        },
+      },
+    );
+    const body = (await response.json()) as {
+      summary?: { totalGenes?: number; promotionRate?: number };
+      timeline?: unknown[];
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.summary?.totalGenes).toBeGreaterThan(0);
+    expect(body.summary?.promotionRate).toBeTypeOf('number');
+    expect(Array.isArray(body.timeline)).toBe(true);
+  });
+
+  it('returns unified governance dashboard metrics', async () => {
+    await fetch(`${baseUrl}/api/memory/add`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': 'test-key',
+      },
+      body: JSON.stringify({
+        agentFolder: 'agent-runtime-api-memory',
+        content: 'governance dashboard memory',
+        level: 'L2',
+      }),
+    });
+    await fetch(`${baseUrl}/api/evolution/submit`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': 'test-key',
+      },
+      body: JSON.stringify({
+        abilityName: 'governance-dashboard-entry',
+        content: 'governance evolution content',
+        sourceAgentId: 'agent-runtime-api-memory',
+      }),
+    });
+
+    const response = await fetch(
+      `${baseUrl}/api/governance/metrics/dashboard?timelineLimit=3`,
+      {
+        method: 'GET',
+        headers: {
+          'x-api-key': 'test-key',
+        },
+      },
+    );
+    const body = (await response.json()) as {
+      generatedAt?: string;
+      memory?: { summary?: { counters?: { totalSearches?: number } } };
+      evolution?: { summary?: { totalGenes?: number } };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.generatedAt).toBeTruthy();
+    expect(body.memory?.summary?.counters?.totalSearches).toBeTypeOf('number');
+    expect(body.evolution?.summary?.totalGenes).toBeGreaterThan(0);
+  });
+
   it('supports release control update and rollback', async () => {
     const updateResponse = await fetch(
       `${baseUrl}/api/memory/release/control`,
@@ -422,12 +504,25 @@ describe('runtime api memory validation', () => {
     });
     const invalidRatingBody = (await invalidRating.json()) as { code?: string };
 
+    const invalidTimelineLimit = await fetch(
+      `${baseUrl}/api/evolution/metrics/dashboard?timelineLimit=999`,
+      {
+        method: 'GET',
+        headers,
+      },
+    );
+    const invalidTimelineLimitBody = (await invalidTimelineLimit.json()) as {
+      code?: string;
+    };
+
     expect(invalidLimit.status).toBe(400);
     expect(invalidLimitBody.code).toBe('INVALID_LIMIT');
     expect(invalidSubmitTags.status).toBe(400);
     expect(invalidSubmitTagsBody.code).toBe('INVALID_TAGS');
     expect(invalidRating.status).toBe(400);
     expect(invalidRatingBody.code).toBe('INVALID_RATING');
+    expect(invalidTimelineLimit.status).toBe(400);
+    expect(invalidTimelineLimitBody.code).toBe('INVALID_TIMELINELIMIT');
   });
 
   it('enforces evolution api rate limiting', async () => {

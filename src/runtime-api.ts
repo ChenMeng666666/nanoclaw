@@ -434,6 +434,38 @@ export async function startRuntimeAPI(
 
       // ===== 进化库 API =====
 
+      if (path === '/api/evolution/metrics/dashboard' && req.method === 'GET') {
+        const timelineLimit = parseOptionalIntegerInRange(
+          url.searchParams.get('timelineLimit'),
+          'timelineLimit',
+          1,
+          200,
+        );
+        const dashboard = evolutionManager.getDashboardMetrics(
+          timelineLimit ?? 30,
+        );
+        writeJSON(res, 200, dashboard);
+        return;
+      }
+
+      if (
+        path === '/api/governance/metrics/dashboard' &&
+        req.method === 'GET'
+      ) {
+        const timelineLimit = parseOptionalIntegerInRange(
+          url.searchParams.get('timelineLimit'),
+          'timelineLimit',
+          1,
+          200,
+        );
+        writeJSON(res, 200, {
+          generatedAt: new Date().toISOString(),
+          evolution: evolutionManager.getDashboardMetrics(timelineLimit ?? 30),
+          memory: memoryManager.getDashboardMetrics(timelineLimit ?? 24),
+        });
+        return;
+      }
+
       if (path === '/api/evolution/query' && req.method === 'POST') {
         const body = await readJSON(req);
         const query = parseRequiredString(body.query, 'query');
@@ -2156,6 +2188,8 @@ function isMemoryApiPath(path: string): boolean {
 
 function isEvolutionApiPath(path: string): boolean {
   return (
+    path === '/api/evolution/metrics/dashboard' ||
+    path === '/api/governance/metrics/dashboard' ||
     path === '/api/evolution/query' ||
     path === '/api/evolution/submit' ||
     path === '/api/evolution/feedback'

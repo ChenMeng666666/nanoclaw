@@ -393,15 +393,13 @@ interface AbilityChain {
 
 ### 进化系统 API
 
-| 端点                          | 方法 | 说明                            |
-| ----------------------------- | ---- | ------------------------------- |
-| `/api/evolution/submit`       | POST | 提交经验（自动生成 Gene）       |
-| `/api/evolution/search`       | POST | 搜索进化库（支持 GDI 评分排序） |
-| `/api/evolution/gene/:id`     | GET  | 获取 Gene 详情                  |
-| `/api/evolution/capsule/:id`  | GET  | 获取 Capsule 详情               |
-| `/api/evolution/feedback`     | POST | 提交使用反馈                    |
-| `/api/evolution/chain/create` | POST | 创建 Ability Chain              |
-| `/api/evolution/metrics`      | GET  | 获取生态系统指标                |
+| 端点                               | 方法 | 说明                                   |
+| ---------------------------------- | ---- | -------------------------------------- |
+| `/api/evolution/query`             | POST | 查询进化库（支持标签与 limit）         |
+| `/api/evolution/submit`            | POST | 提交经验（自动生成 Gene）              |
+| `/api/evolution/feedback`          | POST | 提交使用反馈                           |
+| `/api/evolution/metrics/dashboard` | GET  | 获取进化看板指标（summary + timeline） |
+| `/api/governance/metrics/dashboard`| GET  | 获取统一治理看板（进化 + 记忆）        |
 
 ### 审核流程
 

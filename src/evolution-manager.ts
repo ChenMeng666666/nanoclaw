@@ -83,6 +83,32 @@ export interface ReviewConfig {
   strategy: EvolutionStrategy;
 }
 
+export interface EvolutionDashboardSnapshot {
+  timestamp: string;
+  shannonDiversity: number;
+  avgGDIScore: number;
+  totalGenes: number;
+  totalCapsules: number;
+  promotedGenes: number;
+  staleGenes: number;
+  archivedGenes: number;
+}
+
+export interface EvolutionDashboardMetrics {
+  generatedAt: string;
+  summary: {
+    shannonDiversity: number;
+    avgGDIScore: number;
+    totalGenes: number;
+    totalCapsules: number;
+    promotedGenes: number;
+    staleGenes: number;
+    archivedGenes: number;
+    promotionRate: number;
+  };
+  timeline: EvolutionDashboardSnapshot[];
+}
+
 /**
  * 默认配置
  */
@@ -817,6 +843,39 @@ export class EvolutionManager {
       archivedGenes: metrics.archivedGenes,
     });
     logger.info('Ecosystem metrics snapshot saved (GEP)');
+  }
+
+  getDashboardMetrics(timelineLimit: number = 30): EvolutionDashboardMetrics {
+    const safeLimit = Math.max(1, Math.min(200, timelineLimit));
+    const current = this.calculateEcosystemMetrics();
+    const timeline = getEcosystemMetrics(safeLimit)
+      .map((item) => ({
+        timestamp: item.timestamp,
+        shannonDiversity: item.shannonDiversity,
+        avgGDIScore: item.avgGDIScore,
+        totalGenes: item.totalGenes,
+        totalCapsules: item.totalCapsules,
+        promotedGenes: item.promotedGenes,
+        staleGenes: item.staleGenes,
+        archivedGenes: item.archivedGenes,
+      }))
+      .reverse();
+    const promotionRate =
+      current.totalGenes > 0 ? current.promotedGenes / current.totalGenes : 0;
+    return {
+      generatedAt: new Date().toISOString(),
+      summary: {
+        shannonDiversity: current.shannonDiversity,
+        avgGDIScore: current.avgGDIScore,
+        totalGenes: current.totalGenes,
+        totalCapsules: current.totalCapsules,
+        promotedGenes: current.promotedGenes,
+        staleGenes: current.staleGenes,
+        archivedGenes: current.archivedGenes,
+        promotionRate,
+      },
+      timeline,
+    };
   }
 
   // ===== 信号去重机制 =====
