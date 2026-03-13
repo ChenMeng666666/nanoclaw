@@ -1,6 +1,6 @@
 # NanoClaw 完整架构文档
 
-> 最后更新: 2026-03-13 11:10
+> 最后更新: 2026-03-14 10:30
 
 ## 目录
 
@@ -130,10 +130,11 @@ NanoClaw 是一个个人 Claude 助手，其设计哲学是：
 
 ### 分层记忆架构
 
-NanoClaw 实现了三级分层记忆系统，并采用「ContextEngine + MemoryManager」双入口协作：
+NanoClaw 实现了三级分层记忆系统，并将 `ContextEngine` 冻结为唯一主消息链路，`MemoryManager` 作为治理与服务层：
 
-- **主消息链路**: ContextEngine 执行 `assemble -> ingest -> afterTurn`
-- **运行时与治理链路**: MemoryManager 提供增删查、迁移、指标与发布控制
+- **主消息链路（唯一）**: `ContextEngine` 执行 `assemble -> ingest -> afterTurn`
+- **治理与运行时链路**: `MemoryManager` 提供增删查、迁移、指标、发布控制与回滚
+- **链路开关策略**: `MEMORY_MAIN_PIPELINE=context_engine` 为默认生产值；`memory_manager` 仅用于降级兼容
 - **迁移方向**: 单向 L1 -> L2 -> L3
 
 ```
@@ -417,6 +418,14 @@ interface AbilityChain {
    - 使用反馈评分过低
    - 长时间未使用
    - 安全问题报告
+
+### 进化闭环与治理强化（P0/P1）
+
+- **Capsule 晋升语义对齐**: 主流程只在有效成功结果下构建 `outcome.status='success'` 的晋升输入
+- **冷启动晋升可达**: 晋升判定不再依赖 `capsules.length` 近似计数，首个 Capsule 可在受控条件下产生
+- **配置驱动阈值**: duplicate 阈值、GDI 晋升阈值、metrics 快照间隔均由配置统一消费
+- **API 防线增强**: evolution 路由补齐参数边界校验，并加入限流与并发保护，避免异常输入与资源放大
+- **统一观测看板**: 提供 `evolution` 与 `governance` 指标看板，便于跨系统审计与回归排查
 
 ---
 
@@ -1276,6 +1285,6 @@ systemctl --user status nanoclaw
 
 ---
 
-**文档版本**: 1.1.1
-**最后更新**: 2026-03-13 11:10
+**文档版本**: 1.2.0
+**最后更新**: 2026-03-14 10:30
 **维护者**: NanoClaw Team
