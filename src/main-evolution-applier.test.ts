@@ -56,6 +56,15 @@ describe('MainEvolutionApplier', () => {
       }),
     );
     expect(createCapsule).toHaveBeenCalledTimes(1);
+    expect(createCapsule).toHaveBeenCalledWith(
+      42,
+      ['error'],
+      expect.any(Number),
+      { files: 1, lines: 40 },
+      expect.objectContaining({
+        status: 'success',
+      }),
+    );
     expect(updateGeneGDIScore).toHaveBeenCalledWith(42);
   });
 

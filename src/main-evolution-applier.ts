@@ -237,7 +237,7 @@ export class MainEvolutionApplier {
       trigger: gene.signalsMatch?.length ? gene.signalsMatch : [category],
       confidence,
       blastRadius,
-      outcome: { status: 'partial', score: outcomeScore },
+      outcome: { status: 'success', score: outcomeScore },
     });
 
     this.updateGeneGDIScore(gene.id);

@@ -34,7 +34,6 @@ import {
   createCapsule,
   getCapsuleById,
   getCapsulesByGeneId,
-  updateCapsuleSuccessStreak,
   createAbilityChain,
   getAbilityChain,
   updateAbilityChain,
@@ -488,19 +487,44 @@ export class EvolutionManager {
     const capsules = getCapsulesByGeneId(geneId);
     const successStreak = this.calculateSuccessStreak(capsules, outcome.status);
 
-    const shouldPromote = this.shouldPromoteToCapsule(
-      capsules.length,
+    const successfulValidationCount =
+      this.calculateSuccessfulValidationCount(geneId);
+    const promotionDecision = this.shouldPromoteToCapsule(
+      successfulValidationCount,
       successStreak,
       confidence,
       outcome.status,
+      capsules.length,
     );
 
-    if (!shouldPromote) {
-      throw new Error('Gene does not meet capsule promotion criteria');
+    if (!promotionDecision.shouldPromote) {
+      logger.warn(
+        {
+          geneId,
+          confidence,
+          outcomeStatus: outcome.status,
+          successStreak,
+          successfulValidationCount,
+          existingCapsuleCount: capsules.length,
+          promotionMode: promotionDecision.mode,
+          promotionBlockReasons: promotionDecision.reasonCodes,
+        },
+        'Capsule promotion blocked by criteria',
+      );
+      throw new Error(
+        `CAPSULE_PROMOTION_BLOCKED:${promotionDecision.reasonCodes.join(',')}`,
+      );
     }
 
     // 生成 capsule asset_id
-    const capsuleContent = JSON.stringify({ geneId, trigger, outcome });
+    const approvedAt = new Date().toISOString();
+    const capsuleContent = JSON.stringify({
+      geneId,
+      trigger,
+      outcome,
+      approvedAt,
+      nonce: crypto.randomBytes(8).toString('hex'),
+    });
     const capsuleId = generateAssetId(capsuleContent);
 
     // 创建 Capsule
@@ -518,7 +542,7 @@ export class EvolutionManager {
         runtime: `Node.js ${process.version}`,
       },
       successStreak,
-      approvedAt: new Date().toISOString(),
+      approvedAt,
     });
 
     // 更新 Gene 的生态系统状态
@@ -994,16 +1018,51 @@ export class EvolutionManager {
     successStreak: number,
     confidence: number,
     outcomeStatus: string,
-  ): boolean {
+    existingCapsuleCount: number,
+  ): {
+    shouldPromote: boolean;
+    mode: 'cold_start' | 'standard';
+    reasonCodes: string[];
+  } {
     const { minSuccessCount, minSuccessStreak, minConfidence } =
       EVOLUTION_CONFIG.capsulePromotion;
+    const reasonCodes: string[] = [];
 
-    return (
-      successCount >= minSuccessCount &&
-      successStreak >= minSuccessStreak &&
-      confidence >= minConfidence &&
-      outcomeStatus === 'success'
-    );
+    if (outcomeStatus !== 'success') {
+      reasonCodes.push('OUTCOME_NOT_SUCCESS');
+    }
+    if (confidence < minConfidence) {
+      reasonCodes.push('CONFIDENCE_BELOW_THRESHOLD');
+    }
+
+    if (existingCapsuleCount === 0) {
+      if (successStreak < 1) {
+        reasonCodes.push('COLD_START_REQUIRES_SUCCESS_STREAK');
+      }
+      return {
+        shouldPromote: reasonCodes.length === 0,
+        mode: 'cold_start',
+        reasonCodes,
+      };
+    }
+
+    if (successCount < minSuccessCount) {
+      reasonCodes.push('SUCCESS_COUNT_BELOW_THRESHOLD');
+    }
+    if (successStreak < minSuccessStreak) {
+      reasonCodes.push('SUCCESS_STREAK_BELOW_THRESHOLD');
+    }
+
+    return {
+      shouldPromote: reasonCodes.length === 0,
+      mode: 'standard',
+      reasonCodes,
+    };
+  }
+
+  private calculateSuccessfulValidationCount(geneId: number): number {
+    const reports = getValidationReportsByGeneId(geneId);
+    return reports.filter((report) => report.success).length;
   }
 
   /**

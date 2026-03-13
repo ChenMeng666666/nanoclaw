@@ -1630,7 +1630,7 @@ export function getCapsuleById(id: string): any | undefined {
 
 export function getCapsulesByGeneId(geneId: number): any[] {
   const rows = db
-    .prepare('SELECT * FROM capsules WHERE gene_id = ?')
+    .prepare('SELECT * FROM capsules WHERE gene_id = ? ORDER BY created_at ASC')
     .all(geneId) as Array<{
     id: string;
     gene_id: number;
