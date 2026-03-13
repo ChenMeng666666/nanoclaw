@@ -65,6 +65,15 @@ const learningAutomationState = new Set<string>();
 let learningNeedsLlmProvider: LocalLLMQueryExpansionProvider | null = null;
 let learningNeedsLlmInitPromise: Promise<void> | null = null;
 const MEMORY_LEVELS = new Set(['L1', 'L2', 'L3']);
+const MEMORY_SCOPES = new Set(['session', 'user', 'agent', 'global']);
+const MEMORY_SOURCE_TYPES = new Set(['direct', 'extracted', 'summary']);
+const MEMORY_MESSAGE_TYPES = new Set([
+  'user',
+  'system',
+  'bot',
+  'code',
+  'document',
+]);
 
 // 检查端口是否可用
 function checkPortAvailable(port: number): Promise<boolean> {
@@ -199,12 +208,31 @@ export async function startRuntimeAPI(
         );
         const userJid = parseOptionalString(body.userJid);
         const limit = parseMemoryLimit(body.limit);
+        const scope = parseOptionalMemoryScope(body.scope, 'scope');
+        const sessionId = parseOptionalString(body.sessionId);
+        const sourceType = parseOptionalMemorySourceType(
+          body.sourceType,
+          'sourceType',
+        );
+        const messageType = parseOptionalMemoryMessageType(
+          body.messageType,
+          'messageType',
+        );
+        const tags = parseOptionalStringArray(body.tags, 'tags');
+        const normalizedScope = normalizeMemoryScope(scope, sessionId);
 
         const memories = await memoryManager.searchMemories(
           agentFolder,
           query,
           limit,
           userJid,
+          {
+            scope: normalizedScope,
+            sessionId,
+            sourceType,
+            messageType,
+            tags,
+          },
         );
 
         writeJSON(res, 200, { memories });
@@ -220,6 +248,18 @@ export async function startRuntimeAPI(
         const content = parseRequiredString(body.content, 'content');
         const level = parseMemoryLevel(body.level ?? 'L1', 'level');
         const userJid = parseOptionalString(body.userJid);
+        const scope = parseOptionalMemoryScope(body.scope, 'scope');
+        const sessionId = parseOptionalString(body.sessionId);
+        const sourceType = parseOptionalMemorySourceType(
+          body.sourceType,
+          'sourceType',
+        );
+        const messageType = parseOptionalMemoryMessageType(
+          body.messageType,
+          'messageType',
+        );
+        const tags = parseOptionalStringArray(body.tags, 'tags');
+        const normalizedScope = normalizeMemoryScope(scope, sessionId);
 
         if (content.length > MEMORY_CONFIG.api.maxContentLength) {
           throw createApiError(
@@ -229,29 +269,57 @@ export async function startRuntimeAPI(
           );
         }
 
-        await memoryManager.addMemory(agentFolder, content, level, userJid);
+        await memoryManager.addMemory(agentFolder, content, level, userJid, {
+          scope: normalizedScope,
+          sessionId,
+          sourceType,
+          messageType,
+          tags,
+        });
 
         writeJSON(res, 200, { success: true });
         return;
       }
 
       if (path === '/api/memory/list' && req.method === 'GET') {
-        const agentFolder = url.searchParams.get('agentFolder');
+        const agentFolder = parseRequiredString(
+          url.searchParams.get('agentFolder'),
+          'agentFolder',
+        );
         const levelParam = url.searchParams.get('level');
         const level = levelParam
           ? parseMemoryLevel(levelParam, 'level')
           : undefined;
         const userJid = url.searchParams.get('userJid') || undefined;
+        const scopeParam = url.searchParams.get('scope');
+        const scope = scopeParam
+          ? parseOptionalMemoryScope(scopeParam, 'scope')
+          : undefined;
+        const sessionId = url.searchParams.get('sessionId') || undefined;
+        const sourceTypeParam = url.searchParams.get('sourceType');
+        const sourceType = sourceTypeParam
+          ? parseOptionalMemorySourceType(sourceTypeParam, 'sourceType')
+          : undefined;
+        const messageTypeParam = url.searchParams.get('messageType');
+        const messageType = messageTypeParam
+          ? parseOptionalMemoryMessageType(messageTypeParam, 'messageType')
+          : undefined;
+        const tagsParam = url.searchParams.get('tags');
+        const tags = tagsParam
+          ? tagsParam
+              .split(',')
+              .map((tag) => tag.trim())
+              .filter((tag) => tag.length > 0)
+          : undefined;
+        const normalizedScope = normalizeMemoryScope(scope, sessionId);
 
-        if (!agentFolder) {
-          throw createApiError(
-            400,
-            'INVALID_AGENT_FOLDER',
-            'agentFolder is required',
-          );
-        }
-
-        const memories = getMemories(agentFolder, level, userJid);
+        const memories = getMemories(agentFolder, level, userJid, {
+          scope: normalizedScope,
+          sessionId,
+          sourceType,
+          messageType,
+          tags,
+        });
 
         writeJSON(res, 200, { memories });
         return;
@@ -1791,6 +1859,102 @@ function parseMemoryLevel(value: unknown, field: string): 'L1' | 'L2' | 'L3' {
     );
   }
   return value as 'L1' | 'L2' | 'L3';
+}
+
+function parseOptionalMemoryScope(
+  value: unknown,
+  field: string,
+): 'session' | 'user' | 'agent' | 'global' | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+  if (typeof value !== 'string' || !MEMORY_SCOPES.has(value)) {
+    throw createApiError(
+      400,
+      `INVALID_${field.toUpperCase()}`,
+      `${field} must be one of session, user, agent, global`,
+    );
+  }
+  return value as 'session' | 'user' | 'agent' | 'global';
+}
+
+function parseOptionalMemorySourceType(
+  value: unknown,
+  field: string,
+): 'direct' | 'extracted' | 'summary' | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+  if (typeof value !== 'string' || !MEMORY_SOURCE_TYPES.has(value)) {
+    throw createApiError(
+      400,
+      `INVALID_${field.toUpperCase()}`,
+      `${field} must be one of direct, extracted, summary`,
+    );
+  }
+  return value as 'direct' | 'extracted' | 'summary';
+}
+
+function parseOptionalMemoryMessageType(
+  value: unknown,
+  field: string,
+): 'user' | 'system' | 'bot' | 'code' | 'document' | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+  if (typeof value !== 'string' || !MEMORY_MESSAGE_TYPES.has(value)) {
+    throw createApiError(
+      400,
+      `INVALID_${field.toUpperCase()}`,
+      `${field} must be one of user, system, bot, code, document`,
+    );
+  }
+  return value as 'user' | 'system' | 'bot' | 'code' | 'document';
+}
+
+function parseOptionalStringArray(
+  value: unknown,
+  field: string,
+): string[] | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw createApiError(
+      400,
+      `INVALID_${field.toUpperCase()}`,
+      `${field} must be an array`,
+    );
+  }
+  const parsed = value
+    .filter((item) => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+  return parsed.length > 0 ? parsed : undefined;
+}
+
+function normalizeMemoryScope(
+  scope: 'session' | 'user' | 'agent' | 'global' | undefined,
+  sessionId: string | undefined,
+): 'session' | 'user' | 'agent' | 'global' | undefined {
+  if (scope === 'session' && !sessionId) {
+    throw createApiError(
+      400,
+      'INVALID_SESSIONID',
+      'sessionId is required when scope=session',
+    );
+  }
+  if (scope && scope !== 'session' && sessionId) {
+    throw createApiError(
+      400,
+      'INVALID_SCOPE_SESSION_COMBINATION',
+      'sessionId can only be used with scope=session',
+    );
+  }
+  if (!scope && sessionId) {
+    return 'session';
+  }
+  return scope;
 }
 
 function parseMemoryLimit(value: unknown): number {

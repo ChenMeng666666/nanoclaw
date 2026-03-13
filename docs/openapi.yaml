@@ -31,6 +31,11 @@ components:
           type: string
         userJid:
           type: string
+        sessionId:
+          type: string
+        scope:
+          type: string
+          enum: [session, user, agent, global]
         level:
           type: string
           enum: [L1, L2, L3]
@@ -40,7 +45,25 @@ components:
           type: number
         accessCount:
           type: number
+        lastAccessedAt:
+          type: string
+          format: date-time
+        messageType:
+          type: string
+          enum: [user, system, bot, code, document]
+        timestampWeight:
+          type: number
+        tags:
+          type: array
+          items:
+            type: string
+        sourceType:
+          type: string
+          enum: [direct, extracted, summary]
         createdAt:
+          type: string
+          format: date-time
+        updatedAt:
           type: string
           format: date-time
 
@@ -342,6 +365,21 @@ paths:
                 limit:
                   type: number
                   default: 10
+                scope:
+                  type: string
+                  enum: [session, user, agent, global]
+                sessionId:
+                  type: string
+                sourceType:
+                  type: string
+                  enum: [direct, extracted, summary]
+                messageType:
+                  type: string
+                  enum: [user, system, bot, code, document]
+                tags:
+                  type: array
+                  items:
+                    type: string
       responses:
         '200':
           description: List of memories
@@ -377,6 +415,21 @@ paths:
                   default: L1
                 userJid:
                   type: string
+                scope:
+                  type: string
+                  enum: [session, user, agent, global]
+                sessionId:
+                  type: string
+                sourceType:
+                  type: string
+                  enum: [direct, extracted, summary]
+                messageType:
+                  type: string
+                  enum: [user, system, bot, code, document]
+                tags:
+                  type: array
+                  items:
+                    type: string
       responses:
         '200':
           description: Success
@@ -405,6 +458,30 @@ paths:
             enum: [L1, L2, L3]
         - in: query
           name: userJid
+          schema:
+            type: string
+        - in: query
+          name: scope
+          schema:
+            type: string
+            enum: [session, user, agent, global]
+        - in: query
+          name: sessionId
+          schema:
+            type: string
+        - in: query
+          name: sourceType
+          schema:
+            type: string
+            enum: [direct, extracted, summary]
+        - in: query
+          name: messageType
+          schema:
+            type: string
+            enum: [user, system, bot, code, document]
+        - in: query
+          name: tags
+          description: Comma-separated tags
           schema:
             type: string
       responses:

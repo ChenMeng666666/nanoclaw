@@ -16,7 +16,6 @@ import {
   updateMemory,
   incrementMemoryAccess,
   deleteMemory,
-  getUserMemories,
 } from '../db-agents.js';
 import { getRecentMessagesWithinWindow } from '../db.js';
 import {
@@ -173,6 +172,8 @@ export class DefaultContextEngine implements ContextEngine {
         id: this.generateMemoryId(),
         agentFolder: this.agentFolder,
         userJid: message.sender,
+        sessionId: context.sessionId || message.chat_jid,
+        scope: context.sessionId || message.chat_jid ? 'session' : 'user',
         level: 'L2',
         content,
         embedding,
@@ -181,7 +182,6 @@ export class DefaultContextEngine implements ContextEngine {
         updatedAt: new Date().toISOString(),
         messageType: chunk.type,
         timestampWeight: this.calculateTimestampWeight(message.timestamp),
-        sessionId: context.sessionId,
         tags: this.extractTags(chunk.content),
         sourceType: 'direct',
       };
@@ -460,6 +460,8 @@ export class DefaultContextEngine implements ContextEngine {
     // 获取最近消息
     const messages = this.getRecentMessages(chatJid, limit);
     const userJid = messages[0]?.sender;
+    const sessionId = chatJid;
+    const scopedMemories = this.getScopedMemories(userJid, sessionId);
 
     // 构建查询文本
     const recentContent = messages.map((m) => m.content).join(' ');
@@ -487,9 +489,9 @@ export class DefaultContextEngine implements ContextEngine {
 
       // 向量搜索
       const vectorResults = await this.vectorSearch(
-        this.agentFolder,
         query,
         limit * 2,
+        scopedMemories,
       );
       allVectorResults.push(...vectorResults);
     }
@@ -503,10 +505,15 @@ export class DefaultContextEngine implements ContextEngine {
       uniqueBm25Results,
       uniqueVectorResults,
     );
-    const memoryIds = this.reRankResults(fusedResults, recentContent, limit);
+    const memoryIds = this.reRankResults(
+      fusedResults,
+      recentContent,
+      scopedMemories,
+      limit,
+    );
 
     // 从数据库加载记忆
-    const memories = this.getMemoriesByIds(memoryIds);
+    const memories = this.getMemoriesByIds(memoryIds, scopedMemories);
 
     return {
       agentFolder: this.agentFolder,
@@ -725,12 +732,11 @@ export class DefaultContextEngine implements ContextEngine {
   private reRankResults(
     results: any[],
     query: string,
+    memories: Memory[],
     limit: number,
   ): string[] {
-    // 获取所有记忆内容
-    const allMemories = getMemories(this.agentFolder);
     const memoryMap = new Map<string, Memory>();
-    for (const memory of allMemories) {
+    for (const memory of memories) {
       memoryMap.set(memory.id, memory);
     }
 
@@ -795,15 +801,14 @@ export class DefaultContextEngine implements ContextEngine {
   }
 
   private async vectorSearch(
-    agentFolder: string,
     query: string,
     limit: number,
+    memories: Memory[],
   ): Promise<string[]> {
     const queryEmbedding = await generateEmbedding(query);
     if (queryEmbedding.length === 0) {
       return [];
     }
-    const memories = getMemories(agentFolder);
 
     const scored = memories
       .filter((m) => m.embedding && m.embedding.length > 0)
@@ -818,18 +823,57 @@ export class DefaultContextEngine implements ContextEngine {
     return scored.map((s) => s.id);
   }
 
-  private getMemoriesByIds(ids: string[]): Memory[] {
-    const memoryMap = new Map(
-      getMemories(this.agentFolder).map((memory) => [memory.id, memory]),
-    );
+  private getMemoriesByIds(ids: string[], memories: Memory[]): Memory[] {
+    const memoryMap = new Map(memories.map((memory) => [memory.id, memory]));
     const orderedMemories: Memory[] = [];
     for (const id of ids) {
       const memory = memoryMap.get(id);
       if (memory) {
         orderedMemories.push(memory);
+        incrementMemoryAccess(memory.id);
       }
     }
     return orderedMemories;
+  }
+
+  private getScopedMemories(userJid?: string, sessionId?: string): Memory[] {
+    const ordered: Memory[] = [];
+    const seen = new Set<string>();
+    const groups: Memory[][] = [];
+    if (sessionId) {
+      groups.push(
+        getMemories(this.agentFolder, undefined, userJid, {
+          scope: 'session',
+          sessionId,
+        }),
+      );
+    }
+    if (userJid) {
+      groups.push(
+        getMemories(this.agentFolder, undefined, userJid, {
+          scope: 'user',
+        }),
+      );
+    }
+    groups.push(
+      getMemories(this.agentFolder, undefined, undefined, {
+        scope: 'agent',
+      }),
+    );
+    groups.push(
+      getMemories(this.agentFolder, undefined, undefined, {
+        scope: 'global',
+      }),
+    );
+    for (const group of groups) {
+      for (const memory of group) {
+        if (!seen.has(memory.id)) {
+          seen.add(memory.id);
+          ordered.push(memory);
+        }
+      }
+    }
+    return ordered;
   }
 
   private cosineSimilarity(a: number[], b: number[]): number {

@@ -264,6 +264,8 @@ function createSchema(database: Database.Database): void {
       id TEXT PRIMARY KEY,
       agent_folder TEXT NOT NULL,
       user_jid TEXT,
+      session_id TEXT,
+      scope TEXT DEFAULT 'agent',
       level TEXT NOT NULL,
       content TEXT NOT NULL,
       embedding BLOB,
@@ -271,6 +273,10 @@ function createSchema(database: Database.Database): void {
       importance REAL DEFAULT 0.5,
       access_count INTEGER DEFAULT 0,
       last_accessed_at TEXT,
+      message_type TEXT,
+      timestamp_weight REAL,
+      tags TEXT,
+      source_type TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (agent_folder) REFERENCES agents(folder)
@@ -634,6 +640,56 @@ function createSchema(database: Database.Database): void {
     );
   } catch (err) {
     logger.debug({ err }, 'Failed to create index idx_memories_content_hash');
+  }
+
+  try {
+    database.exec(`ALTER TABLE memories ADD COLUMN session_id TEXT`);
+  } catch (err) {
+    logger.debug({ err }, 'Failed to add session_id column to memories');
+  }
+
+  try {
+    database.exec(`ALTER TABLE memories ADD COLUMN scope TEXT DEFAULT 'agent'`);
+  } catch (err) {
+    logger.debug({ err }, 'Failed to add scope column to memories');
+  }
+
+  try {
+    database.exec(`ALTER TABLE memories ADD COLUMN message_type TEXT`);
+  } catch (err) {
+    logger.debug({ err }, 'Failed to add message_type column to memories');
+  }
+
+  try {
+    database.exec(`ALTER TABLE memories ADD COLUMN timestamp_weight REAL`);
+  } catch (err) {
+    logger.debug({ err }, 'Failed to add timestamp_weight column to memories');
+  }
+
+  try {
+    database.exec(`ALTER TABLE memories ADD COLUMN tags TEXT`);
+  } catch (err) {
+    logger.debug({ err }, 'Failed to add tags column to memories');
+  }
+
+  try {
+    database.exec(`ALTER TABLE memories ADD COLUMN source_type TEXT`);
+  } catch (err) {
+    logger.debug({ err }, 'Failed to add source_type column to memories');
+  }
+
+  try {
+    database.exec(`UPDATE memories SET scope = 'agent' WHERE scope IS NULL`);
+  } catch (err) {
+    logger.debug({ err }, 'Failed to backfill scope for existing memories');
+  }
+
+  try {
+    database.exec(
+      `CREATE INDEX IF NOT EXISTS idx_memories_scope ON memories(scope, agent_folder, user_jid, session_id)`,
+    );
+  } catch (err) {
+    logger.debug({ err }, 'Failed to create index idx_memories_scope');
   }
 }
 

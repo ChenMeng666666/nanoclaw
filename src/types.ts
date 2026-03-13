@@ -360,21 +360,21 @@ export interface UserProfile {
 export interface Memory {
   id: string;
   agentFolder: string;
-  userJid?: string; // 可选：绑定特定用户
+  userJid?: string;
+  sessionId?: string;
+  scope?: 'session' | 'user' | 'agent' | 'global';
   level: 'L1' | 'L2' | 'L3';
   content: string;
-  embedding?: number[]; // 向量嵌入
+  embedding?: number[];
   importance: number;
   accessCount: number;
   lastAccessedAt?: string;
   createdAt: string;
   updatedAt: string;
-  // 新增元数据字段
-  messageType?: 'user' | 'system' | 'bot' | 'code' | 'document'; // 消息类型
-  timestampWeight?: number; // 时间戳权重（用于排序）
-  sessionId?: string; // 会话ID，用于关联上下文
-  tags?: string[]; // 标签，用于分类和检索
-  sourceType?: 'direct' | 'extracted' | 'summary'; // 来源类型
+  messageType?: 'user' | 'system' | 'bot' | 'code' | 'document';
+  timestampWeight?: number;
+  tags?: string[];
+  sourceType?: 'direct' | 'extracted' | 'summary';
 }
 
 /**

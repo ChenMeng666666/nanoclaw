@@ -459,6 +459,86 @@ export function getUserProfile(
 
 // ===== Memories =====
 
+export interface MemoryQueryOptions {
+  scope?: Memory['scope'];
+  sessionId?: string;
+  sourceType?: Memory['sourceType'];
+  tags?: string[];
+  messageType?: Memory['messageType'];
+}
+
+type MemoryRow = {
+  id: string;
+  agent_folder: string;
+  user_jid: string | null;
+  session_id: string | null;
+  scope: string | null;
+  level: string;
+  content: string;
+  embedding: string | null;
+  importance: number;
+  access_count: number;
+  last_accessed_at: string | null;
+  message_type: string | null;
+  timestamp_weight: number | null;
+  tags: string | null;
+  source_type: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function resolveMemoryScope(
+  memory: Omit<Memory, 'accessCount' | 'lastAccessedAt'>,
+): NonNullable<Memory['scope']> {
+  if (memory.scope) {
+    return memory.scope;
+  }
+  if (memory.sessionId) {
+    return 'session';
+  }
+  if (memory.userJid) {
+    return 'user';
+  }
+  return 'agent';
+}
+
+function validateScopeSession(
+  scope: Memory['scope'] | undefined,
+  sessionId: string | undefined,
+): void {
+  if (scope === 'session' && !sessionId) {
+    throw new Error('sessionId is required when scope is session');
+  }
+  if (scope && scope !== 'session' && sessionId) {
+    throw new Error('sessionId can only be used when scope is session');
+  }
+}
+
+function mapMemoryRow(row: MemoryRow): Memory {
+  return {
+    id: row.id,
+    agentFolder: row.agent_folder,
+    userJid: row.user_jid || undefined,
+    sessionId: row.session_id || undefined,
+    scope: (row.scope as Memory['scope']) || undefined,
+    level: row.level as 'L1' | 'L2' | 'L3',
+    content: row.content,
+    embedding: safeJsonParse(row.embedding, undefined),
+    importance: row.importance,
+    accessCount: row.access_count,
+    lastAccessedAt: row.last_accessed_at || undefined,
+    messageType: (row.message_type as Memory['messageType']) || undefined,
+    timestampWeight:
+      typeof row.timestamp_weight === 'number'
+        ? row.timestamp_weight
+        : undefined,
+    tags: safeJsonParse(row.tags, undefined),
+    sourceType: (row.source_type as Memory['sourceType']) || undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export function createMemory(
   memory: Omit<Memory, 'accessCount' | 'lastAccessedAt'>,
 ): void {
@@ -467,20 +547,28 @@ export function createMemory(
     .createHash('sha256')
     .update(memory.content)
     .digest('hex');
+  const scope = resolveMemoryScope(memory);
+  validateScopeSession(scope, memory.sessionId);
   db.prepare(
     `
-    INSERT INTO memories (id, agent_folder, user_jid, level, content, embedding, content_hash, importance, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO memories (id, agent_folder, user_jid, session_id, scope, level, content, embedding, content_hash, importance, message_type, timestamp_weight, tags, source_type, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `,
   ).run(
     memory.id,
     memory.agentFolder,
     memory.userJid || null,
+    memory.sessionId || null,
+    scope,
     memory.level,
     memory.content,
     memory.embedding ? JSON.stringify(memory.embedding) : null,
     contentHash,
     memory.importance || 0.5,
+    memory.messageType || null,
+    memory.timestampWeight ?? null,
+    memory.tags ? JSON.stringify(memory.tags) : null,
+    memory.sourceType || null,
     now,
     now,
   );
@@ -490,6 +578,7 @@ export function getMemories(
   agentFolder: string,
   level?: 'L1' | 'L2' | 'L3',
   userJid?: string,
+  options?: MemoryQueryOptions,
 ): Memory[] {
   let sql = 'SELECT * FROM memories WHERE agent_folder = ?';
   const params: unknown[] = [agentFolder];
@@ -502,36 +591,32 @@ export function getMemories(
     sql += ' AND (user_jid = ? OR user_jid IS NULL)';
     params.push(userJid);
   }
+  if (options?.scope) {
+    sql += ' AND scope = ?';
+    params.push(options.scope);
+  }
+  if (options?.sessionId) {
+    sql += ' AND session_id = ?';
+    params.push(options.sessionId);
+  }
+  if (options?.sourceType) {
+    sql += ' AND source_type = ?';
+    params.push(options.sourceType);
+  }
+  if (options?.messageType) {
+    sql += ' AND message_type = ?';
+    params.push(options.messageType);
+  }
+  if (options?.tags && options.tags.length > 0) {
+    const tagClauses = options.tags.map(() => 'tags LIKE ?').join(' OR ');
+    sql += ` AND (${tagClauses})`;
+    params.push(...options.tags.map((tag) => `%"${tag}"%`));
+  }
 
   sql += ' ORDER BY importance DESC, access_count DESC';
 
-  const rows = db.prepare(sql).all(...params) as Array<{
-    id: string;
-    agent_folder: string;
-    user_jid: string | null;
-    level: string;
-    content: string;
-    embedding: string | null;
-    importance: number;
-    access_count: number;
-    last_accessed_at: string | null;
-    created_at: string;
-    updated_at: string;
-  }>;
-
-  return rows.map((row) => ({
-    id: row.id,
-    agentFolder: row.agent_folder,
-    userJid: row.user_jid || undefined,
-    level: row.level as 'L1' | 'L2' | 'L3',
-    content: row.content,
-    embedding: safeJsonParse(row.embedding, undefined),
-    importance: row.importance,
-    accessCount: row.access_count,
-    lastAccessedAt: row.last_accessed_at || undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+  const rows = db.prepare(sql).all(...params) as MemoryRow[];
+  return rows.map(mapMemoryRow);
 }
 
 export function getAllMemories(level?: 'L1' | 'L2' | 'L3'): Memory[] {
@@ -545,33 +630,8 @@ export function getAllMemories(level?: 'L1' | 'L2' | 'L3'): Memory[] {
 
   sql += ' ORDER BY importance DESC, access_count DESC';
 
-  const rows = db.prepare(sql).all(...params) as Array<{
-    id: string;
-    agent_folder: string;
-    user_jid: string | null;
-    level: string;
-    content: string;
-    embedding: string | null;
-    importance: number;
-    access_count: number;
-    last_accessed_at: string | null;
-    created_at: string;
-    updated_at: string;
-  }>;
-
-  return rows.map((row) => ({
-    id: row.id,
-    agentFolder: row.agent_folder,
-    userJid: row.user_jid || undefined,
-    level: row.level as 'L1' | 'L2' | 'L3',
-    content: row.content,
-    embedding: safeJsonParse(row.embedding, undefined),
-    importance: row.importance,
-    accessCount: row.access_count,
-    lastAccessedAt: row.last_accessed_at || undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+  const rows = db.prepare(sql).all(...params) as MemoryRow[];
+  return rows.map(mapMemoryRow);
 }
 
 /**
@@ -581,6 +641,7 @@ export function getUserMemories(
   agentFolder: string,
   userJid: string,
   levels?: ('L1' | 'L2' | 'L3')[],
+  options?: MemoryQueryOptions,
 ): Memory[] {
   let sql =
     'SELECT * FROM memories WHERE agent_folder = ? AND (user_jid = ? OR user_jid IS NULL)';
@@ -591,36 +652,19 @@ export function getUserMemories(
     sql += ` AND level IN (${placeholders})`;
     params.push(...levels);
   }
+  if (options?.scope) {
+    sql += ' AND scope = ?';
+    params.push(options.scope);
+  }
+  if (options?.sessionId) {
+    sql += ' AND session_id = ?';
+    params.push(options.sessionId);
+  }
 
   sql += ' ORDER BY level, importance DESC, access_count DESC';
 
-  const rows = db.prepare(sql).all(...params) as Array<{
-    id: string;
-    agent_folder: string;
-    user_jid: string | null;
-    level: string;
-    content: string;
-    embedding: string | null;
-    importance: number;
-    access_count: number;
-    last_accessed_at: string | null;
-    created_at: string;
-    updated_at: string;
-  }>;
-
-  return rows.map((row) => ({
-    id: row.id,
-    agentFolder: row.agent_folder,
-    userJid: row.user_jid || undefined,
-    level: row.level as 'L1' | 'L2' | 'L3',
-    content: row.content,
-    embedding: safeJsonParse(row.embedding, undefined),
-    importance: row.importance,
-    accessCount: row.access_count,
-    lastAccessedAt: row.last_accessed_at || undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+  const rows = db.prepare(sql).all(...params) as MemoryRow[];
+  return rows.map(mapMemoryRow);
 }
 
 /**
@@ -644,29 +688,39 @@ export function getDuplicateMemory(
 
   sql += ' ORDER BY created_at DESC LIMIT 1';
 
-  const row = db.prepare(sql).get(...params) as any;
+  const row = db.prepare(sql).get(...params) as MemoryRow | undefined;
   if (!row) return undefined;
-  return {
-    id: row.id,
-    agentFolder: row.agent_folder,
-    userJid: row.user_jid || undefined,
-    level: row.level as 'L1' | 'L2' | 'L3',
-    content: row.content,
-    embedding: safeJsonParse(row.embedding, undefined),
-    importance: row.importance,
-    accessCount: row.access_count,
-    lastAccessedAt: row.last_accessed_at || undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+  return mapMemoryRow(row);
 }
 
 export function updateMemory(
   id: string,
   updates: Partial<
-    Pick<Memory, 'content' | 'importance' | 'embedding' | 'level' | 'updatedAt'>
+    Pick<
+      Memory,
+      | 'content'
+      | 'importance'
+      | 'embedding'
+      | 'level'
+      | 'updatedAt'
+      | 'messageType'
+      | 'timestampWeight'
+      | 'sessionId'
+      | 'tags'
+      | 'sourceType'
+      | 'scope'
+    >
   >,
 ): void {
+  const existing = db
+    .prepare('SELECT scope, session_id FROM memories WHERE id = ?')
+    .get(id) as { scope: string | null; session_id: string | null } | undefined;
+  const nextScope = (updates.scope ?? existing?.scope ?? undefined) as
+    | Memory['scope']
+    | undefined;
+  const nextSessionId = updates.sessionId ?? existing?.session_id ?? undefined;
+  validateScopeSession(nextScope, nextSessionId);
+
   const fields: string[] = [];
   const values: unknown[] = [];
 
@@ -692,6 +746,30 @@ export function updateMemory(
   if (updates.level !== undefined) {
     fields.push('level = ?');
     values.push(updates.level);
+  }
+  if (updates.messageType !== undefined) {
+    fields.push('message_type = ?');
+    values.push(updates.messageType);
+  }
+  if (updates.timestampWeight !== undefined) {
+    fields.push('timestamp_weight = ?');
+    values.push(updates.timestampWeight);
+  }
+  if (updates.sessionId !== undefined) {
+    fields.push('session_id = ?');
+    values.push(updates.sessionId);
+  }
+  if (updates.tags !== undefined) {
+    fields.push('tags = ?');
+    values.push(JSON.stringify(updates.tags));
+  }
+  if (updates.sourceType !== undefined) {
+    fields.push('source_type = ?');
+    values.push(updates.sourceType);
+  }
+  if (updates.scope !== undefined) {
+    fields.push('scope = ?');
+    values.push(updates.scope);
   }
 
   if (fields.length === 0) return;

@@ -9,6 +9,7 @@ import {
   createMemory,
   getAllMemories,
   getMemories,
+  MemoryQueryOptions,
   updateMemory,
   incrementMemoryAccess,
   deleteMemory,
@@ -18,6 +19,14 @@ import { Memory } from './types.js';
 import { logger } from './logger.js';
 import { generateEmbedding as generateEmbeddingFromProvider } from './embedding-providers/registry.js';
 import { MEMORY_CONFIG } from './config.js';
+
+interface MemoryMetadataInput {
+  scope?: Memory['scope'];
+  sessionId?: string;
+  sourceType?: Memory['sourceType'];
+  messageType?: Memory['messageType'];
+  tags?: string[];
+}
 
 /**
  * 生成文本的向量嵌入
@@ -131,6 +140,7 @@ export class MemoryManager {
         id: this.generateMemoryId(),
         agentFolder,
         userJid,
+        scope: userJid ? 'user' : 'agent',
         level: 'L1',
         content,
         embedding,
@@ -186,6 +196,7 @@ export class MemoryManager {
     content: string,
     level: 'L1' | 'L2' | 'L3' = 'L1',
     userJid?: string,
+    metadata?: MemoryMetadataInput,
   ): Promise<void> {
     // 检查重复记忆
     const contentHash = crypto
@@ -215,10 +226,18 @@ export class MemoryManager {
       id: this.generateMemoryId(),
       agentFolder,
       userJid,
+      sessionId: metadata?.sessionId,
+      scope:
+        metadata?.scope ||
+        (metadata?.sessionId ? 'session' : userJid ? 'user' : 'agent'),
       level,
       content,
       embedding,
       importance,
+      messageType: metadata?.messageType,
+      timestampWeight: 0.5,
+      tags: metadata?.tags,
+      sourceType: metadata?.sourceType || 'direct',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -289,9 +308,10 @@ export class MemoryManager {
     query: string,
     limit: number = 10,
     userJid?: string,
+    options?: MemoryQueryOptions,
   ): Promise<Memory[]> {
     const queryEmbedding = await generateEmbedding(query);
-    const memories = getMemories(agentFolder, undefined, userJid);
+    const memories = getMemories(agentFolder, undefined, userJid, options);
 
     // 计算余弦相似度
     const scored = memories
@@ -303,7 +323,11 @@ export class MemoryManager {
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
 
-    return scored.map((s) => s.memory);
+    const matched = scored.map((s) => s.memory);
+    for (const memory of matched) {
+      incrementMemoryAccess(memory.id);
+    }
+    return matched;
   }
 
   /**
