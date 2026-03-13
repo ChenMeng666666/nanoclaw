@@ -153,4 +153,40 @@ describe('runtime api memory validation', () => {
     expect(overlongResponse.status).toBe(400);
     expect(oversizedStatus).toBe(413);
   });
+
+  it('returns memory explain payload for search hits', async () => {
+    await fetch(`${baseUrl}/api/memory/add`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': 'test-key',
+      },
+      body: JSON.stringify({
+        agentFolder: 'agent-runtime-api-memory',
+        content: 'alpha query expansion design',
+        level: 'L2',
+        tags: ['alpha'],
+      }),
+    });
+
+    const response = await fetch(`${baseUrl}/api/memory/search`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': 'test-key',
+      },
+      body: JSON.stringify({
+        agentFolder: 'agent-runtime-api-memory',
+        query: 'alpha query',
+        limit: 5,
+      }),
+    });
+    const body = (await response.json()) as {
+      memories?: Array<{ explain?: { scores?: { final?: number } } }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.memories?.length).toBeGreaterThan(0);
+    expect(body.memories?.[0]?.explain?.scores?.final).toBeTypeOf('number');
+  });
 });

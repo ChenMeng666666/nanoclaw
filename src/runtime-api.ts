@@ -221,7 +221,7 @@ export async function startRuntimeAPI(
         const tags = parseOptionalStringArray(body.tags, 'tags');
         const normalizedScope = normalizeMemoryScope(scope, sessionId);
 
-        const memories = await memoryManager.searchMemories(
+        const hits = await memoryManager.searchMemoriesDetailed(
           agentFolder,
           query,
           limit,
@@ -235,7 +235,12 @@ export async function startRuntimeAPI(
           },
         );
 
-        writeJSON(res, 200, { memories });
+        writeJSON(res, 200, {
+          memories: hits.map((hit) => ({
+            ...hit.memory,
+            explain: hit.explain,
+          })),
+        });
         return;
       }
 

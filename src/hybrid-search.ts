@@ -105,6 +105,13 @@ export class BM25Index {
    * 搜索相关文档
    */
   search(query: string, limit: number): string[] {
+    return this.searchWithScores(query, limit).map((item) => item.id);
+  }
+
+  /**
+   * 搜索相关文档并返回分数
+   */
+  searchWithScores(query: string, limit: number): BM25Result[] {
     const queryTokens = tokenize(query);
     const scores = new Map<string, number>();
 
@@ -130,12 +137,14 @@ export class BM25Index {
     }
 
     // 排序并返回 top K
-    const results = Array.from(scores.entries())
+    return Array.from(scores.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, limit)
-      .map(([id]) => id);
-
-    return results;
+      .map(([id, score], index) => ({
+        id,
+        score,
+        rank: index + 1,
+      }));
   }
 
   /**

@@ -244,6 +244,64 @@ export const MEMORY_CONFIG = {
     ),
     migratedContentPrefix: process.env.MEMORY_MIGRATION_PREFIX || '',
   },
+  retrieval: {
+    queryVariantLimit: validateConfig(
+      parseInt(process.env.MEMORY_QUERY_VARIANT_LIMIT || '5', 10),
+      (v) => validateInteger(v, 1, 10),
+      5,
+      'MEMORY_QUERY_VARIANT_LIMIT',
+    ),
+    semanticDedupThreshold: validateConfig(
+      parseFloat(process.env.MEMORY_SEMANTIC_DEDUP_THRESHOLD || '0.92'),
+      (v) => typeof v === 'number' && v >= 0 && v <= 1,
+      0.92,
+      'MEMORY_SEMANTIC_DEDUP_THRESHOLD',
+    ),
+    conflictMergeThreshold: validateConfig(
+      parseFloat(process.env.MEMORY_CONFLICT_MERGE_THRESHOLD || '0.85'),
+      (v) => typeof v === 'number' && v >= 0 && v <= 1,
+      0.85,
+      'MEMORY_CONFLICT_MERGE_THRESHOLD',
+    ),
+    rerankWeights: {
+      fused: validateConfig(
+        parseFloat(process.env.MEMORY_RERANK_WEIGHT_FUSED || '0.35'),
+        (v) => typeof v === 'number' && v >= 0 && v <= 1,
+        0.35,
+        'MEMORY_RERANK_WEIGHT_FUSED',
+      ),
+      vector: validateConfig(
+        parseFloat(process.env.MEMORY_RERANK_WEIGHT_VECTOR || '0.25'),
+        (v) => typeof v === 'number' && v >= 0 && v <= 1,
+        0.25,
+        'MEMORY_RERANK_WEIGHT_VECTOR',
+      ),
+      bm25: validateConfig(
+        parseFloat(process.env.MEMORY_RERANK_WEIGHT_BM25 || '0.15'),
+        (v) => typeof v === 'number' && v >= 0 && v <= 1,
+        0.15,
+        'MEMORY_RERANK_WEIGHT_BM25',
+      ),
+      quality: validateConfig(
+        parseFloat(process.env.MEMORY_RERANK_WEIGHT_QUALITY || '0.1'),
+        (v) => typeof v === 'number' && v >= 0 && v <= 1,
+        0.1,
+        'MEMORY_RERANK_WEIGHT_QUALITY',
+      ),
+      timestamp: validateConfig(
+        parseFloat(process.env.MEMORY_RERANK_WEIGHT_TIMESTAMP || '0.1'),
+        (v) => typeof v === 'number' && v >= 0 && v <= 1,
+        0.1,
+        'MEMORY_RERANK_WEIGHT_TIMESTAMP',
+      ),
+      importance: validateConfig(
+        parseFloat(process.env.MEMORY_RERANK_WEIGHT_IMPORTANCE || '0.05'),
+        (v) => typeof v === 'number' && v >= 0 && v <= 1,
+        0.05,
+        'MEMORY_RERANK_WEIGHT_IMPORTANCE',
+      ),
+    },
+  },
   api: {
     maxRequestBodyBytes: validateConfig(
       parseInt(process.env.MEMORY_API_MAX_BODY_BYTES || '1048576', 10),

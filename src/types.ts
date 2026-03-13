@@ -367,6 +367,7 @@ export interface Memory {
   content: string;
   embedding?: number[];
   importance: number;
+  qualityScore?: number;
   accessCount: number;
   lastAccessedAt?: string;
   createdAt: string;

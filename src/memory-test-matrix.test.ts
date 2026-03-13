@@ -165,4 +165,66 @@ describe('memory test matrix', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].access_count).toBeGreaterThanOrEqual(1);
   });
+
+  it('returns explain metadata in hybrid retrieval pipeline', async () => {
+    const now = new Date().toISOString();
+    createMemory({
+      id: 'm-explain-1',
+      agentFolder: 'agent-memory-matrix',
+      userJid: 'u-matrix',
+      scope: 'user',
+      level: 'L2',
+      content: 'alpha 系统 查询扩展 方案',
+      embedding: [1, 0, 0],
+      importance: 0.8,
+      qualityScore: 0.9,
+      sourceType: 'summary',
+      tags: ['alpha', 'query'],
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const manager = new MemoryManager();
+    const hits = await manager.searchMemoriesDetailed(
+      'agent-memory-matrix',
+      'alpha 系统 怎么查',
+      3,
+      'u-matrix',
+    );
+
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits[0].explain.queryVariants.length).toBeGreaterThan(0);
+    expect(hits[0].explain.scores.final).toBeGreaterThan(0);
+    expect(Array.isArray(hits[0].explain.matchedTerms)).toBe(true);
+  });
+
+  it('merges semantically similar memories and keeps single row', async () => {
+    const manager = new MemoryManager();
+    await manager.addMemory(
+      'agent-memory-matrix',
+      'alpha cache strategy for query ranking',
+      'L2',
+      'u-matrix',
+      {
+        tags: ['cache', 'ranking'],
+        sourceType: 'direct',
+      },
+    );
+    await manager.addMemory(
+      'agent-memory-matrix',
+      'alpha cache strategy for query ranking detail',
+      'L2',
+      'u-matrix',
+      {
+        tags: ['cache', 'detail'],
+        sourceType: 'summary',
+      },
+    );
+    const rows = getMemories('agent-memory-matrix', 'L2', 'u-matrix');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].content.includes('alpha cache strategy for query ranking')).toBe(
+      true,
+    );
+    expect(rows[0].qualityScore).toBeDefined();
+  });
 });

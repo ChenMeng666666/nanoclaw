@@ -19,6 +19,7 @@ import { Memory } from './types.js';
 import { logger } from './logger.js';
 import { generateEmbedding as generateEmbeddingFromProvider } from './embedding-providers/registry.js';
 import { MEMORY_CONFIG } from './config.js';
+import { BM25Index, reciprocalRankFusion } from './hybrid-search.js';
 
 interface MemoryMetadataInput {
   scope?: Memory['scope'];
@@ -26,6 +27,28 @@ interface MemoryMetadataInput {
   sourceType?: Memory['sourceType'];
   messageType?: Memory['messageType'];
   tags?: string[];
+}
+
+export interface MemorySearchExplanation {
+  queryVariants: string[];
+  matchedTerms: string[];
+  scores: {
+    bm25: number;
+    vector: number;
+    fused: number;
+    quality: number;
+    importance: number;
+    timestamp: number;
+    final: number;
+  };
+  scope?: Memory['scope'];
+  level: Memory['level'];
+  tags?: string[];
+}
+
+export interface MemorySearchHit {
+  memory: Memory;
+  explain: MemorySearchExplanation;
 }
 
 /**
@@ -145,6 +168,10 @@ export class MemoryManager {
         content,
         embedding,
         importance: 0.5,
+        qualityScore: this.calculateQualityScore(content, {
+          sourceType: 'direct',
+          scope: userJid ? 'user' : 'agent',
+        }),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -221,6 +248,53 @@ export class MemoryManager {
 
     const embedding = await generateEmbedding(content);
     const importance = this.calculateImportance(content, level);
+    const mergeTarget = this.findLifecycleMergeTarget(
+      agentFolder,
+      content,
+      embedding,
+      level,
+      userJid,
+      metadata,
+    );
+    if (mergeTarget) {
+      const mergedTags = this.mergeTags(mergeTarget.tags, metadata?.tags);
+      const mergedContent = this.mergeLifecycleContent(
+        mergeTarget.content,
+        content,
+        mergeTarget.isConflict,
+      );
+      const qualityScore = this.calculateQualityScore(mergedContent, {
+        sourceType: metadata?.sourceType || mergeTarget.sourceType || 'direct',
+        scope: metadata?.scope || mergeTarget.scope,
+        tags: mergedTags,
+        messageType: metadata?.messageType,
+      });
+      updateMemory(mergeTarget.id, {
+        content: mergedContent,
+        importance: Math.min(1, Math.max(mergeTarget.importance, importance)),
+        qualityScore,
+        tags: mergedTags,
+      });
+      incrementMemoryAccess(mergeTarget.id);
+      logger.info(
+        {
+          targetId: mergeTarget.id,
+          level,
+          userJid,
+          isConflict: mergeTarget.isConflict,
+        },
+        'Memory merged by lifecycle governance',
+      );
+      return;
+    }
+    const qualityScore = this.calculateQualityScore(content, {
+      sourceType: metadata?.sourceType || 'direct',
+      scope:
+        metadata?.scope ||
+        (metadata?.sessionId ? 'session' : userJid ? 'user' : 'agent'),
+      tags: metadata?.tags,
+      messageType: metadata?.messageType,
+    });
 
     const memory: Omit<Memory, 'accessCount' | 'lastAccessedAt'> = {
       id: this.generateMemoryId(),
@@ -234,6 +308,7 @@ export class MemoryManager {
       content,
       embedding,
       importance,
+      qualityScore,
       messageType: metadata?.messageType,
       timestampWeight: 0.5,
       tags: metadata?.tags,
@@ -269,6 +344,7 @@ export class MemoryManager {
     let migratedCount = 0;
 
     for (const memory of allMemories) {
+      this.applyLifecycleGovernance(memory);
       const migration = this.shouldMigrateMemory(memory);
       if (migration.should) {
         await this.migrateMemory(memory, migration.targetLevel!);
@@ -299,10 +375,6 @@ export class MemoryManager {
     logger.debug('L1 memories persisted and cache cleaned');
   }
 
-  /**
-   * 语义检索记忆
-   * 使用向量相似度搜索相关记忆
-   */
   async searchMemories(
     agentFolder: string,
     query: string,
@@ -310,24 +382,137 @@ export class MemoryManager {
     userJid?: string,
     options?: MemoryQueryOptions,
   ): Promise<Memory[]> {
-    const queryEmbedding = await generateEmbedding(query);
+    const hits = await this.searchMemoriesDetailed(
+      agentFolder,
+      query,
+      limit,
+      userJid,
+      options,
+    );
+    return hits.map((hit) => hit.memory);
+  }
+
+  async searchMemoriesDetailed(
+    agentFolder: string,
+    query: string,
+    limit: number = 10,
+    userJid?: string,
+    options?: MemoryQueryOptions,
+  ): Promise<MemorySearchHit[]> {
     const memories = getMemories(agentFolder, undefined, userJid, options);
-
-    // 计算余弦相似度
-    const scored = memories
-      .filter((m) => m.embedding && m.embedding.length > 0)
-      .map((memory) => ({
-        memory,
-        score: this.cosineSimilarity(queryEmbedding, memory.embedding!),
-      }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit);
-
-    const matched = scored.map((s) => s.memory);
-    for (const memory of matched) {
-      incrementMemoryAccess(memory.id);
+    if (memories.length === 0) {
+      return [];
     }
-    return matched;
+    const queryVariants = this.generateQueryVariants(query);
+    const searchLimit = Math.max(limit * 3, MEMORY_CONFIG.api.maxLimit);
+    const bm25Index = new BM25Index();
+    for (const memory of memories) {
+      bm25Index.addDocument(memory.id, memory.content);
+    }
+    const bm25ScoreMap = new Map<string, number>();
+    const vectorScoreMap = new Map<string, number>();
+    const allBm25Ids: string[] = [];
+    const allVectorIds: string[] = [];
+    for (const variant of queryVariants) {
+      const bm25Results = bm25Index.searchWithScores(variant, searchLimit);
+      for (const item of bm25Results) {
+        const current = bm25ScoreMap.get(item.id) ?? 0;
+        if (item.score > current) {
+          bm25ScoreMap.set(item.id, item.score);
+        }
+        allBm25Ids.push(item.id);
+      }
+      const queryEmbedding = await generateEmbedding(variant);
+      if (queryEmbedding.length === 0) {
+        continue;
+      }
+      const vectorResults = memories
+        .filter((m) => m.embedding && m.embedding.length === queryEmbedding.length)
+        .map((memory) => ({
+          id: memory.id,
+          score: this.cosineSimilarity(queryEmbedding, memory.embedding!),
+        }))
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, searchLimit);
+      for (const item of vectorResults) {
+        const current = vectorScoreMap.get(item.id) ?? 0;
+        if (item.score > current) {
+          vectorScoreMap.set(item.id, item.score);
+        }
+        allVectorIds.push(item.id);
+      }
+    }
+    const uniqueBm25 = [...new Set(allBm25Ids)];
+    const uniqueVector = [...new Set(allVectorIds)];
+    const fusedResults = reciprocalRankFusion(uniqueBm25, uniqueVector);
+    const fusedScoreMap = new Map(
+      fusedResults.map((item) => [item.id, item.fusedScore]),
+    );
+    const maxBm25 = this.safeMax([...bm25ScoreMap.values()]);
+    const maxFused = this.safeMax([...fusedScoreMap.values()]);
+    const maxVector = this.safeMax([...vectorScoreMap.values()]);
+    const memoryMap = new Map(memories.map((memory) => [memory.id, memory]));
+    const normalizedWeights = this.normalizeWeights(
+      MEMORY_CONFIG.retrieval.rerankWeights,
+    );
+    const queryTerms = this.extractKeywords(query);
+    const scoredHits = [...new Set([...uniqueBm25, ...uniqueVector])]
+      .map((id) => {
+        const memory = memoryMap.get(id);
+        if (!memory) {
+          return null;
+        }
+        const bm25Raw = bm25ScoreMap.get(id) ?? 0;
+        const vectorRaw = vectorScoreMap.get(id) ?? 0;
+        const fusedRaw = fusedScoreMap.get(id) ?? 0;
+        const bm25 = maxBm25 > 0 ? bm25Raw / maxBm25 : 0;
+        const vector = maxVector > 0 ? vectorRaw / maxVector : 0;
+        const fused = maxFused > 0 ? fusedRaw / maxFused : 0;
+        const quality =
+          memory.qualityScore ??
+          this.calculateQualityScore(memory.content, {
+            sourceType: memory.sourceType,
+            scope: memory.scope,
+            tags: memory.tags,
+            messageType: memory.messageType,
+          });
+        const timestamp = this.resolveTimestampWeight(memory);
+        const importance = memory.importance || 0;
+        const final =
+          fused * normalizedWeights.fused +
+          vector * normalizedWeights.vector +
+          bm25 * normalizedWeights.bm25 +
+          quality * normalizedWeights.quality +
+          timestamp * normalizedWeights.timestamp +
+          importance * normalizedWeights.importance;
+        return {
+          memory,
+          explain: {
+            queryVariants,
+            matchedTerms: this.extractMatchedTerms(queryTerms, memory.content),
+            scores: {
+              bm25,
+              vector,
+              fused,
+              quality,
+              importance,
+              timestamp,
+              final,
+            },
+            scope: memory.scope,
+            level: memory.level,
+            tags: memory.tags,
+          },
+        } satisfies MemorySearchHit;
+      })
+      .filter((item): item is MemorySearchHit => Boolean(item))
+      .sort((a, b) => b.explain.scores.final - a.explain.scores.final)
+      .slice(0, limit);
+    for (const hit of scoredHits) {
+      incrementMemoryAccess(hit.memory.id);
+    }
+    return scoredHits;
   }
 
   /**
@@ -362,6 +547,279 @@ export class MemoryManager {
     return Math.min(baseImportance + lengthFactor, 1.0);
   }
 
+  private calculateQualityScore(
+    content: string,
+    metadata?: {
+      sourceType?: Memory['sourceType'];
+      scope?: Memory['scope'];
+      tags?: string[];
+      messageType?: Memory['messageType'];
+    },
+  ): number {
+    const lengthSignal = Math.min(content.trim().length / 600, 1);
+    const structuredSignal = /[`#:\-\n]/.test(content) ? 0.12 : 0;
+    const sourceSignal =
+      metadata?.sourceType === 'summary'
+        ? 0.12
+        : metadata?.sourceType === 'extracted'
+          ? 0.08
+          : 0.05;
+    const scopeSignal =
+      metadata?.scope === 'session'
+        ? 0.07
+        : metadata?.scope === 'user'
+          ? 0.1
+          : metadata?.scope === 'global'
+            ? 0.09
+            : 0.06;
+    const tagSignal = Math.min((metadata?.tags?.length || 0) * 0.03, 0.12);
+    const messageSignal = metadata?.messageType === 'code' ? 0.08 : 0.04;
+    return this.clamp01(
+      0.38 +
+        lengthSignal * 0.23 +
+        structuredSignal +
+        sourceSignal +
+        scopeSignal +
+        tagSignal +
+        messageSignal,
+    );
+  }
+
+  private resolveTimestampWeight(memory: Memory): number {
+    if (typeof memory.timestampWeight === 'number') {
+      return this.clamp01(memory.timestampWeight);
+    }
+    const updatedAt = new Date(memory.updatedAt).getTime();
+    if (Number.isNaN(updatedAt)) {
+      return 0.5;
+    }
+    const days = (Date.now() - updatedAt) / (1000 * 60 * 60 * 24);
+    if (days <= 1) return 1;
+    if (days <= 7) return 0.8;
+    if (days <= 30) return 0.55;
+    return 0.35;
+  }
+
+  private safeMax(values: number[]): number {
+    if (values.length === 0) {
+      return 0;
+    }
+    return Math.max(...values);
+  }
+
+  private normalizeWeights(weights: Record<string, number>): Record<string, number> {
+    const entries = Object.entries(weights);
+    const sum = entries.reduce((acc, [, value]) => acc + value, 0);
+    if (sum <= 0) {
+      return {
+        fused: 1 / 6,
+        vector: 1 / 6,
+        bm25: 1 / 6,
+        quality: 1 / 6,
+        timestamp: 1 / 6,
+        importance: 1 / 6,
+      };
+    }
+    return Object.fromEntries(
+      entries.map(([key, value]) => [key, value / sum]),
+    ) as Record<string, number>;
+  }
+
+  private extractKeywords(text: string): string[] {
+    const stopWords = new Set([
+      'the',
+      'and',
+      'for',
+      'with',
+      'this',
+      'that',
+      'you',
+      'are',
+      'can',
+      'how',
+      'what',
+      'please',
+      '帮我',
+      '请问',
+      '一下',
+      '这个',
+      '那个',
+    ]);
+    return text
+      .toLowerCase()
+      .replace(/[^\w\s\u4e00-\u9fff]/g, ' ')
+      .split(/\s+/)
+      .filter((token) => token.length > 1 && !stopWords.has(token))
+      .slice(0, 10);
+  }
+
+  private simplifyQuery(text: string): string {
+    return text
+      .replace(/\b(please|thanks|thank you|could you|would you)\b/gi, ' ')
+      .replace(/(请|麻烦|帮我|可以|是否|能不能)/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private replaceSynonyms(text: string): string {
+    const synonyms: Record<string, string> = {
+      问题: '难题',
+      方法: '方案',
+      使用: '采用',
+      学习: '掌握',
+      功能: '能力',
+      系统: '架构',
+      数据: '信息',
+      代码: '程序',
+      query: 'search',
+      bug: 'issue',
+    };
+    let output = text;
+    for (const [key, value] of Object.entries(synonyms)) {
+      output = output.replace(new RegExp(`\\b${key}\\b`, 'gi'), value);
+    }
+    return output;
+  }
+
+  private generateQueryVariants(query: string): string[] {
+    const variants = new Set<string>();
+    const normalized = query.trim();
+    if (!normalized) {
+      return [];
+    }
+    variants.add(normalized);
+    const simplified = this.simplifyQuery(normalized);
+    if (simplified) {
+      variants.add(simplified);
+    }
+    const keywords = this.extractKeywords(normalized);
+    if (keywords.length > 0) {
+      variants.add(keywords.join(' '));
+    }
+    const synonymVariant = this.replaceSynonyms(normalized);
+    if (synonymVariant) {
+      variants.add(synonymVariant);
+    }
+    return [...variants].slice(0, MEMORY_CONFIG.retrieval.queryVariantLimit);
+  }
+
+  private extractMatchedTerms(queryTerms: string[], content: string): string[] {
+    const normalized = content.toLowerCase();
+    return queryTerms.filter((term) => normalized.includes(term)).slice(0, 8);
+  }
+
+  private mergeTags(existing?: string[], incoming?: string[]): string[] | undefined {
+    const merged = [...new Set([...(existing || []), ...(incoming || [])])].filter(
+      (item) => item.trim().length > 0,
+    );
+    return merged.length > 0 ? merged : undefined;
+  }
+
+  private mergeLifecycleContent(
+    existingContent: string,
+    incomingContent: string,
+    isConflict: boolean,
+  ): string {
+    if (existingContent.includes(incomingContent)) {
+      return existingContent;
+    }
+    if (incomingContent.includes(existingContent)) {
+      return incomingContent;
+    }
+    if (isConflict) {
+      return `${existingContent}\n冲突补充：${incomingContent}`;
+    }
+    return `${existingContent}\n补充：${incomingContent}`;
+  }
+
+  private detectLifecycleConflict(existingContent: string, incomingContent: string): boolean {
+    const negatives = ['不', '不是', '不能', '没', 'never', 'not', 'no'];
+    const hasNegative = (text: string) => negatives.some((token) => text.includes(token));
+    const existingNeg = hasNegative(existingContent.toLowerCase());
+    const incomingNeg = hasNegative(incomingContent.toLowerCase());
+    if (existingNeg === incomingNeg) {
+      return false;
+    }
+    const overlap = this.extractMatchedTerms(
+      this.extractKeywords(existingContent),
+      incomingContent,
+    );
+    return overlap.length >= 2;
+  }
+
+  private findLifecycleMergeTarget(
+    agentFolder: string,
+    incomingContent: string,
+    incomingEmbedding: number[],
+    level: 'L1' | 'L2' | 'L3',
+    userJid?: string,
+    metadata?: MemoryMetadataInput,
+  ): (Memory & { isConflict: boolean }) | null {
+    const candidates = getMemories(agentFolder, level, userJid, {
+      scope: metadata?.scope,
+      sessionId: metadata?.sessionId,
+    });
+    let bestCandidate: (Memory & { isConflict: boolean }) | null = null;
+    let bestScore = 0;
+    for (const candidate of candidates) {
+      if (!candidate.embedding || candidate.embedding.length !== incomingEmbedding.length) {
+        continue;
+      }
+      const similarity = this.cosineSimilarity(incomingEmbedding, candidate.embedding);
+      const isConflict = this.detectLifecycleConflict(
+        candidate.content.toLowerCase(),
+        incomingContent.toLowerCase(),
+      );
+      const threshold = isConflict
+        ? MEMORY_CONFIG.retrieval.conflictMergeThreshold
+        : MEMORY_CONFIG.retrieval.semanticDedupThreshold;
+      if (similarity >= threshold && similarity > bestScore) {
+        bestCandidate = { ...candidate, isConflict };
+        bestScore = similarity;
+      }
+    }
+    return bestCandidate;
+  }
+
+  private applyLifecycleGovernance(memory: Memory): void {
+    const now = Date.now();
+    const lastAccess = memory.lastAccessedAt
+      ? new Date(memory.lastAccessedAt).getTime()
+      : new Date(memory.updatedAt).getTime();
+    if (Number.isNaN(lastAccess)) {
+      return;
+    }
+    const daysSinceAccess = Math.max(
+      0,
+      (now - lastAccess) / (1000 * 60 * 60 * 24),
+    );
+    const decay = Math.exp(-daysSinceAccess / 90);
+    const reinforce = Math.min(1, memory.accessCount / 12);
+    const nextImportance = this.clamp01(memory.importance * decay + reinforce * 0.2);
+    const baseQuality =
+      memory.qualityScore ??
+      this.calculateQualityScore(memory.content, {
+        sourceType: memory.sourceType,
+        scope: memory.scope,
+        tags: memory.tags,
+        messageType: memory.messageType,
+      });
+    const nextQuality = this.clamp01(baseQuality * decay + reinforce * 0.25);
+    if (
+      Math.abs(nextImportance - memory.importance) >= 0.02 ||
+      Math.abs(nextQuality - (memory.qualityScore ?? baseQuality)) >= 0.02
+    ) {
+      updateMemory(memory.id, {
+        importance: nextImportance,
+        qualityScore: nextQuality,
+      });
+    }
+  }
+
+  private clamp01(value: number): number {
+    return Math.max(0, Math.min(1, value));
+  }
+
   private shouldMigrateMemory(memory: Memory): {
     should: boolean;
     targetLevel?: 'L2' | 'L3';
@@ -374,7 +832,9 @@ export class MemoryManager {
 
     // 时间衰减因子（30 天半衰期）
     const decayFactor = Math.exp(-daysSinceAccess / 30);
-    const adjustedImportance = memory.importance * decayFactor;
+    const qualityScore = memory.qualityScore ?? 0.5;
+    const adjustedImportance =
+      memory.importance * decayFactor * (0.95 + qualityScore * 0.05);
 
     const migrationConfig = MEMORY_CONFIG.migration;
 
@@ -411,6 +871,9 @@ export class MemoryManager {
       level: targetLevel,
       content,
       importance: targetLevel === 'L2' ? 0.7 : 0.9,
+      qualityScore: this.clamp01(
+        (memory.qualityScore ?? 0.5) + (targetLevel === 'L3' ? 0.08 : 0.04),
+      ),
     });
     if (memory.level === 'L1') {
       for (const [key, cached] of this.l1Cache.entries()) {

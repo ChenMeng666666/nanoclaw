@@ -271,6 +271,7 @@ function createSchema(database: Database.Database): void {
       embedding BLOB,
       content_hash TEXT,
       importance REAL DEFAULT 0.5,
+      quality_score REAL DEFAULT 0.5,
       access_count INTEGER DEFAULT 0,
       last_accessed_at TEXT,
       message_type TEXT,
@@ -679,6 +680,12 @@ function createSchema(database: Database.Database): void {
   }
 
   try {
+    database.exec(`ALTER TABLE memories ADD COLUMN quality_score REAL DEFAULT 0.5`);
+  } catch (err) {
+    logger.debug({ err }, 'Failed to add quality_score column to memories');
+  }
+
+  try {
     database.exec(`UPDATE memories SET scope = 'agent' WHERE scope IS NULL`);
   } catch (err) {
     logger.debug({ err }, 'Failed to backfill scope for existing memories');
@@ -690,6 +697,14 @@ function createSchema(database: Database.Database): void {
     );
   } catch (err) {
     logger.debug({ err }, 'Failed to create index idx_memories_scope');
+  }
+
+  try {
+    database.exec(
+      `CREATE INDEX IF NOT EXISTS idx_memories_quality ON memories(quality_score DESC, importance DESC)`,
+    );
+  } catch (err) {
+    logger.debug({ err }, 'Failed to create index idx_memories_quality');
   }
 }
 

@@ -477,6 +477,7 @@ type MemoryRow = {
   content: string;
   embedding: string | null;
   importance: number;
+  quality_score: number | null;
   access_count: number;
   last_accessed_at: string | null;
   message_type: string | null;
@@ -525,6 +526,8 @@ function mapMemoryRow(row: MemoryRow): Memory {
     content: row.content,
     embedding: safeJsonParse(row.embedding, undefined),
     importance: row.importance,
+    qualityScore:
+      typeof row.quality_score === 'number' ? row.quality_score : undefined,
     accessCount: row.access_count,
     lastAccessedAt: row.last_accessed_at || undefined,
     messageType: (row.message_type as Memory['messageType']) || undefined,
@@ -551,8 +554,8 @@ export function createMemory(
   validateScopeSession(scope, memory.sessionId);
   db.prepare(
     `
-    INSERT INTO memories (id, agent_folder, user_jid, session_id, scope, level, content, embedding, content_hash, importance, message_type, timestamp_weight, tags, source_type, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO memories (id, agent_folder, user_jid, session_id, scope, level, content, embedding, content_hash, importance, quality_score, message_type, timestamp_weight, tags, source_type, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `,
   ).run(
     memory.id,
@@ -565,6 +568,7 @@ export function createMemory(
     memory.embedding ? JSON.stringify(memory.embedding) : null,
     contentHash,
     memory.importance || 0.5,
+    memory.qualityScore ?? 0.5,
     memory.messageType || null,
     memory.timestampWeight ?? null,
     memory.tags ? JSON.stringify(memory.tags) : null,
@@ -700,6 +704,7 @@ export function updateMemory(
       Memory,
       | 'content'
       | 'importance'
+      | 'qualityScore'
       | 'embedding'
       | 'level'
       | 'updatedAt'
@@ -738,6 +743,10 @@ export function updateMemory(
   if (updates.importance !== undefined) {
     fields.push('importance = ?');
     values.push(updates.importance);
+  }
+  if (updates.qualityScore !== undefined) {
+    fields.push('quality_score = ?');
+    values.push(updates.qualityScore);
   }
   if (updates.embedding !== undefined) {
     fields.push('embedding = ?');
