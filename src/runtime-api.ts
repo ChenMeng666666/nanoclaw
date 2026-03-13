@@ -163,15 +163,17 @@ export async function startRuntimeAPI(
     throw err;
   }
 
-  // 简单的 API Key 认证 - 生产环境必须设置环境变量
+  const allowNoAuth = process.env.RUNTIME_API_ALLOW_NO_AUTH === 'true';
   const API_KEY = process.env.RUNTIME_API_KEY;
-  if (!API_KEY) {
-    logger.error('RUNTIME_API_KEY 环境变量未设置，这是一个安全隐患');
-    // 在开发环境可以继续，但生产环境应该拒绝启动
-    const isProduction = process.env.NODE_ENV === 'production';
-    if (isProduction) {
-      throw new Error('RUNTIME_API_KEY 环境变量未设置');
-    }
+  if (!API_KEY && !allowNoAuth) {
+    throw new Error(
+      'RUNTIME_API_KEY 环境变量未设置；如需在本地无鉴权调试，请显式设置 RUNTIME_API_ALLOW_NO_AUTH=true',
+    );
+  }
+  if (!API_KEY && allowNoAuth) {
+    logger.warn(
+      'Runtime API running without API key because RUNTIME_API_ALLOW_NO_AUTH=true',
+    );
   }
 
   const server = http.createServer(async (req, res) => {
@@ -183,7 +185,7 @@ export async function startRuntimeAPI(
     // 认证检查
     if (req.method !== 'OPTIONS') {
       const apiKey = req.headers['x-api-key'] as string | undefined;
-      if (API_KEY && (!apiKey || apiKey !== API_KEY)) {
+      if (!allowNoAuth && API_KEY && (!apiKey || apiKey !== API_KEY)) {
         logger.warn(
           {
             method: req.method,

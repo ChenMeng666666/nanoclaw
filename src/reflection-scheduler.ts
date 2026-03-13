@@ -26,6 +26,7 @@ import { evolutionManager } from './evolution-manager.js';
  */
 export class ReflectionScheduler {
   private running = false;
+  private cronTasks: Array<{ stop: () => void; destroy?: () => void }> = [];
 
   /**
    * 启动调度器
@@ -39,36 +40,28 @@ export class ReflectionScheduler {
     this.running = true;
     logger.info('Reflection scheduler started');
 
-    // 每小时反思
-    cron.schedule('0 * * * *', () => {
+    this.registerCronTask('0 * * * *', () => {
       this.triggerReflectionsForAllAgents('hourly');
     });
 
-    // 每天 23:00 反思
-    cron.schedule('0 23 * * *', () => {
+    this.registerCronTask('0 23 * * *', () => {
       this.triggerReflectionsForAllAgents('daily');
     });
 
-    // 每天 23:00 执行记忆固化（在反思之后）
-    cron.schedule('30 23 * * *', async () => {
+    this.registerCronTask('30 23 * * *', async () => {
       logger.info('Starting scheduled memory consolidation');
       await this.consolidateMemoriesForAllAgents();
       logger.info('Scheduled memory consolidation completed');
     });
 
-    // 每周日 23:00 反思
-
-    // 每周日 20:00 检查学习进度并触发反思
-    cron.schedule('0 20 * * 0', async () => {
+    this.registerCronTask('0 20 * * 0', async () => {
       await this.checkLearningProgressForAllAgents();
     });
-    cron.schedule('0 23 * * 0', () => {
+    this.registerCronTask('0 23 * * 0', () => {
       this.triggerReflectionsForAllAgents('weekly');
     });
 
-    // 每月末 23:00 反思（使用 28-31 日覆盖所有月份）
-    cron.schedule('0 23 28-31 * *', () => {
-      // 检查是否是当月最后一天
+    this.registerCronTask('0 23 28-31 * *', () => {
       const today = new Date();
       const lastDay = new Date(
         today.getFullYear(),
@@ -85,6 +78,11 @@ export class ReflectionScheduler {
    * 停止调度器
    */
   stop(): void {
+    for (const task of this.cronTasks) {
+      task.stop();
+      task.destroy?.();
+    }
+    this.cronTasks = [];
     this.running = false;
     logger.info('Reflection scheduler stopped');
   }
@@ -217,6 +215,18 @@ export class ReflectionScheduler {
         );
       });
     }
+  }
+
+  private registerCronTask(
+    expression: string,
+    task: () => void | Promise<void>,
+  ): void {
+    const scheduledTask = cron.schedule(expression, () => {
+      Promise.resolve(task()).catch((err) => {
+        logger.error({ expression, err }, 'Reflection cron task failed');
+      });
+    });
+    this.cronTasks.push(scheduledTask);
   }
 
   private async generateReflectionContent(

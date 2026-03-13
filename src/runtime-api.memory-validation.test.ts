@@ -46,6 +46,7 @@ describe('runtime api memory validation', () => {
     }
     delete process.env.RUNTIME_API_KEY;
     delete process.env.RUNTIME_API_ENABLED;
+    delete process.env.RUNTIME_API_ALLOW_NO_AUTH;
     vi.restoreAllMocks();
   });
 
@@ -376,5 +377,50 @@ describe('runtime api memory validation', () => {
           payload.code === 'RATE_LIMIT_EXCEEDED',
       ).toBe(true);
     }
+  });
+
+  it('fails startup when runtime api key is missing by default', async () => {
+    if (server) {
+      await new Promise<void>((resolve) => {
+        server!.close(() => resolve());
+      });
+      server = null;
+    }
+    delete process.env.RUNTIME_API_KEY;
+    delete process.env.RUNTIME_API_ALLOW_NO_AUTH;
+
+    await expect(startRuntimeAPI({ port: 0, enabled: true })).rejects.toThrow(
+      'RUNTIME_API_KEY',
+    );
+  });
+
+  it('allows explicit no-auth mode when enabled', async () => {
+    if (server) {
+      await new Promise<void>((resolve) => {
+        server!.close(() => resolve());
+      });
+      server = null;
+    }
+    delete process.env.RUNTIME_API_KEY;
+    process.env.RUNTIME_API_ALLOW_NO_AUTH = 'true';
+
+    server = await startRuntimeAPI({ port: 0, enabled: true });
+    await new Promise<void>((resolve) => {
+      server!.on('listening', () => resolve());
+    });
+    const address = server.address() as AddressInfo;
+    const noAuthUrl = `http://127.0.0.1:${address.port}`;
+
+    const response = await fetch(`${noAuthUrl}/api/evolution/query`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: 'no-auth-health-check',
+        limit: 1,
+      }),
+    });
+    expect(response.status).toBe(200);
   });
 });
