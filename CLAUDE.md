@@ -14,13 +14,28 @@ Personal Claude assistant. See [README.md](README.md) for philosophy and setup. 
 
 5. **全程中文**：所有的反馈、代码注释建议、技术讨论均严格使用中文。 
 
-   ## 🛠️ Engineering Standards (工程与代码规范) 
+## 🛠️ Engineering Standards (工程与代码规范) 
 
-   1. **TypeScript 严谨性**：严格禁止使用隐式或随意的 `any`。优先使用 Interface 和 Type 定义好数据结构。 
-   2. **防御性编程**：NanoClaw 涉及 Docker 容器读写、IPC 通信、SQLite 交互。对于所有 I/O 操作、异步调用，**必须**编写严谨的 `try...catch` 错误处理，并附带清晰的错误日志输出。 
-   3. **架构红线**：牢记系统的隔离性。主进程（Node.js）负责调度，Agent SDK 必须运行在隔离的 Linux VM 容器中。绝不在主进程中执行业务 Agent 的危险 Shell 命令。 
-   4. **自动化执行**：不要只把 `npm run xxx` 或 Docker 命令打印给我看，请直接利用你的工具能力（CLI/Bash）去执行它们。 
-   5.  **Git 工作流**：每次修改并验证代码有效后，主动使用 Git 记录版本并代码审查：使用三个审查代理评估代码质量，推送到远程仓库。提交信息严格使用中文，格式为：`类型: 描述` (例如 `feat: 新增 Slack 频道路由` 或 `fix: 修复容器缓存无法刷新的问题`)。
+1. **TypeScript 严谨性**：严格禁止使用隐式或随意的 `any`。优先使用 Interface 和 Type 定义好数据结构。 
+2. **防御性编程**：NanoClaw 涉及 Docker 容器读写、IPC 通信、SQLite 交互。对于所有 I/O 操作、异步调用，**必须**编写严谨的 `try...catch` 错误处理，并附带清晰的错误日志输出。 
+3. **架构红线**：牢记系统的隔离性。主进程（Node.js）负责调度，Agent SDK 必须运行在隔离的 Linux VM 容器中。绝不在主进程中执行业务 Agent 的危险 Shell 命令。 
+4. **自动化执行**：不要只把 `npm run xxx` 或 Docker 命令打印给我看，请直接利用你的工具能力（CLI/Bash）去执行它们。 
+5. **Git 工作流**：每次修改并验证代码有效后，主动使用 Git 记录版本并代码审查：使用三个审查代理评估代码质量、安全和性能，推送到远程仓库。提交信息严格使用中文，格式为：`类型: 描述` (例如 `feat: 新增 Slack 频道路由` 或 `fix: 修复容器缓存无法刷新的问题`)。
+
+### ⚠️ 最高优先级系统指令 (CRITICAL DIRECTIVES) ⚠️ 
+
+作为本项目的 AI 研发工程师，你必须绝对遵守以下红线原则，违者将被视为严重错误： 
+
+1. **绝对禁止“假完成”与占位符 (NO STUBS & NO MOCKS)**：   
+   - 严禁在代码中留下 `// TODO`、`// FIXME` 或 `NotImplementedError`。   
+   - 严禁返回 Mock 数据（如 `return { success: true, fake_data: [...] }`）。   
+   - 如果你需要写数据库查询，必须写出真实的 SQLite 语句；如果你需要写通信逻辑，必须写出真实的 IPC/Stream 代码。 
+
+2. **完整端到端交付 (END-TO-END EXECUTION)**：   
+   - 如果一个任务过于复杂，导致你无法在一次响应中写完真实逻辑，**你必须向我报告并请求拆分任务**，绝对不允许用伪代码糊弄过去。 
+
+3. **测试驱动证实 (PROVE BY TESTING)**：   
+   - 任何核心模块的实现，必须伴随真实的调用验证或单元测试，确保逻辑切实可行，而非仅仅“看起来能跑”。
 
 ## Quick Context
 

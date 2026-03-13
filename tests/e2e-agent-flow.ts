@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { join } from 'path';
+import fs from 'fs';
 import { execSync } from 'child_process';
 import {
   initDatabase,
@@ -88,6 +89,11 @@ async function testCompleteAgentFlow() {
 
     // 4. 测试定时任务
     logger.info('4. 测试定时任务');
+    try {
+      deleteTask(TEST_TASK.id);
+    } catch {
+      // Ignore if task doesn't exist
+    }
     createTask(TEST_TASK);
 
     // 验证任务创建
@@ -154,10 +160,26 @@ async function testCompleteAgentFlow() {
       const containerResult = await runContainerAgent(
         TEST_GROUP,
         containerInput,
-        () => undefined,
+        () => {
+          logger.info('   容器进程已启动，等待响应...');
+        },
         async (output) => {
           if (output.status === 'success' && output.result !== null) {
             streamedOutputCount += 1;
+            // 收到成功结果后，发送关闭信号给容器，否则容器会一直等待IPC消息
+            const ipcDir = join(
+              process.cwd(),
+              'data',
+              'ipc',
+              TEST_GROUP.folder,
+              'input',
+            );
+            try {
+              fs.mkdirSync(ipcDir, { recursive: true });
+              fs.writeFileSync(join(ipcDir, '_close'), '');
+            } catch (err) {
+              logger.error({ err }, 'Failed to write _close sentinel');
+            }
           }
         },
       );

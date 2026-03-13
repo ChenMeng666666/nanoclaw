@@ -176,10 +176,6 @@ function createSchema(database: Database.Database): void {
       validation TEXT DEFAULT '[]',
       created_at TEXT NOT NULL
     );
-    CREATE INDEX IF NOT EXISTS idx_evolution_content_hash ON evolution_log(content_hash);
-    CREATE INDEX IF NOT EXISTS idx_evolution_asset_id ON evolution_log(asset_id);
-    CREATE INDEX IF NOT EXISTS idx_evolution_chain_id ON evolution_log(chain_id);
-    CREATE INDEX IF NOT EXISTS idx_evolution_status ON evolution_log(ecosystem_status);
 
     -- Capsules 表（符合 GEP 标准）
     CREATE TABLE IF NOT EXISTS capsules (
@@ -273,7 +269,6 @@ function createSchema(database: Database.Database): void {
       updated_at TEXT NOT NULL,
       FOREIGN KEY (agent_folder) REFERENCES agents(folder)
     );
-    CREATE INDEX IF NOT EXISTS idx_memories_content_hash ON memories(content_hash, agent_folder, level);
 
     -- Reflections: periodic reflection and summary records
     CREATE TABLE IF NOT EXISTS reflections (
@@ -542,6 +537,20 @@ function createSchema(database: Database.Database): void {
     }
   }
 
+  // Create indexes for Gene structure columns
+  try {
+    database.exec(`
+      CREATE INDEX IF NOT EXISTS idx_evolution_asset_id ON evolution_log(asset_id);
+      CREATE INDEX IF NOT EXISTS idx_evolution_chain_id ON evolution_log(chain_id);
+      CREATE INDEX IF NOT EXISTS idx_evolution_status ON evolution_log(ecosystem_status);
+    `);
+  } catch (err) {
+    logger.debug(
+      { err },
+      'Failed to create indexes for evolution_log Gene columns',
+    );
+  }
+
   // 为现有记录计算 asset_id
   try {
     const existingEntries = database
@@ -582,6 +591,15 @@ function createSchema(database: Database.Database): void {
     /* column already exists */
   }
 
+  // Create index for evolution_log content_hash
+  try {
+    database.exec(
+      `CREATE INDEX IF NOT EXISTS idx_evolution_content_hash ON evolution_log(content_hash)`,
+    );
+  } catch (err) {
+    logger.debug({ err }, 'Failed to create index idx_evolution_content_hash');
+  }
+
   // Add content_hash column to memories if it doesn't exist (migration for existing DBs)
   try {
     database.exec(`ALTER TABLE memories ADD COLUMN content_hash TEXT`);
@@ -601,6 +619,15 @@ function createSchema(database: Database.Database): void {
   } catch (err) {
     logger.debug({ err }, 'Failed to add content_hash column to memories');
     /* column already exists */
+  }
+
+  // Create index for memories content_hash
+  try {
+    database.exec(
+      `CREATE INDEX IF NOT EXISTS idx_memories_content_hash ON memories(content_hash, agent_folder, level)`,
+    );
+  } catch (err) {
+    logger.debug({ err }, 'Failed to create index idx_memories_content_hash');
   }
 }
 
