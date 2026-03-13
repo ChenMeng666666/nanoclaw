@@ -66,12 +66,13 @@ beforeEach(() => {
   writeGroupsSnapshotMock = vi.fn(() => {});
 
   deps = {
-    sendMessage: sendMessageMock,
+    sendMessage: sendMessageMock as IpcDeps['sendMessage'],
     registeredGroups: () => groups,
-    registerGroup: registerGroupMock,
-    syncGroups: syncGroupsMock,
-    getAvailableGroups: getAvailableGroupsMock,
-    writeGroupsSnapshot: writeGroupsSnapshotMock,
+    registerGroup: registerGroupMock as IpcDeps['registerGroup'],
+    syncGroups: syncGroupsMock as IpcDeps['syncGroups'],
+    getAvailableGroups: getAvailableGroupsMock as IpcDeps['getAvailableGroups'],
+    writeGroupsSnapshot:
+      writeGroupsSnapshotMock as IpcDeps['writeGroupsSnapshot'],
   };
 });
 
