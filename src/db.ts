@@ -27,6 +27,12 @@ import {
 
 let db: Database.Database;
 
+function toHashInput(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value === null || value === undefined) return '';
+  return String(value);
+}
+
 function createSchema(database: Database.Database): void {
   database.exec(`
     CREATE TABLE IF NOT EXISTS chats (
@@ -555,11 +561,11 @@ function createSchema(database: Database.Database): void {
   try {
     const existingEntries = database
       .prepare('SELECT id, content FROM evolution_log WHERE asset_id IS NULL')
-      .all() as Array<{ id: number; content: string }>;
+      .all() as Array<{ id: number; content: string | null }>;
     for (const entry of existingEntries) {
       const hash = crypto
         .createHash('sha256')
-        .update(entry.content)
+        .update(toHashInput(entry.content))
         .digest('hex');
       const assetId = `sha256:${hash}`;
       database
@@ -576,11 +582,11 @@ function createSchema(database: Database.Database): void {
     // 为现有记录计算并填充 content_hash
     const existingEntries = database
       .prepare('SELECT id, content FROM evolution_log')
-      .all() as Array<{ id: number; content: string }>;
+      .all() as Array<{ id: number; content: string | null }>;
     for (const entry of existingEntries) {
       const hash = crypto
         .createHash('sha256')
-        .update(entry.content)
+        .update(toHashInput(entry.content))
         .digest('hex');
       database
         .prepare('UPDATE evolution_log SET content_hash = ? WHERE id = ?')
@@ -606,11 +612,11 @@ function createSchema(database: Database.Database): void {
     // 为现有记录计算并填充 content_hash
     const existingMemories = database
       .prepare('SELECT id, content FROM memories')
-      .all() as Array<{ id: string; content: string }>;
+      .all() as Array<{ id: string; content: string | null }>;
     for (const memory of existingMemories) {
       const hash = crypto
         .createHash('sha256')
-        .update(memory.content)
+        .update(toHashInput(memory.content))
         .digest('hex');
       database
         .prepare('UPDATE memories SET content_hash = ? WHERE id = ?')

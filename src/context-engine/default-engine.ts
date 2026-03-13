@@ -819,9 +819,17 @@ export class DefaultContextEngine implements ContextEngine {
   }
 
   private getMemoriesByIds(ids: string[]): Memory[] {
-    const allMemories = getMemories(this.agentFolder);
-    const idSet = new Set(ids);
-    return allMemories.filter((m) => idSet.has(m.id));
+    const memoryMap = new Map(
+      getMemories(this.agentFolder).map((memory) => [memory.id, memory]),
+    );
+    const orderedMemories: Memory[] = [];
+    for (const id of ids) {
+      const memory = memoryMap.get(id);
+      if (memory) {
+        orderedMemories.push(memory);
+      }
+    }
+    return orderedMemories;
   }
 
   private cosineSimilarity(a: number[], b: number[]): number {
