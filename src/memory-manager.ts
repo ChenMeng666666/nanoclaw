@@ -427,7 +427,9 @@ export class MemoryManager {
         continue;
       }
       const vectorResults = memories
-        .filter((m) => m.embedding && m.embedding.length === queryEmbedding.length)
+        .filter(
+          (m) => m.embedding && m.embedding.length === queryEmbedding.length,
+        )
         .map((memory) => ({
           id: memory.id,
           score: this.cosineSimilarity(queryEmbedding, memory.embedding!),
@@ -607,7 +609,9 @@ export class MemoryManager {
     return Math.max(...values);
   }
 
-  private normalizeWeights(weights: Record<string, number>): Record<string, number> {
+  private normalizeWeights(
+    weights: Record<string, number>,
+  ): Record<string, number> {
     const entries = Object.entries(weights);
     const sum = entries.reduce((acc, [, value]) => acc + value, 0);
     if (sum <= 0) {
@@ -708,10 +712,13 @@ export class MemoryManager {
     return queryTerms.filter((term) => normalized.includes(term)).slice(0, 8);
   }
 
-  private mergeTags(existing?: string[], incoming?: string[]): string[] | undefined {
-    const merged = [...new Set([...(existing || []), ...(incoming || [])])].filter(
-      (item) => item.trim().length > 0,
-    );
+  private mergeTags(
+    existing?: string[],
+    incoming?: string[],
+  ): string[] | undefined {
+    const merged = [
+      ...new Set([...(existing || []), ...(incoming || [])]),
+    ].filter((item) => item.trim().length > 0);
     return merged.length > 0 ? merged : undefined;
   }
 
@@ -732,9 +739,13 @@ export class MemoryManager {
     return `${existingContent}\n补充：${incomingContent}`;
   }
 
-  private detectLifecycleConflict(existingContent: string, incomingContent: string): boolean {
+  private detectLifecycleConflict(
+    existingContent: string,
+    incomingContent: string,
+  ): boolean {
     const negatives = ['不', '不是', '不能', '没', 'never', 'not', 'no'];
-    const hasNegative = (text: string) => negatives.some((token) => text.includes(token));
+    const hasNegative = (text: string) =>
+      negatives.some((token) => text.includes(token));
     const existingNeg = hasNegative(existingContent.toLowerCase());
     const incomingNeg = hasNegative(incomingContent.toLowerCase());
     if (existingNeg === incomingNeg) {
@@ -762,10 +773,16 @@ export class MemoryManager {
     let bestCandidate: (Memory & { isConflict: boolean }) | null = null;
     let bestScore = 0;
     for (const candidate of candidates) {
-      if (!candidate.embedding || candidate.embedding.length !== incomingEmbedding.length) {
+      if (
+        !candidate.embedding ||
+        candidate.embedding.length !== incomingEmbedding.length
+      ) {
         continue;
       }
-      const similarity = this.cosineSimilarity(incomingEmbedding, candidate.embedding);
+      const similarity = this.cosineSimilarity(
+        incomingEmbedding,
+        candidate.embedding,
+      );
       const isConflict = this.detectLifecycleConflict(
         candidate.content.toLowerCase(),
         incomingContent.toLowerCase(),
@@ -795,7 +812,9 @@ export class MemoryManager {
     );
     const decay = Math.exp(-daysSinceAccess / 90);
     const reinforce = Math.min(1, memory.accessCount / 12);
-    const nextImportance = this.clamp01(memory.importance * decay + reinforce * 0.2);
+    const nextImportance = this.clamp01(
+      memory.importance * decay + reinforce * 0.2,
+    );
     const baseQuality =
       memory.qualityScore ??
       this.calculateQualityScore(memory.content, {

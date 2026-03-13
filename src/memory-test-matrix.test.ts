@@ -222,9 +222,9 @@ describe('memory test matrix', () => {
     );
     const rows = getMemories('agent-memory-matrix', 'L2', 'u-matrix');
     expect(rows).toHaveLength(1);
-    expect(rows[0].content.includes('alpha cache strategy for query ranking')).toBe(
-      true,
-    );
+    expect(
+      rows[0].content.includes('alpha cache strategy for query ranking'),
+    ).toBe(true);
     expect(rows[0].qualityScore).toBeDefined();
   });
 });

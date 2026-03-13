@@ -680,7 +680,9 @@ function createSchema(database: Database.Database): void {
   }
 
   try {
-    database.exec(`ALTER TABLE memories ADD COLUMN quality_score REAL DEFAULT 0.5`);
+    database.exec(
+      `ALTER TABLE memories ADD COLUMN quality_score REAL DEFAULT 0.5`,
+    );
   } catch (err) {
     logger.debug({ err }, 'Failed to add quality_score column to memories');
   }
