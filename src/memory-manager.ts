@@ -1121,9 +1121,9 @@ export class MemoryManager {
     targetLevel?: 'L2' | 'L3';
   } {
     const now = Date.now();
-    const lastAccess = memory.lastAccessedAt
-      ? new Date(memory.lastAccessedAt).getTime()
-      : 0;
+    const lastAccessAnchor =
+      memory.lastAccessedAt || memory.updatedAt || memory.createdAt;
+    const lastAccess = new Date(lastAccessAnchor).getTime();
     const daysSinceAccess = (now - lastAccess) / (1000 * 60 * 60 * 24);
 
     // 时间衰减因子（30 天半衰期）

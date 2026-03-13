@@ -99,6 +99,14 @@ describe('BM25Index', () => {
     expect(results.length).toBeGreaterThan(0);
     expect(results).toContain('doc1');
   });
+
+  it('should match Chinese terms', () => {
+    index.addDocument('doc1', '记忆系统支持中文检索能力');
+    index.addDocument('doc2', '这是另一条无关内容');
+
+    const results = index.search('中文检索', 5);
+    expect(results).toContain('doc1');
+  });
 });
 
 describe('reciprocalRankFusion', () => {

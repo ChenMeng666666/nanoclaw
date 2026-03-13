@@ -260,4 +260,28 @@ describe('memory test matrix', () => {
     );
     spy.mockRestore();
   });
+
+  it('keeps fresh L2 memory when lastAccessedAt is missing', async () => {
+    const now = new Date().toISOString();
+    createMemory({
+      id: 'm-l2-no-last-access',
+      agentFolder: 'agent-memory-matrix',
+      userJid: 'u-matrix',
+      scope: 'user',
+      level: 'L2',
+      content: 'recent low-importance memory',
+      embedding: [0.2, 0.2, 0.2],
+      importance: 0.1,
+      qualityScore: 0.2,
+      sourceType: 'direct',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const manager = new MemoryManager();
+    await manager.migrateMemories();
+
+    const l2Memories = getMemories('agent-memory-matrix', 'L2', 'u-matrix');
+    expect(l2Memories.some((m) => m.id === 'm-l2-no-last-access')).toBe(true);
+  });
 });

@@ -7,11 +7,17 @@
  * 简单的分词器
  */
 function tokenize(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ') // 替换非字母数字为空格
-    .split(/\s+/)
-    .filter((word) => word.length > 0);
+  const normalized = text.toLowerCase();
+  const latinTokens = normalized.match(/[a-z0-9]+/g) ?? [];
+  const cjkChars =
+    normalized.match(
+      /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu,
+    ) ?? [];
+  const cjkBigrams: string[] = [];
+  for (let i = 0; i < cjkChars.length - 1; i++) {
+    cjkBigrams.push(`${cjkChars[i]}${cjkChars[i + 1]}`);
+  }
+  return [...latinTokens, ...cjkChars, ...cjkBigrams];
 }
 
 /**
