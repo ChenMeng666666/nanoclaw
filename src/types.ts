@@ -384,7 +384,7 @@ export interface Memory {
 export interface Reflection {
   id: number;
   agentFolder: string;
-  type: 'hourly' | 'daily' | 'weekly' | 'monthly' | 'task';
+  type: 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'task';
   content: string;
   triggeredBy?: string;
   createdAt: string;

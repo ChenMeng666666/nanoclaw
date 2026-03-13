@@ -136,6 +136,38 @@ describe('runtime-api reflection trigger endpoint', () => {
     expect(mocks.triggerReflection).not.toHaveBeenCalled();
   });
 
+  it('accepts yearly reflection type', async () => {
+    mocks.getAgentByFolder.mockReturnValue({
+      id: 'a1',
+      name: 'Agent One',
+      folder: 'agent-one',
+      isActive: true,
+      credentials: { anthropicModel: 'x' },
+    });
+    mocks.triggerReflection.mockResolvedValue(undefined);
+
+    const response = await fetch(`${baseUrl}/api/reflection/trigger`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': 'test-key',
+      },
+      body: JSON.stringify({
+        agentFolder: 'agent-one',
+        type: 'yearly',
+      }),
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body.type).toBe('yearly');
+    expect(mocks.triggerReflection).toHaveBeenCalledWith(
+      expect.objectContaining({ folder: 'agent-one' }),
+      'yearly',
+      undefined,
+    );
+  });
+
   it('accepts requests without api key when explicitly enabling no-auth mode', async () => {
     if (server) {
       await new Promise<void>((resolve) => {

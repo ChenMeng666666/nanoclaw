@@ -850,7 +850,13 @@ export function getReflectionsByAgent(
   return rows.map((row) => ({
     id: row.id,
     agentFolder: row.agent_folder,
-    type: row.type as 'hourly' | 'daily' | 'weekly' | 'monthly' | 'task',
+    type: row.type as
+      | 'hourly'
+      | 'daily'
+      | 'weekly'
+      | 'monthly'
+      | 'yearly'
+      | 'task',
     content: row.content,
     triggeredBy: row.triggered_by || undefined,
     createdAt: row.created_at,
@@ -1314,7 +1320,7 @@ export function createScheduledTaskForLearning(
   groupFolder: string,
   chatJid: string,
   prompt: string,
-  scheduleType: 'daily' | 'weekly' | 'monthly',
+  scheduleType: 'cron' | 'interval' | 'once',
   scheduleValue: string,
   nextRun: string,
 ): string {

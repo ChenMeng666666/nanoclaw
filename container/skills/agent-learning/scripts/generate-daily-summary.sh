@@ -68,10 +68,15 @@ query_tasks() {
     local agentFolder="$1"
     local API_URL="${RUNTIME_API_URL:-http://host.docker.internal:3456}"
     local today=$(date +%Y-%m-%d)
+    local auth_args=()
+    if [ -n "${RUNTIME_API_KEY:-}" ]; then
+        auth_args=(-H "X-API-Key: $RUNTIME_API_KEY")
+    fi
 
     log_info "查询当日学习任务..."
 
     local response=$(curl -G "$API_URL/api/learning/tasks" \
+        "${auth_args[@]}" \
         --data-urlencode "agentFolder=$agentFolder" \
         --data-urlencode "date=$today" 2>/dev/null)
 
@@ -88,6 +93,10 @@ generate_summary() {
     local agentFolder="$1"
     local tasks="$2"
     local API_URL="${RUNTIME_API_URL:-http://host.docker.internal:3456}"
+    local auth_args=()
+    if [ -n "${RUNTIME_API_KEY:-}" ]; then
+        auth_args=(-H "X-API-Key: $RUNTIME_API_KEY")
+    fi
 
     log_info "生成每日学习总结..."
 
@@ -98,6 +107,7 @@ generate_summary() {
 
     local response=$(curl -s -X POST "$API_URL/api/learning/generate-daily-summary" \
         -H "Content-Type: application/json" \
+        "${auth_args[@]}" \
         -d "$request_body" 2>/dev/null)
 
     if [ $? -ne 0 ]; then

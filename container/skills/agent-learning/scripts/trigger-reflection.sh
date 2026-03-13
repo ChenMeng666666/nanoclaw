@@ -106,6 +106,10 @@ generate_reflection() {
     local reflection_type="$1"
     local agentFolder="$2"
     local API_URL="${RUNTIME_API_URL:-http://host.docker.internal:3456}"
+    local auth_args=()
+    if [ -n "${RUNTIME_API_KEY:-}" ]; then
+        auth_args=(-H "X-API-Key: $RUNTIME_API_KEY")
+    fi
 
     log_info "开始生成 $reflection_type 反思..."
 
@@ -121,6 +125,7 @@ generate_reflection() {
     # 调用 API 生成反思
     local response=$(curl -s -X POST "$API_URL/api/learning/reflection/generate" \
         -H "Content-Type: application/json" \
+        "${auth_args[@]}" \
         -d "{\"agentFolder\": \"$agentFolder\", \"type\": \"$reflection_type\", \"startTime\": \"$start_time\", \"endTime\": \"$end_time\"}" 2>/dev/null)
 
     if [ $? -ne 0 ]; then

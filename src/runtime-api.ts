@@ -825,6 +825,10 @@ export async function startRuntimeAPI(
           const now = new Date();
           // 默认每天晚上 8 点执行学习
           const defaultScheduleTime = '20:00';
+          const [defaultHour, defaultMinute] = defaultScheduleTime
+            .split(':')
+            .map((value) => Number.parseInt(value, 10));
+          const cronValue = `${defaultMinute} ${defaultHour} * * *`;
 
           for (let i = 0; i < phases.length; i++) {
             const phase = phases[i];
@@ -842,8 +846,8 @@ export async function startRuntimeAPI(
               agentFolder as string,
               (chatJid as string) || '',
               `学习${topic} - ${phaseName}`,
-              'daily',
-              defaultScheduleTime,
+              'cron',
+              cronValue,
               nextRun,
             );
             scheduledTaskIds.push(taskId);
@@ -985,12 +989,14 @@ export async function startRuntimeAPI(
           | 'daily'
           | 'weekly'
           | 'monthly'
+          | 'yearly'
           | 'task';
         const supportedTypes = new Set([
           'hourly',
           'daily',
           'weekly',
           'monthly',
+          'yearly',
           'task',
         ]);
 
@@ -1794,10 +1800,15 @@ export async function generateRuntimeReflection(
   agentFolder: string,
   type: string,
 ): Promise<DetailedReflection> {
-  const taskType = ['hourly', 'daily', 'weekly', 'monthly', 'task'].includes(
-    type,
-  )
-    ? (type as 'hourly' | 'daily' | 'weekly' | 'monthly' | 'task')
+  const taskType = [
+    'hourly',
+    'daily',
+    'weekly',
+    'monthly',
+    'yearly',
+    'task',
+  ].includes(type)
+    ? (type as 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'task')
     : 'task';
   const tasks = getLearningTasksByAgent(agentFolder).slice(0, 20);
   const completedCount = tasks.filter(

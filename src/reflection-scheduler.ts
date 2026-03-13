@@ -72,6 +72,10 @@ export class ReflectionScheduler {
         this.triggerReflectionsForAllAgents('monthly');
       }
     });
+
+    this.registerCronTask('0 23 31 12 *', () => {
+      this.triggerReflectionsForAllAgents('yearly');
+    });
   }
 
   /**
@@ -92,7 +96,7 @@ export class ReflectionScheduler {
    */
   async triggerReflection(
     agent: AgentConfig,
-    type: 'hourly' | 'daily' | 'weekly' | 'monthly' | 'task',
+    type: 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'task',
     triggeredBy?: string,
   ): Promise<void> {
     logger.info(
@@ -204,7 +208,7 @@ export class ReflectionScheduler {
   // ===== 私有方法 =====
 
   private triggerReflectionsForAllAgents(
-    type: 'hourly' | 'daily' | 'weekly' | 'monthly',
+    type: 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly',
   ): void {
     const agents = getAllActiveAgents();
     for (const agent of agents) {

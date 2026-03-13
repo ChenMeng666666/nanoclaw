@@ -53,9 +53,13 @@ check_config() {
 # 检查 Runtime API 可用性
 check_api() {
     local API_URL="${RUNTIME_API_URL:-http://host.docker.internal:3456}"
+    local auth_args=()
+    if [ -n "${RUNTIME_API_KEY:-}" ]; then
+        auth_args=(-H "X-API-Key: $RUNTIME_API_KEY")
+    fi
 
     if command -v curl &> /dev/null; then
-        if curl -s --connect-timeout 5 "$API_URL/api/memory/list?agentFolder=test" > /dev/null 2>&1; then
+        if curl -s --connect-timeout 5 "${auth_args[@]}" "$API_URL/api/memory/list?agentFolder=test" > /dev/null 2>&1; then
             log_info "Runtime API 可用：$API_URL"
             return 0
         else
@@ -84,11 +88,16 @@ get_agent_folder() {
 analyze_needs() {
     local agentFolder="$1"
     local API_URL="${RUNTIME_API_URL:-http://host.docker.internal:3456}"
+    local auth_args=()
+    if [ -n "${RUNTIME_API_KEY:-}" ]; then
+        auth_args=(-H "X-API-Key: $RUNTIME_API_KEY")
+    fi
 
     log_info "分析学习需求..."
 
     local response=$(curl -s -X POST "$API_URL/api/learning/analyze-needs" \
         -H "Content-Type: application/json" \
+        "${auth_args[@]}" \
         -d "{\"agentFolder\": \"$agentFolder\"}" 2>/dev/null)
 
     if [ $? -ne 0 ]; then
@@ -107,6 +116,10 @@ generate_plan() {
     local agentFolder="$1"
     local needs="$2"
     local API_URL="${RUNTIME_API_URL:-http://host.docker.internal:3456}"
+    local auth_args=()
+    if [ -n "${RUNTIME_API_KEY:-}" ]; then
+        auth_args=(-H "X-API-Key: $RUNTIME_API_KEY")
+    fi
 
     log_info "生成当日学习计划..."
 
@@ -126,6 +139,7 @@ generate_plan() {
 
     local response=$(curl -s -X POST "$API_URL/api/learning/generate-daily-plan" \
         -H "Content-Type: application/json" \
+        "${auth_args[@]}" \
         -d "$request_body" 2>/dev/null)
 
     if [ $? -ne 0 ]; then
@@ -143,6 +157,10 @@ generate_plan() {
 execute_plan() {
     local plan="$1"
     local API_URL="${RUNTIME_API_URL:-http://host.docker.internal:3456}"
+    local auth_args=()
+    if [ -n "${RUNTIME_API_KEY:-}" ]; then
+        auth_args=(-H "X-API-Key: $RUNTIME_API_KEY")
+    fi
 
     local tasks=$(echo "$plan" | jq -r '.tasks[]')
     local task_count=$(echo "$plan" | jq -r '.tasks | length' 2>/dev/null || echo "0")
@@ -165,6 +183,7 @@ execute_plan() {
         # 调用 API 执行任务
         local exec_response=$(curl -s -X POST "$API_URL/api/learning/task/start" \
             -H "Content-Type: application/json" \
+            "${auth_args[@]}" \
             -d "$task" 2>/dev/null)
 
         if [ $? -eq 0 ]; then
