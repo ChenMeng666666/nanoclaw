@@ -15,6 +15,11 @@ import {
   deleteMemory,
   getDuplicateMemory,
 } from './db-agents.js';
+import {
+  createOperationSnapshot,
+  getOperationSnapshotByOperationId,
+  updateOperationSnapshot,
+} from './db.js';
 import { Memory } from './types.js';
 import { logger } from './logger.js';
 import { generateEmbedding as generateEmbeddingFromProvider } from './embedding-providers/registry.js';
@@ -51,6 +56,104 @@ export interface MemorySearchHit {
   explain: MemorySearchExplanation;
 }
 
+type RolloutMode = 'stable' | 'canary' | 'auto';
+
+interface MemoryMetricsSnapshot {
+  timestamp: string;
+  recallRate: number;
+  hitRate: number;
+  falseRecallRate: number;
+  migrationSuccessRate: number;
+  cacheHitRate: number;
+  avgRetrievalLatencyMs: number;
+}
+
+interface MemoryMetricsState {
+  totalSearches: number;
+  searchesWithHits: number;
+  totalRequested: number;
+  totalReturned: number;
+  lowConfidenceHits: number;
+  retrievalLatencyMs: number[];
+  cacheHits: number;
+  cacheMisses: number;
+  migrationAttempts: number;
+  migrationSuccesses: number;
+  migrationFailures: number;
+  snapshots: MemoryMetricsSnapshot[];
+}
+
+export interface MemoryDashboardMetrics {
+  generatedAt: string;
+  summary: {
+    recallRate: number;
+    hitRate: number;
+    falseRecallRate: number;
+    migrationSuccessRate: number;
+    cacheHitRate: number;
+    retrievalLatencyMs: {
+      avg: number;
+      p95: number;
+      max: number;
+    };
+    counters: {
+      totalSearches: number;
+      searchesWithHits: number;
+      totalRequested: number;
+      totalReturned: number;
+      lowConfidenceHits: number;
+      migrationAttempts: number;
+      migrationSuccesses: number;
+      migrationFailures: number;
+      cacheHits: number;
+      cacheMisses: number;
+    };
+  };
+  timeline: MemoryMetricsSnapshot[];
+}
+
+interface RetrievalRolloutConfig {
+  mode: RolloutMode;
+  canaryEnabled: boolean;
+  canaryPercentage: number;
+  vectorSearchMinScore: number;
+  lowConfidenceThreshold: number;
+  rerankWeights: {
+    fused: number;
+    vector: number;
+    bm25: number;
+    quality: number;
+    timestamp: number;
+    importance: number;
+  };
+}
+
+interface MigrationRuleConfig {
+  l1ToL2MinAccessCount: number;
+  l1ToL2MinIdleDays: number;
+  l2ToL3MinIdleDays: number;
+  l2ToL3MinImportance: number;
+  migratedContentPrefix: string;
+}
+
+interface MigrationRolloutConfig {
+  mode: RolloutMode;
+  canaryEnabled: boolean;
+  canaryPercentage: number;
+  canaryRules: Partial<MigrationRuleConfig>;
+}
+
+export interface MemoryReleaseControl {
+  retrieval: RetrievalRolloutConfig;
+  migration: MigrationRolloutConfig;
+  updatedAt: string;
+}
+
+interface UpdateReleaseControlInput {
+  retrieval?: Partial<RetrievalRolloutConfig>;
+  migration?: Partial<MigrationRolloutConfig>;
+}
+
 /**
  * 生成文本的向量嵌入
  * 使用可插拔的嵌入提供者系统
@@ -76,6 +179,9 @@ export class MemoryManager {
 
   // 缓存持久化定时器
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
+  private metricsState: MemoryMetricsState = this.createInitialMetricsState();
+  private releaseControl: MemoryReleaseControl =
+    this.createDefaultReleaseControl();
 
   /**
    * 获取工作记忆（L1）
@@ -91,6 +197,7 @@ export class MemoryManager {
 
     // 如果强制刷新或缓存不存在，从数据库加载
     if (forceReloadFromDB || !this.l1Cache.has(key)) {
+      this.recordCacheResult(false);
       // 从数据库加载
       const memories = getMemories(agentFolder, 'L1', userJid);
       if (memories.length > 0) {
@@ -105,9 +212,97 @@ export class MemoryManager {
     }
 
     const cached = this.l1Cache.get(key)!;
+    this.recordCacheResult(true);
     // 更新访问计数
     incrementMemoryAccess(cached.id);
     return cached.content;
+  }
+
+  getDashboardMetrics(timelineLimit: number = 24): MemoryDashboardMetrics {
+    const metrics = this.calculateCurrentMetrics();
+    const safeLimit = Math.max(1, Math.min(200, timelineLimit));
+    return {
+      generatedAt: new Date().toISOString(),
+      summary: {
+        recallRate: metrics.recallRate,
+        hitRate: metrics.hitRate,
+        falseRecallRate: metrics.falseRecallRate,
+        migrationSuccessRate: metrics.migrationSuccessRate,
+        cacheHitRate: metrics.cacheHitRate,
+        retrievalLatencyMs: {
+          avg: metrics.avgRetrievalLatencyMs,
+          p95: metrics.p95RetrievalLatencyMs,
+          max: metrics.maxRetrievalLatencyMs,
+        },
+        counters: {
+          totalSearches: this.metricsState.totalSearches,
+          searchesWithHits: this.metricsState.searchesWithHits,
+          totalRequested: this.metricsState.totalRequested,
+          totalReturned: this.metricsState.totalReturned,
+          lowConfidenceHits: this.metricsState.lowConfidenceHits,
+          migrationAttempts: this.metricsState.migrationAttempts,
+          migrationSuccesses: this.metricsState.migrationSuccesses,
+          migrationFailures: this.metricsState.migrationFailures,
+          cacheHits: this.metricsState.cacheHits,
+          cacheMisses: this.metricsState.cacheMisses,
+        },
+      },
+      timeline: this.metricsState.snapshots.slice(-safeLimit),
+    };
+  }
+
+  getReleaseControl(): MemoryReleaseControl {
+    return structuredClone(this.releaseControl);
+  }
+
+  updateReleaseControl(
+    input: UpdateReleaseControlInput,
+    operator: string,
+    reason?: string,
+  ): { operationId: string; control: MemoryReleaseControl } {
+    const beforeState = this.getReleaseControl();
+    const nextState = this.mergeReleaseControl(this.releaseControl, input);
+    this.releaseControl = nextState;
+    const operationId = crypto.randomUUID();
+    createOperationSnapshot({
+      operationId,
+      operationType: 'memory_release_control_update',
+      beforeState: JSON.stringify(beforeState),
+      afterState: JSON.stringify(nextState),
+      timestamp: new Date().toISOString(),
+      status: 'applied',
+      description: `${operator}:${reason || 'update'}`,
+    });
+    return {
+      operationId,
+      control: this.getReleaseControl(),
+    };
+  }
+
+  rollbackReleaseControl(
+    operationId: string,
+    operator: string,
+  ): MemoryReleaseControl {
+    const snapshot = getOperationSnapshotByOperationId(operationId);
+    if (!snapshot) {
+      throw new Error(`Operation snapshot not found: ${operationId}`);
+    }
+    if (!snapshot.beforeState) {
+      throw new Error(`Operation snapshot has no before state: ${operationId}`);
+    }
+    const parsed = safeParseReleaseControl(snapshot.beforeState);
+    if (!parsed) {
+      throw new Error(
+        `Operation snapshot before state invalid: ${operationId}`,
+      );
+    }
+    this.releaseControl = parsed;
+    updateOperationSnapshot(operationId, {
+      status: 'rolled_back',
+      description:
+        `${snapshot.description || ''};rollback_by:${operator}`.slice(0, 512),
+    });
+    return this.getReleaseControl();
   }
 
   /**
@@ -360,6 +555,7 @@ export class MemoryManager {
     if (migrationPlans.length === 0) {
       return 0;
     }
+    this.metricsState.migrationAttempts += migrationPlans.length;
     let migratedCount = 0;
     const batchSize = MEMORY_CONFIG.retrieval.migrationBatchSize;
     const concurrency = MEMORY_CONFIG.retrieval.migrationConcurrency;
@@ -379,7 +575,9 @@ export class MemoryManager {
         for (const result of results) {
           if (result.status === 'fulfilled') {
             migratedCount += 1;
+            this.metricsState.migrationSuccesses += 1;
           } else {
+            this.metricsState.migrationFailures += 1;
             logger.warn(
               {
                 err:
@@ -393,6 +591,7 @@ export class MemoryManager {
         }
       }
     }
+    this.appendMetricsSnapshot();
     return migratedCount;
   }
 
@@ -441,10 +640,13 @@ export class MemoryManager {
     userJid?: string,
     options?: MemoryQueryOptions,
   ): Promise<MemorySearchHit[]> {
+    const startedAt = Date.now();
     const memories = getMemories(agentFolder, undefined, userJid, options);
     if (memories.length === 0) {
+      this.recordSearchMetrics(limit, 0, 0, Date.now() - startedAt);
       return [];
     }
+    const retrievalRollout = this.resolveRetrievalRollout(agentFolder, userJid);
     const queryVariants = this.generateQueryVariants(query);
     const searchLimit = Math.min(
       Math.max(limit * 3, limit),
@@ -486,8 +688,7 @@ export class MemoryManager {
               score: this.cosineSimilarity(queryEmbedding, memory.embedding!),
             }))
             .filter(
-              (item) =>
-                item.score >= MEMORY_CONFIG.retrieval.vectorSearchMinScore,
+              (item) => item.score >= retrievalRollout.vectorSearchMinScore,
             )
             .sort((a, b) => b.score - a.score)
             .slice(0, searchLimit);
@@ -522,7 +723,7 @@ export class MemoryManager {
     const maxVector = this.safeMax([...vectorScoreMap.values()]);
     const memoryMap = new Map(memories.map((memory) => [memory.id, memory]));
     const normalizedWeights = this.normalizeWeights(
-      MEMORY_CONFIG.retrieval.rerankWeights,
+      retrievalRollout.rerankWeights,
     );
     const queryTerms = this.extractKeywords(query);
     const scoredHits = [...new Set([...uniqueBm25, ...uniqueVector])]
@@ -577,6 +778,16 @@ export class MemoryManager {
       .filter((item): item is MemorySearchHit => item !== null)
       .sort((a, b) => b.explain.scores.final - a.explain.scores.final)
       .slice(0, limit);
+    const lowConfidenceHits = scoredHits.filter(
+      (hit) =>
+        hit.explain.scores.final < retrievalRollout.lowConfidenceThreshold,
+    ).length;
+    this.recordSearchMetrics(
+      limit,
+      scoredHits.length,
+      lowConfidenceHits,
+      Date.now() - startedAt,
+    );
     for (const hit of scoredHits) {
       incrementMemoryAccess(hit.memory.id);
     }
@@ -921,7 +1132,10 @@ export class MemoryManager {
     const adjustedImportance =
       memory.importance * decayFactor * (0.95 + qualityScore * 0.05);
 
-    const migrationConfig = MEMORY_CONFIG.migration;
+    const migrationConfig = this.resolveMigrationRules(
+      memory.agentFolder,
+      memory.userJid,
+    );
 
     if (memory.level === 'L1') {
       if (
@@ -1016,7 +1230,11 @@ export class MemoryManager {
     memory: Memory,
     targetLevel: 'L2' | 'L3',
   ): Promise<void> {
-    const contentPrefix = MEMORY_CONFIG.migration.migratedContentPrefix;
+    const migrationConfig = this.resolveMigrationRules(
+      memory.agentFolder,
+      memory.userJid,
+    );
+    const contentPrefix = migrationConfig.migratedContentPrefix;
     const content = contentPrefix
       ? `${contentPrefix}${memory.content}`
       : memory.content;
@@ -1087,6 +1305,274 @@ export class MemoryManager {
   invalidateAllCache(): void {
     this.l1Cache.clear();
     logger.debug('All L1 cache invalidated');
+  }
+
+  private createInitialMetricsState(): MemoryMetricsState {
+    return {
+      totalSearches: 0,
+      searchesWithHits: 0,
+      totalRequested: 0,
+      totalReturned: 0,
+      lowConfidenceHits: 0,
+      retrievalLatencyMs: [],
+      cacheHits: 0,
+      cacheMisses: 0,
+      migrationAttempts: 0,
+      migrationSuccesses: 0,
+      migrationFailures: 0,
+      snapshots: [],
+    };
+  }
+
+  private createDefaultReleaseControl(): MemoryReleaseControl {
+    return {
+      retrieval: {
+        mode: 'stable',
+        canaryEnabled: false,
+        canaryPercentage: 0,
+        vectorSearchMinScore: MEMORY_CONFIG.retrieval.vectorSearchMinScore,
+        lowConfidenceThreshold: 0.4,
+        rerankWeights: { ...MEMORY_CONFIG.retrieval.rerankWeights },
+      },
+      migration: {
+        mode: 'stable',
+        canaryEnabled: false,
+        canaryPercentage: 0,
+        canaryRules: {},
+      },
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  private mergeReleaseControl(
+    current: MemoryReleaseControl,
+    patch: UpdateReleaseControlInput,
+  ): MemoryReleaseControl {
+    const next: MemoryReleaseControl = {
+      retrieval: {
+        ...current.retrieval,
+        ...(patch.retrieval || {}),
+        rerankWeights: {
+          ...current.retrieval.rerankWeights,
+          ...(patch.retrieval?.rerankWeights || {}),
+        },
+      },
+      migration: {
+        ...current.migration,
+        ...(patch.migration || {}),
+        canaryRules: {
+          ...current.migration.canaryRules,
+          ...(patch.migration?.canaryRules || {}),
+        },
+      },
+      updatedAt: new Date().toISOString(),
+    };
+    next.retrieval.canaryPercentage = this.clampPercentage(
+      next.retrieval.canaryPercentage,
+    );
+    next.migration.canaryPercentage = this.clampPercentage(
+      next.migration.canaryPercentage,
+    );
+    next.retrieval.lowConfidenceThreshold = this.clamp01(
+      next.retrieval.lowConfidenceThreshold,
+    );
+    return next;
+  }
+
+  private clampPercentage(value: number): number {
+    if (!Number.isFinite(value)) {
+      return 0;
+    }
+    return Math.max(0, Math.min(100, Math.round(value)));
+  }
+
+  private resolveRetrievalRollout(
+    agentFolder: string,
+    userJid?: string,
+  ): RetrievalRolloutConfig {
+    const retrieval = this.releaseControl.retrieval;
+    const inCanary = this.isCanaryActive(
+      retrieval.mode,
+      retrieval.canaryEnabled,
+      retrieval.canaryPercentage,
+      `${agentFolder}:${userJid || 'global'}:retrieval`,
+    );
+    if (!inCanary) {
+      return {
+        ...retrieval,
+        vectorSearchMinScore: MEMORY_CONFIG.retrieval.vectorSearchMinScore,
+        rerankWeights: { ...MEMORY_CONFIG.retrieval.rerankWeights },
+      };
+    }
+    return retrieval;
+  }
+
+  private resolveMigrationRules(
+    agentFolder: string,
+    userJid?: string,
+  ): MigrationRuleConfig {
+    const base: MigrationRuleConfig = {
+      l1ToL2MinAccessCount: MEMORY_CONFIG.migration.l1ToL2MinAccessCount,
+      l1ToL2MinIdleDays: MEMORY_CONFIG.migration.l1ToL2MinIdleDays,
+      l2ToL3MinIdleDays: MEMORY_CONFIG.migration.l2ToL3MinIdleDays,
+      l2ToL3MinImportance: MEMORY_CONFIG.migration.l2ToL3MinImportance,
+      migratedContentPrefix: MEMORY_CONFIG.migration.migratedContentPrefix,
+    };
+    const migration = this.releaseControl.migration;
+    const inCanary = this.isCanaryActive(
+      migration.mode,
+      migration.canaryEnabled,
+      migration.canaryPercentage,
+      `${agentFolder}:${userJid || 'global'}:migration`,
+    );
+    if (!inCanary) {
+      return base;
+    }
+    return {
+      ...base,
+      ...migration.canaryRules,
+    };
+  }
+
+  private isCanaryActive(
+    mode: RolloutMode,
+    canaryEnabled: boolean,
+    canaryPercentage: number,
+    bucketKey: string,
+  ): boolean {
+    if (mode === 'stable') {
+      return false;
+    }
+    if (mode === 'canary') {
+      return true;
+    }
+    if (!canaryEnabled || canaryPercentage <= 0) {
+      return false;
+    }
+    return this.computeBucket(bucketKey) < canaryPercentage;
+  }
+
+  private computeBucket(seed: string): number {
+    const digest = crypto.createHash('sha256').update(seed).digest('hex');
+    const value = parseInt(digest.slice(0, 8), 16);
+    return value % 100;
+  }
+
+  private recordSearchMetrics(
+    requestedLimit: number,
+    returnedCount: number,
+    lowConfidenceHits: number,
+    latencyMs: number,
+  ): void {
+    this.metricsState.totalSearches += 1;
+    this.metricsState.totalRequested += Math.max(0, requestedLimit);
+    this.metricsState.totalReturned += Math.max(0, returnedCount);
+    this.metricsState.lowConfidenceHits += Math.max(0, lowConfidenceHits);
+    if (returnedCount > 0) {
+      this.metricsState.searchesWithHits += 1;
+    }
+    this.metricsState.retrievalLatencyMs.push(Math.max(0, latencyMs));
+    if (this.metricsState.retrievalLatencyMs.length > 500) {
+      this.metricsState.retrievalLatencyMs.shift();
+    }
+    this.appendMetricsSnapshot();
+  }
+
+  private recordCacheResult(hit: boolean): void {
+    if (hit) {
+      this.metricsState.cacheHits += 1;
+    } else {
+      this.metricsState.cacheMisses += 1;
+    }
+    this.appendMetricsSnapshot();
+  }
+
+  private appendMetricsSnapshot(): void {
+    const current = this.calculateCurrentMetrics();
+    this.metricsState.snapshots.push({
+      timestamp: new Date().toISOString(),
+      recallRate: current.recallRate,
+      hitRate: current.hitRate,
+      falseRecallRate: current.falseRecallRate,
+      migrationSuccessRate: current.migrationSuccessRate,
+      cacheHitRate: current.cacheHitRate,
+      avgRetrievalLatencyMs: current.avgRetrievalLatencyMs,
+    });
+    if (this.metricsState.snapshots.length > 500) {
+      this.metricsState.snapshots.shift();
+    }
+  }
+
+  private calculateCurrentMetrics(): {
+    recallRate: number;
+    hitRate: number;
+    falseRecallRate: number;
+    migrationSuccessRate: number;
+    cacheHitRate: number;
+    avgRetrievalLatencyMs: number;
+    p95RetrievalLatencyMs: number;
+    maxRetrievalLatencyMs: number;
+  } {
+    const recallRate =
+      this.metricsState.totalRequested > 0
+        ? this.metricsState.totalReturned / this.metricsState.totalRequested
+        : 0;
+    const hitRate =
+      this.metricsState.totalSearches > 0
+        ? this.metricsState.searchesWithHits / this.metricsState.totalSearches
+        : 0;
+    const falseRecallRate =
+      this.metricsState.totalReturned > 0
+        ? this.metricsState.lowConfidenceHits / this.metricsState.totalReturned
+        : 0;
+    const migrationSuccessRate =
+      this.metricsState.migrationAttempts > 0
+        ? this.metricsState.migrationSuccesses /
+          this.metricsState.migrationAttempts
+        : 0;
+    const totalCache =
+      this.metricsState.cacheHits + this.metricsState.cacheMisses;
+    const cacheHitRate =
+      totalCache > 0 ? this.metricsState.cacheHits / totalCache : 0;
+    const latency = [...this.metricsState.retrievalLatencyMs].sort(
+      (a, b) => a - b,
+    );
+    const avgRetrievalLatencyMs =
+      latency.length > 0
+        ? latency.reduce((sum, value) => sum + value, 0) / latency.length
+        : 0;
+    const p95Index =
+      latency.length > 0
+        ? Math.min(latency.length - 1, Math.floor(latency.length * 0.95))
+        : 0;
+    const p95RetrievalLatencyMs = latency.length > 0 ? latency[p95Index] : 0;
+    const maxRetrievalLatencyMs =
+      latency.length > 0 ? latency[latency.length - 1] : 0;
+    return {
+      recallRate,
+      hitRate,
+      falseRecallRate,
+      migrationSuccessRate,
+      cacheHitRate,
+      avgRetrievalLatencyMs,
+      p95RetrievalLatencyMs,
+      maxRetrievalLatencyMs,
+    };
+  }
+}
+
+function safeParseReleaseControl(raw: string): MemoryReleaseControl | null {
+  try {
+    const parsed = JSON.parse(raw) as MemoryReleaseControl;
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+    if (!parsed.retrieval || !parsed.migration || !parsed.updatedAt) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
   }
 }
 

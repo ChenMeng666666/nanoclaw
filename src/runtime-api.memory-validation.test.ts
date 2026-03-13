@@ -192,6 +192,126 @@ describe('runtime api memory validation', () => {
     expect(body.memories?.[0]?.explain?.scores?.final).toBeTypeOf('number');
   });
 
+  it('returns memory dashboard metrics', async () => {
+    await memoryManager.setWorkingMemory(
+      'agent-runtime-api-memory',
+      'cache warmup content',
+    );
+    await memoryManager.getWorkingMemory('agent-runtime-api-memory');
+    await fetch(`${baseUrl}/api/memory/add`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': 'test-key',
+      },
+      body: JSON.stringify({
+        agentFolder: 'agent-runtime-api-memory',
+        content: 'dashboard keyword record',
+        level: 'L2',
+      }),
+    });
+    await fetch(`${baseUrl}/api/memory/search`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': 'test-key',
+      },
+      body: JSON.stringify({
+        agentFolder: 'agent-runtime-api-memory',
+        query: 'dashboard keyword',
+        limit: 5,
+      }),
+    });
+
+    const response = await fetch(
+      `${baseUrl}/api/memory/metrics/dashboard?timelineLimit=5`,
+      {
+        method: 'GET',
+        headers: {
+          'x-api-key': 'test-key',
+        },
+      },
+    );
+    const body = (await response.json()) as {
+      summary?: {
+        counters?: { totalSearches?: number };
+        retrievalLatencyMs?: { avg?: number };
+      };
+      timeline?: unknown[];
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.summary?.counters?.totalSearches).toBeGreaterThan(0);
+    expect(body.summary?.retrievalLatencyMs?.avg).toBeTypeOf('number');
+    expect(Array.isArray(body.timeline)).toBe(true);
+  });
+
+  it('supports release control update and rollback', async () => {
+    const updateResponse = await fetch(
+      `${baseUrl}/api/memory/release/control`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': 'test-key',
+        },
+        body: JSON.stringify({
+          operator: 'test-suite',
+          reason: 'enable canary',
+          retrieval: {
+            mode: 'auto',
+            canaryEnabled: true,
+            canaryPercentage: 25,
+            lowConfidenceThreshold: 0.55,
+          },
+          migration: {
+            mode: 'auto',
+            canaryEnabled: true,
+            canaryPercentage: 30,
+            canaryRules: {
+              l2ToL3MinImportance: 0.62,
+            },
+          },
+        }),
+      },
+    );
+    const updateBody = (await updateResponse.json()) as {
+      operationId?: string;
+      control?: {
+        retrieval?: { canaryPercentage?: number };
+      };
+    };
+
+    expect(updateResponse.status).toBe(200);
+    expect(updateBody.operationId).toBeTruthy();
+    expect(updateBody.control?.retrieval?.canaryPercentage).toBe(25);
+
+    const rollbackResponse = await fetch(
+      `${baseUrl}/api/memory/release/rollback`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': 'test-key',
+        },
+        body: JSON.stringify({
+          operationId: updateBody.operationId,
+          operator: 'test-suite',
+        }),
+      },
+    );
+    const rollbackBody = (await rollbackResponse.json()) as {
+      status?: string;
+      control?: {
+        retrieval?: { mode?: string };
+      };
+    };
+
+    expect(rollbackResponse.status).toBe(200);
+    expect(rollbackBody.status).toBe('rolled_back');
+    expect(rollbackBody.control?.retrieval?.mode).toBe('stable');
+  });
+
   it('enforces memory api rate limiting', async () => {
     const headers = {
       'content-type': 'application/json',
