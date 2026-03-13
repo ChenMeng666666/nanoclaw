@@ -521,6 +521,23 @@ describe('schedule_task schedule types', () => {
     expect(getAllTasks()).toHaveLength(0);
   });
 
+  it('rejects invalid interval with unit suffix', async () => {
+    await processTaskIpc(
+      {
+        type: 'schedule_task',
+        prompt: 'bad interval suffix',
+        schedule_type: 'interval',
+        schedule_value: '60000ms',
+        targetJid: 'other@g.us',
+      },
+      'whatsapp_main',
+      true,
+      deps,
+    );
+
+    expect(getAllTasks()).toHaveLength(0);
+  });
+
   it('rejects invalid interval (zero)', async () => {
     await processTaskIpc(
       {
@@ -785,6 +802,36 @@ describe('update_task schedule recompute', () => {
 
     const updated = getTaskById('task-update-type');
     expect(updated?.schedule_type).toBe('once');
+  });
+
+  it('rejects update_task when schedule_type changes without schedule_value', async () => {
+    createTask({
+      id: 'task-update-type-missing-value',
+      group_folder: 'other-group',
+      chat_jid: 'other@g.us',
+      prompt: 'safe',
+      schedule_type: 'once',
+      schedule_value: '2025-06-01T00:00:00',
+      context_mode: 'isolated',
+      next_run: '2025-06-01T00:00:00.000Z',
+      status: 'active',
+      created_at: '2025-01-01T00:00:00.000Z',
+    });
+
+    await processTaskIpc(
+      {
+        type: 'update_task',
+        taskId: 'task-update-type-missing-value',
+        schedule_type: 'interval',
+      },
+      'other-group',
+      false,
+      deps,
+    );
+
+    const updated = getTaskById('task-update-type-missing-value');
+    expect(updated?.schedule_type).toBe('once');
+    expect(updated?.schedule_value).toBe('2025-06-01T00:00:00');
   });
 });
 

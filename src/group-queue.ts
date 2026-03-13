@@ -13,6 +13,7 @@ interface QueuedTask {
 
 const MAX_RETRIES = 5;
 const BASE_RETRY_MS = 5000;
+const PIPED_MESSAGE_ACK_TIMEOUT_MS = 15000;
 
 interface GroupState {
   active: boolean;
@@ -21,6 +22,8 @@ interface GroupState {
   runningTaskId: string | null;
   pendingMessages: boolean;
   lastPipedMessageTimestamp: string | null;
+  lastPipedMessageFilePath: string | null;
+  lastPipedMessageWrittenAt: number | null;
   pendingTasks: QueuedTask[];
   process: ChildProcess | null;
   containerName: string | null;
@@ -58,6 +61,8 @@ export class GroupQueue {
         runningTaskId: null,
         pendingMessages: false,
         lastPipedMessageTimestamp: null,
+        lastPipedMessageFilePath: null,
+        lastPipedMessageWrittenAt: null,
         pendingTasks: [],
         process: null,
         containerName: null,
@@ -295,6 +300,7 @@ export class GroupQueue {
     state.idleWaiting = false;
     if (lastMessageTimestamp)
       state.lastPipedMessageTimestamp = lastMessageTimestamp;
+    else state.lastPipedMessageTimestamp = null;
 
     const inputDir = path.join(DATA_DIR, 'ipc', state.groupFolder, 'input');
     try {
@@ -309,11 +315,78 @@ export class GroupQueue {
         logger.warn({ groupJid, filepath }, 'IPC message file is empty');
         return { success: false, code: 'write_failed', filePath: filepath };
       }
+      state.lastPipedMessageFilePath = filepath;
+      state.lastPipedMessageWrittenAt = Date.now();
       return { success: true, code: 'write_verified', filePath: filepath };
     } catch (err) {
       logger.warn({ groupJid, err }, 'Failed to send IPC message');
+      state.lastPipedMessageFilePath = null;
+      state.lastPipedMessageWrittenAt = null;
       return { success: false, code: 'write_failed' };
     }
+  }
+
+  hasPendingPipedMessage(groupJid: string): boolean {
+    const state = this.getGroup(groupJid);
+    if (
+      !state.lastPipedMessageTimestamp ||
+      !state.lastPipedMessageFilePath ||
+      state.lastPipedMessageWrittenAt === null
+    ) {
+      return false;
+    }
+
+    const isStale =
+      Date.now() - state.lastPipedMessageWrittenAt >
+      PIPED_MESSAGE_ACK_TIMEOUT_MS;
+    if (isStale) {
+      state.lastPipedMessageTimestamp = null;
+      state.lastPipedMessageFilePath = null;
+      state.lastPipedMessageWrittenAt = null;
+      return false;
+    }
+
+    const inputFileExists = fs.existsSync(state.lastPipedMessageFilePath);
+    if (inputFileExists) return true;
+
+    const processingConfirmed = state.outputSent || state.idleWaiting;
+    return !processingConfirmed;
+  }
+
+  consumePipedMessageAck(groupJid: string): string | null {
+    const state = this.getGroup(groupJid);
+    if (
+      !state.lastPipedMessageTimestamp ||
+      !state.lastPipedMessageFilePath ||
+      state.lastPipedMessageWrittenAt === null
+    ) {
+      return null;
+    }
+
+    const isStale =
+      Date.now() - state.lastPipedMessageWrittenAt >
+      PIPED_MESSAGE_ACK_TIMEOUT_MS;
+    if (isStale) {
+      state.lastPipedMessageTimestamp = null;
+      state.lastPipedMessageFilePath = null;
+      state.lastPipedMessageWrittenAt = null;
+      return null;
+    }
+
+    if (fs.existsSync(state.lastPipedMessageFilePath)) {
+      return null;
+    }
+
+    const processingConfirmed = state.outputSent || state.idleWaiting;
+    if (!processingConfirmed) {
+      return null;
+    }
+
+    const consumedTimestamp = state.lastPipedMessageTimestamp;
+    state.lastPipedMessageTimestamp = null;
+    state.lastPipedMessageFilePath = null;
+    state.lastPipedMessageWrittenAt = null;
+    return consumedTimestamp;
   }
 
   /**

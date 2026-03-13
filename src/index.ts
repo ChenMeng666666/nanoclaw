@@ -634,6 +634,23 @@ async function startMessageLoop(): Promise<void> {
             continue;
           }
 
+          const consumedCursor = queue.consumePipedMessageAck(chatJid);
+          if (consumedCursor) {
+            const previousCursor = lastAgentTimestamp[chatJid] || '';
+            const shouldAdvance =
+              !previousCursor ||
+              new Date(consumedCursor).getTime() >=
+                new Date(previousCursor).getTime();
+            if (shouldAdvance) {
+              lastAgentTimestamp[chatJid] = consumedCursor;
+              saveState();
+              logger.debug(
+                { chatJid, consumedCursor, previousCursor },
+                'Advanced cursor after IPC consumption ack',
+              );
+            }
+          }
+
           const channel = findChannel(channels, chatJid);
           if (!channel) {
             logger.warn({ chatJid }, 'No channel owns JID, skipping messages');
@@ -691,14 +708,34 @@ async function startMessageLoop(): Promise<void> {
           const newCursor =
             messagesToSend[messagesToSend.length - 1]?.timestamp;
 
-          if (queue.sendMessage(chatJid, formatted, newCursor)) {
+          if (queue.hasPendingPipedMessage(chatJid)) {
             logger.debug(
               { chatJid, count: messagesToSend.length },
+              'Skipping duplicate pipe while previous IPC message is unconsumed',
+            );
+            continue;
+          }
+
+          const pipeResult = queue.sendMessageDetailed(
+            chatJid,
+            formatted,
+            newCursor,
+          );
+          if (pipeResult.success) {
+            logger.debug(
+              {
+                chatJid,
+                count: messagesToSend.length,
+                code: pipeResult.code,
+                filePath: pipeResult.filePath,
+              },
               'Piped messages to active container',
             );
-            // 更新 lastAgentTimestamp
-            lastAgentTimestamp[chatJid] = newCursor;
-            saveState();
+            const ackedCursor = queue.consumePipedMessageAck(chatJid);
+            if (ackedCursor) {
+              lastAgentTimestamp[chatJid] = ackedCursor;
+              saveState();
+            }
             // Show typing indicator while the container processes the piped message
             channel
               .setTyping?.(chatJid, true)
@@ -706,11 +743,23 @@ async function startMessageLoop(): Promise<void> {
                 logger.warn({ chatJid, err }, 'Failed to set typing indicator'),
               );
           } else {
+            if (pipeResult.code === 'task_container_pending') {
+              logger.debug(
+                {
+                  chatJid,
+                  count: messagesToSend.length,
+                  code: pipeResult.code,
+                },
+                'Task container pending, skip enqueue for now',
+              );
+              continue;
+            }
             // No active container — enqueue for a new one
             logger.debug(
               {
                 chatJid,
                 count: messagesToSend.length,
+                code: pipeResult.code,
                 previousCursor,
                 newCursor,
               },

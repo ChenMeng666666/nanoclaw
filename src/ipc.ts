@@ -27,6 +27,32 @@ export interface IpcDeps {
 
 let ipcWatcherRunning = false;
 
+const ISO_8601_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?(?:Z)?$/;
+const MIN_INTERVAL_MS = 1000;
+const MAX_INTERVAL_MS = 365 * 24 * 60 * 60 * 1000;
+
+function parseIntervalMs(value: unknown): number | null {
+  const raw =
+    typeof value === 'number' || typeof value === 'string'
+      ? String(value).trim()
+      : '';
+  if (!/^\d+$/.test(raw)) return null;
+  const intervalMs = Number(raw);
+  if (!Number.isSafeInteger(intervalMs)) return null;
+  if (intervalMs < MIN_INTERVAL_MS || intervalMs > MAX_INTERVAL_MS) return null;
+  return intervalMs;
+}
+
+function parseOnceTimestamp(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const raw = value.trim();
+  if (!ISO_8601_PATTERN.test(raw)) return null;
+  const parsedDate = new Date(raw);
+  if (isNaN(parsedDate.getTime())) return null;
+  return parsedDate.toISOString();
+}
+
 export function startIpcWatcher(deps: IpcDeps): void {
   if (ipcWatcherRunning) {
     logger.debug('IPC watcher already running, skipping duplicate start');
@@ -252,25 +278,25 @@ export async function processTaskIpc(
             break;
           }
         } else if (scheduleType === 'interval') {
-          const ms = parseInt(data.schedule_value, 10);
-          if (isNaN(ms) || ms <= 0) {
+          const intervalMs = parseIntervalMs(data.schedule_value);
+          if (intervalMs === null) {
             logger.warn(
               { scheduleValue: data.schedule_value },
               'Invalid interval',
             );
             break;
           }
-          nextRun = new Date(Date.now() + ms).toISOString();
+          nextRun = new Date(Date.now() + intervalMs).toISOString();
         } else if (scheduleType === 'once') {
-          const date = new Date(data.schedule_value);
-          if (isNaN(date.getTime())) {
+          const normalizedTimestamp = parseOnceTimestamp(data.schedule_value);
+          if (!normalizedTimestamp) {
             logger.warn(
               { scheduleValue: data.schedule_value },
               'Invalid timestamp',
             );
             break;
           }
-          nextRun = date.toISOString();
+          nextRun = normalizedTimestamp;
         }
 
         const taskId =
@@ -400,6 +426,16 @@ export async function processTaskIpc(
           data.schedule_type !== undefined ||
           data.schedule_value !== undefined
         ) {
+          if (
+            data.schedule_type !== undefined &&
+            data.schedule_value === undefined
+          ) {
+            logger.warn(
+              { taskId: data.taskId, scheduleType: data.schedule_type },
+              'Task update rejected: schedule_value is required when schedule_type changes',
+            );
+            break;
+          }
           const updatedTask = {
             ...task,
             ...updates,
@@ -430,25 +466,27 @@ export async function processTaskIpc(
               break;
             }
           } else if (updatedTask.schedule_type === 'interval') {
-            const ms = parseInt(updatedTask.schedule_value, 10);
-            if (isNaN(ms) || ms <= 0) {
+            const intervalMs = parseIntervalMs(updatedTask.schedule_value);
+            if (intervalMs === null) {
               logger.warn(
                 { taskId: data.taskId, value: updatedTask.schedule_value },
                 'Invalid interval in task update',
               );
               break;
             }
-            updates.next_run = new Date(Date.now() + ms).toISOString();
+            updates.next_run = new Date(Date.now() + intervalMs).toISOString();
           } else if (updatedTask.schedule_type === 'once') {
-            const date = new Date(updatedTask.schedule_value);
-            if (isNaN(date.getTime())) {
+            const normalizedTimestamp = parseOnceTimestamp(
+              updatedTask.schedule_value,
+            );
+            if (!normalizedTimestamp) {
               logger.warn(
                 { taskId: data.taskId, value: updatedTask.schedule_value },
                 'Invalid timestamp in task update',
               );
               break;
             }
-            updates.next_run = date.toISOString();
+            updates.next_run = normalizedTimestamp;
           }
         }
 

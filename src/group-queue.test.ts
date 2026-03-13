@@ -18,6 +18,8 @@ vi.mock('fs', async () => {
       mkdirSync: vi.fn(),
       writeFileSync: vi.fn(),
       renameSync: vi.fn(),
+      statSync: vi.fn(() => ({ size: 16 })),
+      existsSync: vi.fn(() => false),
     },
   };
 });
@@ -430,6 +432,47 @@ describe('GroupQueue', () => {
     expect(result).toBe(false);
 
     resolveTask!();
+    await vi.advanceTimersByTimeAsync(10);
+  });
+
+  it('tracks and consumes piped message ack before advancing cursor', async () => {
+    const fs = await import('fs');
+    const existsSync = vi.mocked(fs.default.existsSync);
+    const existsStates = [true, true, false];
+    existsSync.mockImplementation(() => existsStates.shift() ?? false);
+
+    let resolveProcess: () => void;
+    const processMessages = vi.fn(async () => {
+      await new Promise<void>((resolve) => {
+        resolveProcess = resolve;
+      });
+      return true;
+    });
+    queue.setProcessMessagesFn(processMessages);
+
+    queue.enqueueMessageCheck('group1@g.us');
+    await vi.advanceTimersByTimeAsync(10);
+    queue.registerProcess(
+      'group1@g.us',
+      {} as any,
+      'container-1',
+      'test-group',
+    );
+
+    const sendResult = queue.sendMessageDetailed(
+      'group1@g.us',
+      'hello',
+      '2025-07-01T12:30:00.000Z',
+    );
+    expect(sendResult.success).toBe(true);
+    expect(queue.hasPendingPipedMessage('group1@g.us')).toBe(true);
+    expect(queue.consumePipedMessageAck('group1@g.us')).toBeNull();
+    expect(queue.hasPendingPipedMessage('group1@g.us')).toBe(true);
+    queue.markOutputSent('group1@g.us');
+    expect(queue.consumePipedMessageAck('group1@g.us')).toBe(
+      '2025-07-01T12:30:00.000Z',
+    );
+    resolveProcess!();
     await vi.advanceTimersByTimeAsync(10);
   });
 
