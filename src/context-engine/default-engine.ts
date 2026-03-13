@@ -18,7 +18,7 @@ import {
   deleteMemory,
   getUserMemories,
 } from '../db-agents.js';
-import { getMessagesSince } from '../db.js';
+import { getRecentMessagesWithinWindow } from '../db.js';
 import {
   BM25Index,
   reciprocalRankFusion,
@@ -784,7 +784,14 @@ export class DefaultContextEngine implements ContextEngine {
   }
 
   private getRecentMessages(chatJid: string, limit: number): NewMessage[] {
-    return getMessagesSince(chatJid, '', ASSISTANT_NAME, limit);
+    const windowHours = Number(process.env.CONTEXT_RECENT_WINDOW_HOURS) || 24;
+    const pageSize = Number(process.env.CONTEXT_RECENT_PAGE_SIZE) || 50;
+    return getRecentMessagesWithinWindow(chatJid, {
+      limit,
+      pageSize,
+      windowHours,
+      botPrefix: ASSISTANT_NAME,
+    });
   }
 
   private async vectorSearch(
@@ -793,6 +800,9 @@ export class DefaultContextEngine implements ContextEngine {
     limit: number,
   ): Promise<string[]> {
     const queryEmbedding = await generateEmbedding(query);
+    if (queryEmbedding.length === 0) {
+      return [];
+    }
     const memories = getMemories(agentFolder);
 
     const scored = memories
@@ -801,6 +811,7 @@ export class DefaultContextEngine implements ContextEngine {
         id: memory.id,
         score: this.cosineSimilarity(queryEmbedding, memory.embedding!),
       }))
+      .filter((item) => item.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
 

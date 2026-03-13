@@ -855,6 +855,62 @@ export function getMessagesSince(
     .all(chatJid, sinceTimestamp, `${botPrefix}:%`, limit) as NewMessage[];
 }
 
+export function getRecentMessagesWithinWindow(
+  chatJid: string,
+  options?: {
+    limit?: number;
+    pageSize?: number;
+    windowHours?: number;
+    beforeTimestamp?: string;
+    botPrefix?: string;
+  },
+): NewMessage[] {
+  const limit = Math.max(1, Math.min(options?.limit ?? 200, 500));
+  const pageSize = Math.max(10, Math.min(options?.pageSize ?? 50, 200));
+  const windowHours = Math.max(
+    1,
+    Math.min(options?.windowHours ?? 24, 24 * 30),
+  );
+  const botPrefix = options?.botPrefix || ASSISTANT_NAME;
+  const now = Date.now();
+  const windowStart = new Date(
+    now - windowHours * 60 * 60 * 1000,
+  ).toISOString();
+  let cursor = options?.beforeTimestamp || new Date(now + 1000).toISOString();
+  const result: NewMessage[] = [];
+
+  const statement = db.prepare(`
+    SELECT id, chat_jid, sender, sender_name, content, timestamp, is_from_me
+    FROM messages
+    WHERE chat_jid = ? AND timestamp >= ? AND timestamp < ?
+      AND is_bot_message = 0 AND content NOT LIKE ?
+      AND content != '' AND content IS NOT NULL
+    ORDER BY timestamp DESC
+    LIMIT ?
+  `);
+
+  while (result.length < limit) {
+    const fetchSize = Math.min(pageSize, limit - result.length);
+    const page = statement.all(
+      chatJid,
+      windowStart,
+      cursor,
+      `${botPrefix}:%`,
+      fetchSize,
+    ) as NewMessage[];
+    if (page.length === 0) {
+      break;
+    }
+    result.push(...page);
+    cursor = page[page.length - 1].timestamp;
+    if (page.length < fetchSize) {
+      break;
+    }
+  }
+
+  return result.reverse();
+}
+
 export function createTask(
   task: Omit<ScheduledTask, 'last_run' | 'last_result'>,
 ): void {

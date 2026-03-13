@@ -328,11 +328,14 @@ async function processGroupMessagesWithTimeout(
     code: ProcessMessagesOutcomeCode;
   }
 
-  const timeoutPromise = new Promise<ProcessMessagesOutcome>((_, reject) => {
-    setTimeout(
-      () => reject(new Error('Message processing timed out')),
-      timeoutMs,
-    );
+  let didTimeout = false;
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<ProcessMessagesOutcome>((resolve) => {
+    timeoutHandle = setTimeout(() => {
+      didTimeout = true;
+      queue.closeStdin(chatJid);
+      resolve({ ok: false, code: 'retry_needed' });
+    }, timeoutMs);
   });
 
   const processingPromise = (async (): Promise<ProcessMessagesOutcome> => {
@@ -426,6 +429,9 @@ async function processGroupMessagesWithTimeout(
     let responseText = '';
 
     const output = await runAgent(group, prompt, chatJid, async (result) => {
+      if (didTimeout) {
+        return;
+      }
       // Streaming output callback — called for each agent result
       if (result.result) {
         const raw =
@@ -459,6 +465,9 @@ async function processGroupMessagesWithTimeout(
 
     await channel.setTyping?.(chatJid, false);
     if (idleTimer) clearTimeout(idleTimer);
+    if (didTimeout) {
+      return { ok: false, code: 'retry_needed' };
+    }
     if (contextEngine) {
       try {
         await contextEngine.afterTurn({
@@ -496,12 +505,18 @@ async function processGroupMessagesWithTimeout(
 
   return Promise.race([processingPromise, timeoutPromise])
     .then((outcome) => {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
       if (outcome.code !== 'processed') {
         logger.debug({ chatJid, outcome }, 'Group message processing outcome');
       }
       return outcome.ok;
     })
     .catch((err) => {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
       logger.error({ chatJid, err }, 'Message processing failed');
       return false;
     });
