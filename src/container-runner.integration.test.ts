@@ -39,9 +39,10 @@ describe('container runner integration', () => {
       return;
     }
 
+    const runId = Date.now();
     const testGroup: RegisteredGroup = {
       name: 'Test',
-      folder: 'test',
+      folder: `test-${runId}`,
       trigger: '@Andy',
       added_at: new Date().toISOString(),
     };
@@ -50,7 +51,7 @@ describe('container runner integration', () => {
     const input: ContainerInput = {
       prompt: '请回复: E2E_CONTAINER_OK',
       groupFolder: testGroup.folder,
-      chatJid: 'test:container-e2e',
+      chatJid: `test:container-e2e:${runId}`,
       isMain: false,
     };
 

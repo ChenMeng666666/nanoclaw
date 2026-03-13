@@ -26,7 +26,7 @@ import {
 import { logger } from './logger.js';
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
 });
 
 // --- Pure functions ---
@@ -114,6 +114,17 @@ describe('cleanupOrphans', () => {
 
     expect(mockExecSync).toHaveBeenCalledTimes(1);
     expect(logger.info).not.toHaveBeenCalled();
+  });
+
+  it('supports custom container name prefix', () => {
+    mockExecSync.mockReturnValueOnce('');
+
+    cleanupOrphans('nanoclaw-isolated-');
+
+    expect(mockExecSync).toHaveBeenCalledWith(
+      `${CONTAINER_RUNTIME_BIN} ps --filter name=nanoclaw-isolated- --format '{{.Names}}'`,
+      { stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf-8' },
+    );
   });
 
   it('warns and continues when ps fails', () => {

@@ -28,6 +28,8 @@ describe('container runtime integration', () => {
   });
 
   it('runs orphan cleanup command path without crashing', () => {
-    expect(() => cleanupOrphans()).not.toThrow();
+    expect(() =>
+      cleanupOrphans(`nanoclaw-cleanup-it-${Date.now()}-`),
+    ).not.toThrow();
   });
 });
