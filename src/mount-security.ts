@@ -199,23 +199,45 @@ function findAllowedRoot(
 /**
  * Validate the container path to prevent escaping /workspace/extra/
  */
-function isValidContainerPath(containerPath: string): boolean {
-  // Must not contain .. to prevent path traversal
-  if (containerPath.includes('..')) {
-    return false;
-  }
-
-  // Must not be absolute (it will be prefixed with /workspace/extra/)
-  if (containerPath.startsWith('/')) {
-    return false;
-  }
-
-  // Must not be empty
+function isValidContainerPath(containerPath: string): {
+  valid: boolean;
+  reason:
+    | 'empty'
+    | 'absolute_path'
+    | 'path_traversal'
+    | 'normalized_escape'
+    | 'encoded_traversal'
+    | 'ok';
+} {
   if (!containerPath || containerPath.trim() === '') {
-    return false;
+    return { valid: false, reason: 'empty' };
   }
 
-  return true;
+  if (path.isAbsolute(containerPath) || containerPath.startsWith('/')) {
+    return { valid: false, reason: 'absolute_path' };
+  }
+
+  if (containerPath.includes('..')) {
+    return { valid: false, reason: 'path_traversal' };
+  }
+
+  const normalizedPath = path.posix.normalize(
+    containerPath.replace(/\\/g, '/'),
+  );
+  if (normalizedPath.startsWith('../') || normalizedPath === '..') {
+    return { valid: false, reason: 'normalized_escape' };
+  }
+
+  try {
+    const decoded = decodeURIComponent(containerPath);
+    if (decoded.includes('..') || decoded.includes('%2e')) {
+      return { valid: false, reason: 'encoded_traversal' };
+    }
+  } catch {
+    return { valid: false, reason: 'encoded_traversal' };
+  }
+
+  return { valid: true, reason: 'ok' };
 }
 
 export interface MountValidationResult {
@@ -248,10 +270,11 @@ export function validateMount(
   const containerPath = mount.containerPath || path.basename(mount.hostPath);
 
   // Validate container path (cheap check)
-  if (!isValidContainerPath(containerPath)) {
+  const containerPathValidation = isValidContainerPath(containerPath);
+  if (!containerPathValidation.valid) {
     return {
       allowed: false,
-      reason: `Invalid container path: "${containerPath}" - must be relative, non-empty, and not contain ".."`,
+      reason: `Invalid container path: "${containerPath}" (reason: ${containerPathValidation.reason})`,
     };
   }
 

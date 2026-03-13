@@ -124,6 +124,44 @@ class KeystoreAuditManager {
   /**
    * 查询审计日志
    */
+  private evaluateLogMatch(
+    log: CredentialAccessLog,
+    query?: {
+      agentId?: string;
+      credentialKey?: string;
+      operation?: 'read' | 'write' | 'delete' | 'list';
+      success?: boolean;
+      startTime?: Date;
+      endTime?: Date;
+    },
+  ): { matched: boolean; reasons: string[] } {
+    const reasons: string[] = [];
+
+    if (query?.agentId && log.agentId !== query.agentId) {
+      reasons.push('agent_mismatch');
+    }
+    if (query?.credentialKey && log.credentialKey !== query.credentialKey) {
+      reasons.push('credential_mismatch');
+    }
+    if (query?.operation && log.operation !== query.operation) {
+      reasons.push('operation_mismatch');
+    }
+    if (typeof query?.success === 'boolean' && log.success !== query.success) {
+      reasons.push('success_mismatch');
+    }
+    if (query?.startTime && new Date(log.timestamp) < query.startTime) {
+      reasons.push('before_start_time');
+    }
+    if (query?.endTime && new Date(log.timestamp) > query.endTime) {
+      reasons.push('after_end_time');
+    }
+
+    return {
+      matched: reasons.length === 0,
+      reasons,
+    };
+  }
+
   getLogs(query?: {
     agentId?: string;
     credentialKey?: string;
@@ -132,30 +170,7 @@ class KeystoreAuditManager {
     startTime?: Date;
     endTime?: Date;
   }): CredentialAccessLog[] {
-    return this.logs.filter((log) => {
-      if (query?.agentId && log.agentId !== query.agentId) {
-        return false;
-      }
-      if (query?.credentialKey && log.credentialKey !== query.credentialKey) {
-        return false;
-      }
-      if (query?.operation && log.operation !== query.operation) {
-        return false;
-      }
-      if (
-        typeof query?.success === 'boolean' &&
-        log.success !== query.success
-      ) {
-        return false;
-      }
-      if (query?.startTime && new Date(log.timestamp) < query.startTime) {
-        return false;
-      }
-      if (query?.endTime && new Date(log.timestamp) > query.endTime) {
-        return false;
-      }
-      return true;
-    });
+    return this.logs.filter((log) => this.evaluateLogMatch(log, query).matched);
   }
 
   /**

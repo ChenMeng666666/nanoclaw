@@ -225,26 +225,3 @@ Return ONLY the queries, one per line, without numbering or extra text.`;
     return lines.slice(0, this.config.numVariants!);
   }
 }
-
-/**
- * 模拟的本地 LLM 提供者（用于测试，不依赖 node-llama-cpp）
- */
-export class MockLLMQueryExpansionProvider implements QueryExpansionProvider {
-  private variants: string[] = [];
-
-  /**
-   * 添加预设的查询变体（用于测试）
-   */
-  addVariants(variants: string[]): void {
-    this.variants = [...this.variants, ...variants];
-  }
-
-  generateVariants(query: string): string[] {
-    if (this.variants.length > 0) {
-      return this.variants.slice(0, 3);
-    }
-
-    // 默认返回空数组（会回退到关键词方法）
-    return [];
-  }
-}

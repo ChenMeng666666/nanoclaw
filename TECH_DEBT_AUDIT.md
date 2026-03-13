@@ -26,55 +26,55 @@
 
 ## P1：生产代码中疑似占位/短路逻辑（需逐条确认）
 
-- [ ] `src/runtime-api.ts:122`  
+- [x] `src/runtime-api.ts:122`  
   问题：`return http.createServer(() => {});`（禁用 API 时返回空 handler）。  
   应有真实逻辑：返回明确的“禁用态”响应（如固定 503 + 原因），或返回受控的 noop server 并记录可观测指标，避免静默吞请求。
 
-- [ ] `src/query-expansion/local-llm-provider.ts:232`  
+- [x] `src/query-expansion/local-llm-provider.ts:232`  
   问题：生产路径文件内定义 `MockLLMQueryExpansionProvider`。  
   应有真实逻辑：将 Mock 提供者迁移到测试专用模块，生产路径只暴露真实 provider 与受控 fallback。
 
-- [ ] `src/index.ts:322,327,339,349,422,433,766`  
+- [x] `src/index.ts:322,327,339,349,422,433,766`  
   问题：多处直接 `return true`，用于“跳过/成功”语义。  
   应有真实逻辑：区分“无事可做”“跳过处理”“真正成功”“降级成功”状态码，避免布尔值掩盖处理分支，减少队列/重试误判。
 
-- [ ] `src/group-queue.ts:286`  
+- [x] `src/group-queue.ts:286`  
   问题：写 IPC 文件成功后直接 `return true`。  
   应有真实逻辑：除写入成功外应校验落盘一致性（原子写入确认、目标文件可见性、必要时 fsync 或二次校验）并返回结构化结果。
 
-- [ ] `src/config.ts:533`  
+- [x] `src/config.ts:533`  
   问题：`isCommandAllowed` 通过前缀与禁用操作符后直接 `return true`。  
   应有真实逻辑：增加命令语义级校验（参数白名单、路径作用域、子命令限制、长度/编码检查），降低绕过风险。
 
-- [ ] `src/collaboration-scheduler.ts:37,47`  
+- [x] `src/collaboration-scheduler.ts:37,47`  
   问题：依赖检查函数以布尔值快速返回。  
   应有真实逻辑：返回带原因的依赖校验结果（缺失依赖列表、阻塞原因、可重试时间），便于调度器决策与可观测性。
 
-- [ ] `src/agent-communication.ts:140`  
+- [x] `src/agent-communication.ts:140`  
   问题：状态更新后直接 `return true`。  
   应有真实逻辑：返回结构化更新结果（旧状态/新状态/版本号/幂等标识），并在并发场景下保证状态一致性。
 
-- [ ] `src/security-alerts.ts:171`  
+- [x] `src/security-alerts.ts:171`  
   问题：标记事件处理完成后直接 `return true`。  
   应有真实逻辑：补充处理人、处理动作、处理证据与持久化确认，避免“仅内存标记已处理”。
 
-- [ ] `src/keystore-audit.ts:157`  
+- [x] `src/keystore-audit.ts:157`  
   问题：筛选日志时条件通过直接 `return true`。  
   应有真实逻辑：当前实现可工作，但建议抽象为可审计过滤器并输出命中原因，增强审计可解释性。
 
-- [ ] `src/sender-allowlist.ts:110`  
+- [x] `src/sender-allowlist.ts:110`  
   问题：`allow='*'` 直接 `return true`。  
   应有真实逻辑：在全放行场景增加显式风险门禁（仅主群允许、环境开关、审计日志与告警），避免误配置导致越权触发。
 
-- [ ] `src/mount-security.ts:218`  
+- [x] `src/mount-security.ts:218`  
   问题：路径规则校验后直接 `return true`。  
   应有真实逻辑：增加符号链接/编码绕过/平台差异路径的深度校验，并返回失败原因枚举供上层审计。
 
-- [ ] `src/group-folder.ts:15`  
+- [x] `src/group-folder.ts:15`  
   问题：文件夹名校验通过直接 `return true`。  
   应有真实逻辑：当前规则较完整，但建议统一返回校验结果对象（是否通过 + 失败码），便于统一错误处理与安全审计。
 
-- [ ] `src/context-engine/default-engine.ts:863`  
+- [x] `src/context-engine/default-engine.ts:863`  
   问题：构造函数体为空（参数属性注入写法）。  
   应有真实逻辑：此处属于 TypeScript 合法简写，不是缺陷；仅建议在审计基线中标注为“语法型空函数，已确认可接受”。
 

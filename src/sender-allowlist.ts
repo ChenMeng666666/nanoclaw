@@ -107,7 +107,34 @@ export function isSenderAllowed(
   cfg: SenderAllowlistConfig,
 ): boolean {
   const entry = getEntry(chatJid, cfg);
-  if (entry.allow === '*') return true;
+  if (entry.allow === '*') {
+    const allowAllEnvEnabled =
+      process.env.SENDER_ALLOWLIST_ALLOW_ALL === 'true';
+    const configuredMainJid =
+      process.env.SENDER_ALLOWLIST_MAIN_CHAT_JID?.trim() || '';
+    const isConfiguredMainGroup = configuredMainJid === chatJid;
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    if (isConfiguredMainGroup || allowAllEnvEnabled || !isProduction) {
+      logger.warn(
+        {
+          chatJid,
+          sender,
+          isConfiguredMainGroup,
+          allowAllEnvEnabled,
+          isProduction,
+        },
+        'sender-allowlist: wildcard allow enabled for chat',
+      );
+      return true;
+    }
+
+    logger.warn(
+      { chatJid, sender },
+      'sender-allowlist: wildcard allow blocked in production without explicit gate',
+    );
+    return false;
+  }
   return entry.allow.includes(sender);
 }
 

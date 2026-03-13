@@ -39,6 +39,15 @@ export interface SecurityEvent {
   handledAt?: string;
 }
 
+export interface MarkHandledResult {
+  success: boolean;
+  eventId: string;
+  handler?: string;
+  action?: string;
+  evidence?: string;
+  persisted: boolean;
+}
+
 /**
  * 安全告警管理器
  */
@@ -163,14 +172,49 @@ class SecurityAlertManager {
   /**
    * 标记事件为已处理
    */
-  markEventAsHandled(eventId: string): boolean {
+  markEventAsHandled(
+    eventId: string,
+    context?: {
+      handler?: string;
+      action?: string;
+      evidence?: string;
+    },
+  ): boolean {
+    return this.markEventAsHandledDetailed(eventId, context).success;
+  }
+
+  markEventAsHandledDetailed(
+    eventId: string,
+    context?: {
+      handler?: string;
+      action?: string;
+      evidence?: string;
+    },
+  ): MarkHandledResult {
     const event = this.events.find((e) => e.id === eventId);
     if (event) {
       event.handled = true;
       event.handledAt = new Date().toISOString();
-      return true;
+      event.metadata = {
+        ...event.metadata,
+        handledBy: context?.handler ?? 'system',
+        handledAction: context?.action ?? 'mark_handled',
+        handledEvidence: context?.evidence ?? 'n/a',
+      };
+      return {
+        success: true,
+        eventId,
+        handler: context?.handler ?? 'system',
+        action: context?.action ?? 'mark_handled',
+        evidence: context?.evidence ?? 'n/a',
+        persisted: true,
+      };
     }
-    return false;
+    return {
+      success: false,
+      eventId,
+      persisted: false,
+    };
   }
 
   /**

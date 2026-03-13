@@ -20,6 +20,16 @@ const IPC_BASE_DIR = path.join(DATA_DIR, 'ipc');
 
 // 消息状态存储
 const agentMessages = new Map<string, AgentMessage>();
+const agentMessageVersions = new Map<string, number>();
+
+export interface MessageStatusUpdateResult {
+  success: boolean;
+  messageId: string;
+  previousStatus?: AgentMessage['status'];
+  currentStatus?: AgentMessage['status'];
+  version?: number;
+  idempotent: boolean;
+}
 
 /**
  * 生成消息 ID
@@ -127,17 +137,48 @@ export function updateAgentMessageStatus(
   messageId: string,
   status: AgentMessage['status'],
 ): boolean {
+  return updateAgentMessageStatusDetailed(messageId, status).success;
+}
+
+export function updateAgentMessageStatusDetailed(
+  messageId: string,
+  status: AgentMessage['status'],
+): MessageStatusUpdateResult {
   const message = agentMessages.get(messageId);
   if (!message) {
     logger.warn({ messageId }, 'Message not found');
-    return false;
+    return {
+      success: false,
+      messageId,
+      idempotent: false,
+    };
   }
 
+  const previousStatus = message.status;
+  const idempotent = previousStatus === status;
+  const nextVersion = (agentMessageVersions.get(messageId) ?? 0) + 1;
   message.status = status;
   agentMessages.set(messageId, message);
+  agentMessageVersions.set(messageId, nextVersion);
 
-  logger.debug({ messageId, status }, 'Agent message status updated');
-  return true;
+  logger.debug(
+    {
+      messageId,
+      previousStatus,
+      status,
+      version: nextVersion,
+      idempotent,
+    },
+    'Agent message status updated',
+  );
+  return {
+    success: true,
+    messageId,
+    previousStatus,
+    currentStatus: status,
+    version: nextVersion,
+    idempotent,
+  };
 }
 
 /**

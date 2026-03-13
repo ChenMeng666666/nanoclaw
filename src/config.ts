@@ -517,18 +517,31 @@ export const EVOLUTION_CONFIG = {
 // 验证命令安全
 export function isCommandAllowed(command: string): boolean {
   const trimmedCommand = command.trim();
-
-  // 检查白名单前缀
-  const hasAllowedPrefix = EVOLUTION_CONFIG.allowedCommandPrefixes.some(
-    (prefix) => trimmedCommand.startsWith(prefix),
-  );
-  if (!hasAllowedPrefix) return false;
+  if (!trimmedCommand) return false;
+  if (trimmedCommand.length > 300) return false;
+  if (/[\u0000-\u001F]/.test(trimmedCommand)) return false;
 
   // 检查禁止的操作符
   const hasForbiddenOperator = EVOLUTION_CONFIG.forbiddenOperators.some((op) =>
     trimmedCommand.includes(op),
   );
   if (hasForbiddenOperator) return false;
+
+  const tokens = trimmedCommand.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return false;
+
+  const baseCommand = tokens[0];
+  const hasAllowedPrefix =
+    EVOLUTION_CONFIG.allowedCommandPrefixes.includes(baseCommand);
+  if (!hasAllowedPrefix) return false;
+
+  for (const token of tokens.slice(1)) {
+    if (token.length > 120) return false;
+    if (token.includes('..')) return false;
+    if (path.isAbsolute(token)) return false;
+    if (token.startsWith('~')) return false;
+    if (token.includes('\\')) return false;
+  }
 
   return true;
 }

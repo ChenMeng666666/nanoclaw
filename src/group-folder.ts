@@ -5,19 +5,50 @@ import { DATA_DIR, GROUPS_DIR } from './config.js';
 const GROUP_FOLDER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const RESERVED_FOLDERS = new Set(['global']);
 
+export interface GroupFolderValidationResult {
+  valid: boolean;
+  code:
+    | 'ok'
+    | 'empty'
+    | 'contains_whitespace'
+    | 'invalid_pattern'
+    | 'contains_separator'
+    | 'contains_parent_path'
+    | 'reserved_name';
+}
+
+export function validateGroupFolder(
+  folder: string,
+): GroupFolderValidationResult {
+  if (!folder) return { valid: false, code: 'empty' };
+  if (folder !== folder.trim()) {
+    return { valid: false, code: 'contains_whitespace' };
+  }
+  if (!GROUP_FOLDER_PATTERN.test(folder)) {
+    return { valid: false, code: 'invalid_pattern' };
+  }
+  if (folder.includes('/') || folder.includes('\\')) {
+    return { valid: false, code: 'contains_separator' };
+  }
+  if (folder.includes('..')) {
+    return { valid: false, code: 'contains_parent_path' };
+  }
+  if (RESERVED_FOLDERS.has(folder.toLowerCase())) {
+    return { valid: false, code: 'reserved_name' };
+  }
+  return { valid: true, code: 'ok' };
+}
+
 export function isValidGroupFolder(folder: string): boolean {
-  if (!folder) return false;
-  if (folder !== folder.trim()) return false;
-  if (!GROUP_FOLDER_PATTERN.test(folder)) return false;
-  if (folder.includes('/') || folder.includes('\\')) return false;
-  if (folder.includes('..')) return false;
-  if (RESERVED_FOLDERS.has(folder.toLowerCase())) return false;
-  return true;
+  return validateGroupFolder(folder).valid;
 }
 
 export function assertValidGroupFolder(folder: string): void {
-  if (!isValidGroupFolder(folder)) {
-    throw new Error(`Invalid group folder "${folder}"`);
+  const validation = validateGroupFolder(folder);
+  if (!validation.valid) {
+    throw new Error(
+      `Invalid group folder "${folder}" (reason: ${validation.code})`,
+    );
   }
 }
 

@@ -29,22 +29,47 @@ import type { CollaborationTask, TeamState } from './types.js';
 // 调度器状态
 let schedulerRunning = false;
 
+interface DependencyCheckResult {
+  satisfied: boolean;
+  missingDependencies: string[];
+  blockedReason?: string;
+  retryAfterMs?: number;
+}
+
 /**
  * 检查任务依赖是否满足
  */
-function checkDependenciesSatisfied(task: CollaborationTask): boolean {
+function checkDependenciesSatisfied(
+  task: CollaborationTask,
+): DependencyCheckResult {
   if (!task.dependencies || task.dependencies.length === 0) {
-    return true;
+    return {
+      satisfied: true,
+      missingDependencies: [],
+    };
   }
 
+  const missingDependencies: string[] = [];
   for (const depId of task.dependencies) {
     const depTask = getCollaborationTaskById(depId);
     if (!depTask || depTask.status !== 'completed') {
-      return false;
+      missingDependencies.push(depId);
     }
   }
 
-  return true;
+  if (missingDependencies.length > 0) {
+    return {
+      satisfied: false,
+      missingDependencies,
+      blockedReason: 'waiting_for_dependencies',
+      retryAfterMs: 60_000,
+    };
+  }
+
+  return {
+    satisfied: true,
+    missingDependencies: [],
+  };
 }
 
 /**
@@ -175,7 +200,8 @@ function processCollaborationTask(task: CollaborationTask): void {
 
   // 检查依赖是否满足
   if (task.status === 'pending') {
-    if (checkDependenciesSatisfied(task)) {
+    const dependencyCheck = checkDependenciesSatisfied(task);
+    if (dependencyCheck.satisfied) {
       // 依赖满足，开始执行
       updateCollaborationTask(task.id, {
         status: 'in_progress',
@@ -189,7 +215,10 @@ function processCollaborationTask(task: CollaborationTask): void {
       // 分配任务给智能体
       assignTaskToAgents(task, team);
     } else {
-      logger.debug({ taskId: task.id }, 'Task waiting for dependencies');
+      logger.debug(
+        { taskId: task.id, dependencyCheck },
+        'Task waiting for dependencies',
+      );
     }
   }
 

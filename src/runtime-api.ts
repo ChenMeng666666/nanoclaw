@@ -119,8 +119,16 @@ export async function startRuntimeAPI(
 
   if (!opts.enabled) {
     logger.info('Runtime API disabled');
-    // 返回一个空的 server 用于接口兼容
-    return http.createServer(() => {});
+    return http.createServer((req, res) => {
+      logger.debug(
+        { method: req.method, url: req.url },
+        'Runtime API request received while API is disabled',
+      );
+      writeJSON(res, 503, {
+        error: 'Runtime API disabled',
+        reason: 'Set RUNTIME_API_ENABLED=true to enable this endpoint',
+      });
+    });
   }
 
   // 尝试找到可用的端口

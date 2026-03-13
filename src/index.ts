@@ -310,21 +310,34 @@ async function processGroupMessagesWithTimeout(
   chatJid: string,
   timeoutMs: number = 300000,
 ): Promise<boolean> {
-  const timeoutPromise = new Promise<boolean>((_, reject) => {
+  type ProcessMessagesOutcomeCode =
+    | 'skipped_no_group'
+    | 'skipped_no_channel'
+    | 'skipped_no_messages'
+    | 'skipped_missing_trigger'
+    | 'processed'
+    | 'processed_with_post_output_error'
+    | 'retry_needed';
+  interface ProcessMessagesOutcome {
+    ok: boolean;
+    code: ProcessMessagesOutcomeCode;
+  }
+
+  const timeoutPromise = new Promise<ProcessMessagesOutcome>((_, reject) => {
     setTimeout(
       () => reject(new Error('Message processing timed out')),
       timeoutMs,
     );
   });
 
-  const processingPromise = (async (): Promise<boolean> => {
+  const processingPromise = (async (): Promise<ProcessMessagesOutcome> => {
     const group = registeredGroups[chatJid];
-    if (!group) return true;
+    if (!group) return { ok: true, code: 'skipped_no_group' };
 
     const channel = findChannel(channels, chatJid);
     if (!channel) {
       logger.warn({ chatJid }, 'No channel owns JID, skipping messages');
-      return true;
+      return { ok: true, code: 'skipped_no_channel' };
     }
 
     const isMainGroup = group.isMain === true;
@@ -336,7 +349,9 @@ async function processGroupMessagesWithTimeout(
       ASSISTANT_NAME,
     );
 
-    if (missedMessages.length === 0) return true;
+    if (missedMessages.length === 0) {
+      return { ok: true, code: 'skipped_no_messages' };
+    }
 
     // For non-main groups, check if trigger is required and present
     if (!isMainGroup && group.requiresTrigger === true) {
@@ -346,7 +361,9 @@ async function processGroupMessagesWithTimeout(
           TRIGGER_PATTERN.test(m.content.trim()) &&
           (m.is_from_me || isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
       );
-      if (!hasTrigger) return true;
+      if (!hasTrigger) {
+        return { ok: true, code: 'skipped_missing_trigger' };
+      }
     }
 
     const prompt = formatMessages(missedMessages, TIMEZONE);
@@ -419,24 +436,31 @@ async function processGroupMessagesWithTimeout(
           { group: group.name },
           'Agent error after output was sent, skipping cursor rollback to prevent duplicates',
         );
-        return true;
+        return { ok: true, code: 'processed_with_post_output_error' };
       }
       logger.warn(
         { group: group.name },
         'Agent error, keeping cursor unchanged for retry',
       );
-      return false;
+      return { ok: false, code: 'retry_needed' };
     }
 
     lastAgentTimestamp[chatJid] = newCursor;
     saveState();
-    return true;
+    return { ok: true, code: 'processed' };
   })();
 
-  return Promise.race([processingPromise, timeoutPromise]).catch((err) => {
-    logger.error({ chatJid, err }, 'Message processing failed');
-    return false;
-  });
+  return Promise.race([processingPromise, timeoutPromise])
+    .then((outcome) => {
+      if (outcome.code !== 'processed') {
+        logger.debug({ chatJid, outcome }, 'Group message processing outcome');
+      }
+      return outcome.ok;
+    })
+    .catch((err) => {
+      logger.error({ chatJid, err }, 'Message processing failed');
+      return false;
+    });
 }
 
 // 暴露原函数接口保持兼容性
@@ -725,12 +749,16 @@ function calculateMessageHash(content: string): string {
 let lastCacheCleanupTime = 0;
 const CACHE_CLEANUP_INTERVAL = 10 * 1000; // 每 10 秒清理一次缓存
 
-function isDuplicateMessage(
+type MessageDedupResult =
+  | { duplicate: true; reason: 'same_message_id' }
+  | { duplicate: false; reason: 'accepted' };
+
+function evaluateMessageDeduplication(
   chatJid: string,
   messageId: string,
   content: string,
   timestamp: string,
-): boolean {
+): MessageDedupResult {
   const now = Date.now();
   const messageTime = new Date(timestamp).getTime();
 
@@ -763,7 +791,7 @@ function isDuplicateMessage(
       { chatJid, messageId },
       'Duplicate message detected (same ID)',
     );
-    return true;
+    return { duplicate: true, reason: 'same_message_id' };
   }
 
   // 构建去重键
@@ -775,7 +803,22 @@ function isDuplicateMessage(
     hash: contentHash,
   });
 
-  return false;
+  return { duplicate: false, reason: 'accepted' };
+}
+
+function isDuplicateMessage(
+  chatJid: string,
+  messageId: string,
+  content: string,
+  timestamp: string,
+): boolean {
+  const dedupResult = evaluateMessageDeduplication(
+    chatJid,
+    messageId,
+    content,
+    timestamp,
+  );
+  return dedupResult.duplicate;
 }
 
 /**

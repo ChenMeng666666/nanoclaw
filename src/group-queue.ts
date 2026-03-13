@@ -30,6 +30,16 @@ interface GroupState {
   healthMonitor?: NodeJS.Timeout; // 健康监控定时器
 }
 
+interface IpcSendResult {
+  success: boolean;
+  code:
+    | 'no_active_container'
+    | 'task_container_pending'
+    | 'write_failed'
+    | 'write_verified';
+  filePath?: string;
+}
+
 export class GroupQueue {
   private groups = new Map<string, GroupState>();
   private activeCount = 0;
@@ -258,8 +268,19 @@ export class GroupQueue {
     text: string,
     lastMessageTimestamp?: string,
   ): boolean {
+    return this.sendMessageDetailed(groupJid, text, lastMessageTimestamp)
+      .success;
+  }
+
+  sendMessageDetailed(
+    groupJid: string,
+    text: string,
+    lastMessageTimestamp?: string,
+  ): IpcSendResult {
     const state = this.getGroup(groupJid);
-    if (!state.active || !state.groupFolder) return false;
+    if (!state.active || !state.groupFolder) {
+      return { success: false, code: 'no_active_container' };
+    }
 
     // 对于任务容器，我们仍然允许发送消息，但需要谨慎处理
     if (state.isTaskContainer) {
@@ -268,7 +289,7 @@ export class GroupQueue {
         'Task container active, marking message as pending instead of sending directly',
       );
       state.pendingMessages = true; // 标记有消息待处理
-      return false; // 对于任务容器，我们选择不直接发送消息，而是让它在任务完成后处理
+      return { success: false, code: 'task_container_pending' };
     }
 
     state.idleWaiting = false;
@@ -283,9 +304,15 @@ export class GroupQueue {
       const tempPath = `${filepath}.tmp`;
       fs.writeFileSync(tempPath, JSON.stringify({ type: 'message', text }));
       fs.renameSync(tempPath, filepath);
-      return true;
-    } catch {
-      return false;
+      const stat = fs.statSync(filepath);
+      if (stat.size <= 0) {
+        logger.warn({ groupJid, filepath }, 'IPC message file is empty');
+        return { success: false, code: 'write_failed', filePath: filepath };
+      }
+      return { success: true, code: 'write_verified', filePath: filepath };
+    } catch (err) {
+      logger.warn({ groupJid, err }, 'Failed to send IPC message');
+      return { success: false, code: 'write_failed' };
     }
   }
 
