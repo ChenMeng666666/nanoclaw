@@ -534,6 +534,46 @@ export function getMemories(
   }));
 }
 
+export function getAllMemories(level?: 'L1' | 'L2' | 'L3'): Memory[] {
+  let sql = 'SELECT * FROM memories';
+  const params: unknown[] = [];
+
+  if (level) {
+    sql += ' WHERE level = ?';
+    params.push(level);
+  }
+
+  sql += ' ORDER BY importance DESC, access_count DESC';
+
+  const rows = db.prepare(sql).all(...params) as Array<{
+    id: string;
+    agent_folder: string;
+    user_jid: string | null;
+    level: string;
+    content: string;
+    embedding: string | null;
+    importance: number;
+    access_count: number;
+    last_accessed_at: string | null;
+    created_at: string;
+    updated_at: string;
+  }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    agentFolder: row.agent_folder,
+    userJid: row.user_jid || undefined,
+    level: row.level as 'L1' | 'L2' | 'L3',
+    content: row.content,
+    embedding: safeJsonParse(row.embedding, undefined),
+    importance: row.importance,
+    accessCount: row.access_count,
+    lastAccessedAt: row.last_accessed_at || undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+}
+
 /**
  * 获取特定用户的记忆（支持多级记忆）
  */

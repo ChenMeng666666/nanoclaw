@@ -60,10 +60,7 @@ import { Channel, NewMessage, RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
 import { reflectionScheduler } from './reflection-scheduler.js';
 import { contextEngineRegistry } from './context-engine/registry.js';
-import {
-  DefaultContextEngine,
-  createDefaultContextEngine,
-} from './context-engine/default-engine.js';
+import { memoryManager } from './memory-manager.js';
 import { LocalLLMQueryExpansionProvider } from './query-expansion/local-llm-provider.js';
 import { startRuntimeAPI } from './runtime-api.js';
 import net from 'net';
@@ -100,10 +97,18 @@ async function checkSystemDependencies() {
     process.exit(1);
   }
 
-  // 检查端口
-  const portAvailable = await checkPortAvailable(RUNTIME_API_CONFIG.port);
-  if (!portAvailable) {
-    logger.error(`Port ${RUNTIME_API_CONFIG.port} is already in use`);
+  const candidatePorts = [
+    RUNTIME_API_CONFIG.port,
+    ...RUNTIME_API_CONFIG.fallbackPorts,
+  ];
+  const availability = await Promise.all(
+    candidatePorts.map(checkPortAvailable),
+  );
+  if (!availability.some(Boolean)) {
+    logger.error(
+      { candidatePorts },
+      'All runtime API ports are already in use',
+    );
     process.exit(1);
   }
 }
@@ -122,8 +127,6 @@ let lastTimestamp = '';
 let sessions: Record<string, string> = {};
 let registeredGroups: Record<string, RegisteredGroup> = {};
 let lastAgentTimestamp: Record<string, string> = {};
-// ContextEngine 实例映射（按 agentFolder）
-const contextEngines = new Map<string, DefaultContextEngine>();
 let messageLoopRunning = false;
 
 // 消息去重缓存
@@ -966,22 +969,24 @@ async function main(): Promise<void> {
   reflectionScheduler.start();
   logger.info('Reflection scheduler started');
 
-  // ContextEngine 记忆管理已通过引擎内部处理
-  // 定期持久化由每个 ContextEngine 实例自行管理
   const memoryPersistInterval = setInterval(
-    async () => {
-      // 触发所有引擎的持久化
-      for (const engine of contextEngines.values()) {
-        await engine.afterTurn({ response: '', newMemories: [] });
-      }
-    },
+    () =>
+      memoryManager
+        .persistL1Memories()
+        .catch((err) => logger.error({ err }, 'Memory persist task failed')),
     5 * 60 * 1000,
   );
 
-  // 记忆迁移定时器（保留，但移除，因为 ContextEngine 内部处理）
   const memoryMigrateInterval = setInterval(
     () => {
-      // 迁移逻辑已整合到 ContextEngine 中
+      memoryManager
+        .migrateMemories()
+        .then((migratedCount) => {
+          if (migratedCount > 0) {
+            logger.info({ migratedCount }, 'Memory migration task completed');
+          }
+        })
+        .catch((err) => logger.error({ err }, 'Memory migration task failed'));
     },
     60 * 60 * 1000,
   );

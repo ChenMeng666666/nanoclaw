@@ -7,6 +7,7 @@ import crypto from 'crypto';
 
 import {
   createMemory,
+  getAllMemories,
   getMemories,
   updateMemory,
   incrementMemoryAccess,
@@ -16,6 +17,7 @@ import {
 import { Memory } from './types.js';
 import { logger } from './logger.js';
 import { generateEmbedding as generateEmbeddingFromProvider } from './embedding-providers/registry.js';
+import { MEMORY_CONFIG } from './config.js';
 
 /**
  * 生成文本的向量嵌入
@@ -243,19 +245,18 @@ export class MemoryManager {
    * 检查并执行记忆迁移（L1→L2→L3）
    * 基于访问次数和时间衰减
    */
-  async migrateMemories(): Promise<void> {
-    const allMemories = [
-      ...getMemories('', 'L1'),
-      ...getMemories('', 'L2'),
-      ...getMemories('', 'L3'),
-    ];
+  async migrateMemories(): Promise<number> {
+    const allMemories = [...getAllMemories('L1'), ...getAllMemories('L2')];
+    let migratedCount = 0;
 
     for (const memory of allMemories) {
       const migration = this.shouldMigrateMemory(memory);
       if (migration.should) {
         await this.migrateMemory(memory, migration.targetLevel!);
+        migratedCount += 1;
       }
     }
+    return migratedCount;
   }
 
   /**
@@ -351,16 +352,22 @@ export class MemoryManager {
     const decayFactor = Math.exp(-daysSinceAccess / 30);
     const adjustedImportance = memory.importance * decayFactor;
 
-    // L1 -> L2: 访问 3 次后且 7 天未访问
+    const migrationConfig = MEMORY_CONFIG.migration;
+
     if (memory.level === 'L1') {
-      if (memory.accessCount >= 3 && daysSinceAccess > 7) {
+      if (
+        memory.accessCount >= migrationConfig.l1ToL2MinAccessCount &&
+        daysSinceAccess > migrationConfig.l1ToL2MinIdleDays
+      ) {
         return { should: true, targetLevel: 'L2' };
       }
     }
 
-    // L2 -> L3: 30 天未访问或重要性 > 0.8
     if (memory.level === 'L2') {
-      if (daysSinceAccess > 30 || adjustedImportance > 0.8) {
+      if (
+        daysSinceAccess > migrationConfig.l2ToL3MinIdleDays ||
+        adjustedImportance > migrationConfig.l2ToL3MinImportance
+      ) {
         return { should: true, targetLevel: 'L3' };
       }
     }
@@ -372,10 +379,23 @@ export class MemoryManager {
     memory: Memory,
     targetLevel: 'L2' | 'L3',
   ): Promise<void> {
+    const contentPrefix = MEMORY_CONFIG.migration.migratedContentPrefix;
+    const content = contentPrefix
+      ? `${contentPrefix}${memory.content}`
+      : memory.content;
     updateMemory(memory.id, {
-      content: `[Migrated to ${targetLevel}] ${memory.content}`,
+      level: targetLevel,
+      content,
       importance: targetLevel === 'L2' ? 0.7 : 0.9,
     });
+    if (memory.level === 'L1') {
+      for (const [key, cached] of this.l1Cache.entries()) {
+        if (cached.id === memory.id) {
+          this.l1Cache.delete(key);
+          break;
+        }
+      }
+    }
     logger.info(
       { id: memory.id, from: memory.level, to: targetLevel },
       'Memory migrated',

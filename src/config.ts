@@ -216,6 +216,62 @@ export const RUNTIME_API_CONFIG = {
   portCheckTimeout: 5000,
 };
 
+export const MEMORY_CONFIG = {
+  migration: {
+    l1ToL2MinAccessCount: validateConfig(
+      parseInt(process.env.MEMORY_L1_TO_L2_MIN_ACCESS_COUNT || '3', 10),
+      (v) => validateInteger(v, 1, 1000),
+      3,
+      'MEMORY_L1_TO_L2_MIN_ACCESS_COUNT',
+    ),
+    l1ToL2MinIdleDays: validateConfig(
+      parseInt(process.env.MEMORY_L1_TO_L2_MIN_IDLE_DAYS || '7', 10),
+      (v) => validateInteger(v, 0, 3650),
+      7,
+      'MEMORY_L1_TO_L2_MIN_IDLE_DAYS',
+    ),
+    l2ToL3MinIdleDays: validateConfig(
+      parseInt(process.env.MEMORY_L2_TO_L3_MIN_IDLE_DAYS || '30', 10),
+      (v) => validateInteger(v, 0, 3650),
+      30,
+      'MEMORY_L2_TO_L3_MIN_IDLE_DAYS',
+    ),
+    l2ToL3MinImportance: validateConfig(
+      parseFloat(process.env.MEMORY_L2_TO_L3_MIN_IMPORTANCE || '0.8'),
+      (v) => typeof v === 'number' && v >= 0 && v <= 1,
+      0.8,
+      'MEMORY_L2_TO_L3_MIN_IMPORTANCE',
+    ),
+    migratedContentPrefix: process.env.MEMORY_MIGRATION_PREFIX || '',
+  },
+  api: {
+    maxRequestBodyBytes: validateConfig(
+      parseInt(process.env.MEMORY_API_MAX_BODY_BYTES || '1048576', 10),
+      (v) => validateInteger(v, 1024, 10485760),
+      1048576,
+      'MEMORY_API_MAX_BODY_BYTES',
+    ),
+    maxContentLength: validateConfig(
+      parseInt(process.env.MEMORY_API_MAX_CONTENT_LENGTH || '12000', 10),
+      (v) => validateInteger(v, 1, 200000),
+      12000,
+      'MEMORY_API_MAX_CONTENT_LENGTH',
+    ),
+    minLimit: validateConfig(
+      parseInt(process.env.MEMORY_API_MIN_LIMIT || '1', 10),
+      (v) => validateInteger(v, 1, 1000),
+      1,
+      'MEMORY_API_MIN_LIMIT',
+    ),
+    maxLimit: validateConfig(
+      parseInt(process.env.MEMORY_API_MAX_LIMIT || '50', 10),
+      (v) => validateInteger(v, 1, 1000),
+      50,
+      'MEMORY_API_MAX_LIMIT',
+    ),
+  },
+};
+
 // 配置完整性检查
 export function validateAllConfig(): boolean {
   const requiredConfigs = [

@@ -42,6 +42,7 @@ import {
 import { getAllTasks, getTasksForGroup } from './db.js';
 import { logger } from './logger.js';
 import { safeJsonParse } from './security.js';
+import { MEMORY_CONFIG, RUNTIME_API_CONFIG } from './config.js';
 import { LocalLLMQueryExpansionProvider } from './query-expansion/local-llm-provider.js';
 import type {
   LearningNeed,
@@ -63,6 +64,7 @@ const DEFAULT_OPTIONS: RuntimeAPIOptions = {
 const learningAutomationState = new Set<string>();
 let learningNeedsLlmProvider: LocalLLMQueryExpansionProvider | null = null;
 let learningNeedsLlmInitPromise: Promise<void> | null = null;
+const MEMORY_LEVELS = new Set(['L1', 'L2', 'L3']);
 
 // 检查端口是否可用
 function checkPortAvailable(port: number): Promise<boolean> {
@@ -133,7 +135,10 @@ export async function startRuntimeAPI(
 
   // 尝试找到可用的端口
   try {
-    opts.port = await findAvailablePort(opts.port, [3457, 3458, 3459]);
+    opts.port = await findAvailablePort(
+      opts.port,
+      RUNTIME_API_CONFIG.fallbackPorts,
+    );
   } catch (err) {
     logger.error({ err }, 'Failed to find available port for Runtime API');
     throw err;
@@ -187,18 +192,19 @@ export async function startRuntimeAPI(
 
       if (path === '/api/memory/search' && req.method === 'POST') {
         const body = await readJSON(req);
-        const { query, agentFolder, userJid, limit = 10 } = body;
-
-        if (!query || !agentFolder) {
-          writeJSON(res, 400, { error: 'Missing query or agentFolder' });
-          return;
-        }
+        const query = parseRequiredString(body.query, 'query');
+        const agentFolder = parseRequiredString(
+          body.agentFolder,
+          'agentFolder',
+        );
+        const userJid = parseOptionalString(body.userJid);
+        const limit = parseMemoryLimit(body.limit);
 
         const memories = await memoryManager.searchMemories(
-          agentFolder as string,
-          query as string,
-          limit as number,
-          userJid as string | undefined,
+          agentFolder,
+          query,
+          limit,
+          userJid,
         );
 
         writeJSON(res, 200, { memories });
@@ -207,19 +213,23 @@ export async function startRuntimeAPI(
 
       if (path === '/api/memory/add' && req.method === 'POST') {
         const body = await readJSON(req);
-        const { agentFolder, content, level = 'L1', userJid } = body;
+        const agentFolder = parseRequiredString(
+          body.agentFolder,
+          'agentFolder',
+        );
+        const content = parseRequiredString(body.content, 'content');
+        const level = parseMemoryLevel(body.level ?? 'L1', 'level');
+        const userJid = parseOptionalString(body.userJid);
 
-        if (!agentFolder || !content) {
-          writeJSON(res, 400, { error: 'Missing agentFolder or content' });
-          return;
+        if (content.length > MEMORY_CONFIG.api.maxContentLength) {
+          throw createApiError(
+            400,
+            'MEMORY_CONTENT_TOO_LONG',
+            `content exceeds ${MEMORY_CONFIG.api.maxContentLength} characters`,
+          );
         }
 
-        await memoryManager.addMemory(
-          agentFolder as string,
-          content as string,
-          level as 'L1' | 'L2' | 'L3',
-          userJid as string | undefined,
-        );
+        await memoryManager.addMemory(agentFolder, content, level, userJid);
 
         writeJSON(res, 200, { success: true });
         return;
@@ -227,16 +237,18 @@ export async function startRuntimeAPI(
 
       if (path === '/api/memory/list' && req.method === 'GET') {
         const agentFolder = url.searchParams.get('agentFolder');
-        const level = url.searchParams.get('level') as
-          | 'L1'
-          | 'L2'
-          | 'L3'
-          | undefined;
+        const levelParam = url.searchParams.get('level');
+        const level = levelParam
+          ? parseMemoryLevel(levelParam, 'level')
+          : undefined;
         const userJid = url.searchParams.get('userJid') || undefined;
 
         if (!agentFolder) {
-          writeJSON(res, 400, { error: 'Missing agentFolder' });
-          return;
+          throw createApiError(
+            400,
+            'INVALID_AGENT_FOLDER',
+            'agentFolder is required',
+          );
         }
 
         const memories = getMemories(agentFolder, level, userJid);
@@ -1304,10 +1316,15 @@ export async function startRuntimeAPI(
       }
 
       // 404
-      writeJSON(res, 404, { error: 'Not found' });
+      writeJSON(res, 404, { code: 'NOT_FOUND', error: 'Not found' });
     } catch (err) {
       logger.error({ path, method: req.method, err }, 'Runtime API error');
+      if (isApiError(err)) {
+        writeJSON(res, err.statusCode, { code: err.code, error: err.message });
+        return;
+      }
       writeJSON(res, 500, {
+        code: 'INTERNAL_ERROR',
         error: err instanceof Error ? err.message : 'Internal server error',
       });
     }
@@ -1708,21 +1725,117 @@ async function analyzeLearningNeedsWithLLM(
   }
 }
 
-function readJSON(req: http.IncomingMessage): Promise<Record<string, unknown>> {
+function readJSON(
+  req: http.IncomingMessage,
+  maxBytes: number = MEMORY_CONFIG.api.maxRequestBodyBytes,
+): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     let body = '';
+    let size = 0;
+    let aborted = false;
     req.on('data', (chunk) => {
-      body += chunk;
+      const chunkText = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : chunk;
+      body += chunkText;
+      size += Buffer.byteLength(chunkText);
+      if (size > maxBytes && !aborted) {
+        aborted = true;
+        reject(
+          createApiError(
+            413,
+            'REQUEST_BODY_TOO_LARGE',
+            `request body exceeds ${maxBytes} bytes`,
+          ),
+        );
+        req.destroy();
+      }
     });
     req.on('end', () => {
+      if (aborted) {
+        return;
+      }
       try {
         resolve(safeJsonParse(body) as Record<string, unknown>);
       } catch (err) {
-        reject(err);
+        reject(createApiError(400, 'INVALID_JSON', 'Invalid JSON body'));
       }
     });
     req.on('error', reject);
   });
+}
+
+function parseRequiredString(value: unknown, field: string): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw createApiError(
+      400,
+      `INVALID_${field.toUpperCase()}`,
+      `${field} is required`,
+    );
+  }
+  return value.trim();
+}
+
+function parseOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function parseMemoryLevel(value: unknown, field: string): 'L1' | 'L2' | 'L3' {
+  if (typeof value !== 'string' || !MEMORY_LEVELS.has(value)) {
+    throw createApiError(
+      400,
+      `INVALID_${field.toUpperCase()}`,
+      `${field} must be one of L1, L2, L3`,
+    );
+  }
+  return value as 'L1' | 'L2' | 'L3';
+}
+
+function parseMemoryLimit(value: unknown): number {
+  const defaultLimit = 10;
+  if (value === undefined) {
+    return defaultLimit;
+  }
+  if (typeof value !== 'number' || !Number.isInteger(value)) {
+    throw createApiError(400, 'INVALID_LIMIT', 'limit must be an integer');
+  }
+  if (
+    value < MEMORY_CONFIG.api.minLimit ||
+    value > MEMORY_CONFIG.api.maxLimit
+  ) {
+    throw createApiError(
+      400,
+      'INVALID_LIMIT',
+      `limit must be between ${MEMORY_CONFIG.api.minLimit} and ${MEMORY_CONFIG.api.maxLimit}`,
+    );
+  }
+  return value;
+}
+
+interface ApiError extends Error {
+  statusCode: number;
+  code: string;
+}
+
+function createApiError(
+  statusCode: number,
+  code: string,
+  message: string,
+): ApiError {
+  const err = new Error(message) as ApiError;
+  err.statusCode = statusCode;
+  err.code = code;
+  return err;
+}
+
+function isApiError(err: unknown): err is ApiError {
+  return (
+    err instanceof Error &&
+    typeof (err as ApiError).statusCode === 'number' &&
+    typeof (err as ApiError).code === 'string'
+  );
 }
 
 function writeJSON(

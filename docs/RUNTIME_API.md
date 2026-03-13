@@ -24,6 +24,11 @@ RUNTIME_API_ENABLED=true     # 是否启用（默认 true）
 
 查询相关记忆（语义检索）
 
+请求约束：
+- `query`: 必填，非空字符串
+- `agentFolder`: 必填，非空字符串
+- `limit`: 可选，整数，范围由 `MEMORY_API_MIN_LIMIT` 与 `MEMORY_API_MAX_LIMIT` 控制
+
 ```bash
 curl -X POST http://localhost:3456/api/memory/search \
   -H "Content-Type: application/json" \
@@ -56,6 +61,11 @@ curl -X POST http://localhost:3456/api/memory/search \
 
 添加新记忆
 
+请求约束：
+- `agentFolder`: 必填，非空字符串
+- `content`: 必填，最大长度由 `MEMORY_API_MAX_CONTENT_LENGTH` 控制
+- `level`: 可选，必须是 `L1 | L2 | L3`
+
 ```bash
 curl -X POST http://localhost:3456/api/memory/add \
   -H "Content-Type: application/json" \
@@ -71,6 +81,10 @@ curl -X POST http://localhost:3456/api/memory/add \
 
 列出记忆
 
+查询参数约束：
+- `agentFolder`: 必填
+- `level`: 可选，必须是 `L1 | L2 | L3`
+
 ```bash
 curl -G http://localhost:3456/api/memory/list \
   --data-urlencode "agentFolder=andy" \
@@ -79,6 +93,15 @@ curl -G http://localhost:3456/api/memory/list \
 ```
 
 ---
+
+### 错误码约定（Memory API）
+
+- `INVALID_JSON`: 请求体 JSON 非法
+- `REQUEST_BODY_TOO_LARGE`: 请求体超出 `MEMORY_API_MAX_BODY_BYTES`
+- `INVALID_QUERY` / `INVALID_AGENTFOLDER` / `INVALID_CONTENT`: 必填字段非法
+- `INVALID_LEVEL`: `level` 不在允许枚举内
+- `INVALID_LIMIT`: `limit` 非法或越界
+- `MEMORY_CONTENT_TOO_LONG`: `content` 超过最大长度
 
 ### 进化库 API
 
@@ -319,10 +342,10 @@ RUNTIME_API_URL=http://host.docker.internal:3456
 
 ## 安全考虑
 
-⚠️ **注意**: 运行时 API 当前没有身份验证机制，仅限本地开发环境使用。
+⚠️ **注意**: 运行时 API 支持 `X-API-Key` 认证；若未配置 `RUNTIME_API_KEY`，非生产环境仍可启动，仅建议本地开发使用。
 
 生产环境建议：
-1. 添加 API Key 验证
+1. 强制设置 `RUNTIME_API_KEY`
 2. 使用 HTTPS
 3. 限制请求频率
 4. 审计所有 API 调用
