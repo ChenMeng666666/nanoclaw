@@ -515,6 +515,13 @@ export async function startRuntimeAPI(
           body.sourceAgentId,
           'sourceAgentId',
         );
+        if (content.length > MEMORY_CONFIG.api.maxContentLength) {
+          throw createApiError(
+            400,
+            'EVOLUTION_CONTENT_TOO_LONG',
+            `content exceeds ${MEMORY_CONFIG.api.maxContentLength} characters`,
+          );
+        }
         const description = parseOptionalString(body.description);
         const tags = parseOptionalStringArray(body.tags, 'tags');
 
@@ -1523,7 +1530,8 @@ export async function startRuntimeAPI(
 
       if (path === '/api/evolution/select-gene' && req.method === 'POST') {
         const body = await readJSON(req);
-        const { signals, category } = body;
+        const signals = parseOptionalStringArray(body.signals, 'signals') || [];
+        const category = parseEvolutionCategory(body.category);
 
         // 动态导入信号提取模块
         const { getRecommendedGeneCategory } =
@@ -1533,7 +1541,7 @@ export async function startRuntimeAPI(
 
         // 如果没有指定类别，根据信号推荐
         const geneCategory =
-          (category as string) || getRecommendedGeneCategory(signals as any[]);
+          category || getRecommendedGeneCategory(signals as any[]);
 
         // 获取该类别的 Gene
         const genes = getEvolutionEntriesByCategory(
@@ -2192,7 +2200,8 @@ function isEvolutionApiPath(path: string): boolean {
     path === '/api/governance/metrics/dashboard' ||
     path === '/api/evolution/query' ||
     path === '/api/evolution/submit' ||
-    path === '/api/evolution/feedback'
+    path === '/api/evolution/feedback' ||
+    path === '/api/evolution/select-gene'
   );
 }
 
@@ -2223,6 +2232,27 @@ function parseOptionalIntegerInRange(
     );
   }
   return parsed;
+}
+
+function parseEvolutionCategory(
+  value: unknown,
+): 'repair' | 'optimize' | 'innovate' | 'learn' | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+  if (
+    value !== 'repair' &&
+    value !== 'optimize' &&
+    value !== 'innovate' &&
+    value !== 'learn'
+  ) {
+    throw createApiError(
+      400,
+      'INVALID_CATEGORY',
+      'category must be one of repair, optimize, innovate, learn',
+    );
+  }
+  return value;
 }
 
 function parseOptionalNumberInRange(

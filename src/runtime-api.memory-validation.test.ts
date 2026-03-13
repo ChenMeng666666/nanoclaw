@@ -492,6 +492,22 @@ describe('runtime api memory validation', () => {
       code?: string;
     };
 
+    const invalidSubmitContent = await fetch(
+      `${baseUrl}/api/evolution/submit`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          abilityName: 'too long content',
+          content: 'x'.repeat(MEMORY_CONFIG.api.maxContentLength + 1),
+          sourceAgentId: 'agent-runtime-api-memory',
+        }),
+      },
+    );
+    const invalidSubmitContentBody = (await invalidSubmitContent.json()) as {
+      code?: string;
+    };
+
     const invalidRating = await fetch(`${baseUrl}/api/evolution/feedback`, {
       method: 'POST',
       headers,
@@ -515,14 +531,32 @@ describe('runtime api memory validation', () => {
       code?: string;
     };
 
+    const invalidCategory = await fetch(
+      `${baseUrl}/api/evolution/select-gene`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          category: 'unknown-category',
+        }),
+      },
+    );
+    const invalidCategoryBody = (await invalidCategory.json()) as {
+      code?: string;
+    };
+
     expect(invalidLimit.status).toBe(400);
     expect(invalidLimitBody.code).toBe('INVALID_LIMIT');
     expect(invalidSubmitTags.status).toBe(400);
     expect(invalidSubmitTagsBody.code).toBe('INVALID_TAGS');
+    expect(invalidSubmitContent.status).toBe(400);
+    expect(invalidSubmitContentBody.code).toBe('EVOLUTION_CONTENT_TOO_LONG');
     expect(invalidRating.status).toBe(400);
     expect(invalidRatingBody.code).toBe('INVALID_RATING');
     expect(invalidTimelineLimit.status).toBe(400);
     expect(invalidTimelineLimitBody.code).toBe('INVALID_TIMELINELIMIT');
+    expect(invalidCategory.status).toBe(400);
+    expect(invalidCategoryBody.code).toBe('INVALID_CATEGORY');
   });
 
   it('enforces evolution api rate limiting', async () => {
