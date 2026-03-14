@@ -94,33 +94,36 @@ export {
 
 // ===== Evolution Log / Gene =====
 export {
-  createEvolutionEntry,
   getEvolutionEntry,
   getDuplicateEvolutionEntry,
   getApprovedEvolutionEntries,
   getEvolutionEntriesByCategory,
+  getCapsuleById,
+  getCapsulesByGeneId,
+  getAbilityChain,
+  getValidationReportsByGeneId,
+  getEcosystemMetrics,
+  getEvolutionEntriesByStatus,
+  getEvolutionEntryByAssetId,
+} from './infrastructure/persistence/repositories/agent/evolution-read-repository.js';
+
+export {
+  createEvolutionEntry,
   updateEvolutionStatus,
   addEvolutionFeedback,
   createCapsule,
-  getCapsuleById,
-  getCapsulesByGeneId,
   updateCapsuleSuccessStreak,
   createAbilityChain,
-  getAbilityChain,
   updateAbilityChain,
   addGeneToChain,
   addCapsuleToChain,
   createValidationReport,
-  getValidationReportsByGeneId,
   createEcosystemMetrics,
-  getEcosystemMetrics,
   updateGeneChainId,
   updateGeneStatus,
   updateGeneGDIScore,
-  getEvolutionEntriesByStatus,
-  getEvolutionEntryByAssetId,
   type CreateGeneInput,
-} from './infrastructure/persistence/repositories/agent/evolution-repository.js';
+} from './infrastructure/persistence/repositories/agent/evolution-write-repository.js';
 export {
   logAudit,
   createScheduledTaskForLearning,

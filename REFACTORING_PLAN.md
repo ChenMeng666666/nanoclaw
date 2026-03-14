@@ -33,7 +33,7 @@ Focus on extracting core domain services from mixed-responsibility helpers and m
 
 Focus on breaking down the monolithic Evolution Manager and Repository.
 
-- [ ] **Decompose Evolution Manager**
+- [x] **Decompose Evolution Manager**
     - **Source**: `src/evolution-manager.ts`
     - **Destination**:
         - `src/domain/evolution/services/evolution-service.ts` (Core GEP protocol logic, `submitExperience`, `submitGene`)
@@ -41,7 +41,7 @@ Focus on breaking down the monolithic Evolution Manager and Repository.
         - `src/domain/evolution/services/strategy-service.ts` (Strategy configuration and management)
     - **Goal**: Reduce `EvolutionManager` size (<300 lines) and separate GEP protocol concerns.
 
-- [ ] **Refactor Evolution Repository**
+- [x] **Refactor Evolution Repository**
     - **Source**: `src/infrastructure/persistence/repositories/agent/evolution-repository.ts`
     - **Destination**:
         - `src/infrastructure/persistence/repositories/agent/evolution-read-repository.ts` (Read operations, `getEvolutionEntry`, etc.)

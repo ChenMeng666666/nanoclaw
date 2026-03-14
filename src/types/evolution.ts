@@ -1,4 +1,4 @@
-import type { EvolutionCategory, GDIScore } from './gep.js';
+import type { EvolutionCategory, GDIScore, EvolutionStrategy } from './gep.js';
 
 export interface DailyLearningSummary {
   id: string;
@@ -106,3 +106,36 @@ export type EvolutionEntry = Omit<
   validation_commands?: string[];
   ecosystem_status?: 'promoted' | 'stale' | 'archived';
 };
+
+export interface ReviewConfig {
+  autoApproveThreshold: number;
+  requireUserReview: boolean;
+  seniorAgentIds?: string[];
+  strategy: EvolutionStrategy;
+}
+
+export interface EvolutionDashboardSnapshot {
+  timestamp: string;
+  shannonDiversity: number;
+  avgGDIScore: number;
+  totalGenes: number;
+  totalCapsules: number;
+  promotedGenes: number;
+  staleGenes: number;
+  archivedGenes: number;
+}
+
+export interface EvolutionDashboardMetrics {
+  generatedAt: string;
+  summary: {
+    shannonDiversity: number;
+    avgGDIScore: number;
+    totalGenes: number;
+    totalCapsules: number;
+    promotedGenes: number;
+    staleGenes: number;
+    archivedGenes: number;
+    promotionRate: number;
+  };
+  timeline: EvolutionDashboardSnapshot[];
+}
