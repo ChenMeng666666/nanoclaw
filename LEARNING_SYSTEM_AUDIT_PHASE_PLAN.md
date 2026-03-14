@@ -190,9 +190,9 @@
 ## Phase 3：治理、文档、验收（P3）
 
 - [x] **[P3] 更新学习体系架构文档**：按真实实现重写链路图、协议和职责边界。  
-- [x] **[P3] 补齐运维手册**：排障路径、观测指标、故障演练、回滚策略（见 `docs/LEARNING_OPERATIONS_RUNBOOK.md`）。  
-- [x] **[P3] 建立端到端验收矩阵**：用户学习指令 -> 调度 -> 执行 -> 反思 -> 记忆 -> 进化（见 `docs/LEARNING_E2E_ACCEPTANCE_MATRIX.md`）。  
-- [x] **[P3] 建立变更门禁**：学习体系契约变更需通过 API 契约测试和集成回归（见 `docs/LEARNING_CHANGE_GATES.md`）。
+- [x] **[P3] 补齐运维手册**：排障路径、观测指标、故障演练、回滚策略（见 `docs/LEARNING_OPERATIONS_RUNBOOK.md` 与 `container/skills/agent-learning/scripts/p3-governance-check.sh`）。  
+- [x] **[P3] 建立端到端验收矩阵**：用户学习指令 -> 调度 -> 执行 -> 反思 -> 记忆 -> 进化（见 `docs/LEARNING_E2E_ACCEPTANCE_MATRIX.md` 与 `container/skills/agent-learning/config/p3-governance-gates.json`）。  
+- [x] **[P3] 建立变更门禁**：学习体系契约变更需通过 API 契约测试和集成回归（见 `docs/LEARNING_CHANGE_GATES.md` 与 `container/skills/agent-learning/scripts/learning-automation.sh gate`）。
 
 ---
 
@@ -226,6 +226,7 @@
 ## 9.2 运维手册基线（排障 / 观测 / 演练 / 回滚）
 
 - [x] **落地文档**：`docs/LEARNING_OPERATIONS_RUNBOOK.md`
+- [x] **容器生效入口**：`container/skills/agent-learning/scripts/p3-governance-check.sh`
 
 - [x] **排障路径**：按“学习意图识别 -> 计划创建 -> 调度落库 -> 执行状态 -> 反思产出 -> 记忆/进化入库”六段排查，逐段收敛问题域。  
 - [x] **观测指标**：统一跟踪计划可执行率、反思有效率、降级触发率、端到端时延、失败原因码分布。  
@@ -235,6 +236,7 @@
 ## 9.3 端到端验收矩阵（学习指令到治理闭环）
 
 - [x] **落地文档**：`docs/LEARNING_E2E_ACCEPTANCE_MATRIX.md`
+- [x] **容器生效入口**：`container/skills/agent-learning/config/p3-governance-gates.json`
 
 - [x] **标准流验收**：用户指定学习方向与时间偏好后，系统可稳定完成反思任务校验/创建、计划生成、调度执行、反思沉淀。  
 - [x] **异常流验收**：鉴权失败、调度冲突、模型降级、执行超时等异常均有可观测信号与可恢复路径。  
@@ -244,6 +246,7 @@
 ## 9.4 变更门禁（契约与回归双门）
 
 - [x] **落地文档**：`docs/LEARNING_CHANGE_GATES.md`
+- [x] **容器生效入口**：`container/skills/agent-learning/scripts/learning-automation.sh gate`
 
 - [x] **契约门禁**：学习体系相关变更必须通过 `learning-p0-contract`、`learning-p1-contract`、`learning-p2-contract`。  
 - [x] **集成门禁**：提交前必须通过仓库统一的类型检查与测试门禁，确保学习链路改动不破坏全局。  

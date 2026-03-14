@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "requiredScripts": [
+    "trigger-daily-plan.sh",
+    "generate-daily-summary.sh",
+    "reflection-scheduler.sh",
+    "learning-automation.sh"
+  ],
+  "requiredConfigs": [
+    "learning-automation.json",
+    "skill-learning-schedule.json"
+  ],
+  "requiredApiChecks": [
+    {
+      "name": "automation-status",
+      "method": "GET",
+      "path": "/api/learning/automation/status"
+    },
+    {
+      "name": "learning-tasks",
+      "method": "GET",
+      "path": "/api/learning/tasks"
+    },
+    {
+      "name": "scheduled-tasks",
+      "method": "GET",
+      "path": "/api/scheduled/tasks"
+    }
+  ],
+  "acceptHttpCodes": [200, 400, 401, 403],
+  "requireRuntimeSchedulerMode": "runtime"
+}

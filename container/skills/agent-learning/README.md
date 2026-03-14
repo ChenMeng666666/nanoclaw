@@ -95,6 +95,14 @@ curl -G http://host.docker.internal:3456/api/learning/tasks \
   --data-urlencode "agentFolder=mimi"
 ```
 
+### 执行 P3 治理门禁
+
+```bash
+bash /workspace/group/.learning-system/scripts/learning-automation.sh gate
+```
+
+门禁检查会验证脚本与配置完整性、反思调度模式语义、关键学习 API 可达性，并生成检查报告到 `/workspace/group/.learning-system/logs/`。
+
 ## 版本管理
 
 学习体系支持版本迭代，当前最新版本：**1.0**
@@ -141,11 +149,16 @@ apt-get update && apt-get install -y jq
 agent-learning/
 ├── SKILL.md              # 技能主文档
 ├── README.md             # 本文件
+├── config/
+│   ├── learning-automation.json
+│   ├── skill-learning-schedule.json
+│   └── p3-governance-gates.json
 ├── hooks/
 │   └── post-load.sh      # 加载钩子脚本
 ├── scripts/
-│   └── init.sh           # 初始化脚本
-└── tests/                # 测试脚本（未来添加）
+│   ├── init.sh
+│   ├── learning-automation.sh
+│   └── p3-governance-check.sh
 ```
 
 ## 与记忆系统集成
