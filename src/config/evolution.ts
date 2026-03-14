@@ -2,14 +2,22 @@ import path from 'path';
 
 import { validateBoolean, validateConfig } from './validators.js';
 
+const EVOLUTION_STRATEGIES = [
+  'balanced',
+  'repair',
+  'optimize',
+  'innovate',
+  'repair-only',
+] as const;
+
 export const EVOLUTION_CONFIG = {
   strategy: validateConfig(
     process.env.EVOLUTION_STRATEGY || 'balanced',
     (v) =>
-      ['balanced', 'repair', 'optimize', 'innovate', 'repair-only'].includes(v),
-    'balanced' as any,
+      EVOLUTION_STRATEGIES.includes(v as (typeof EVOLUTION_STRATEGIES)[number]),
+    'balanced' as const,
     'EVOLUTION_STRATEGY',
-  ),
+  ) as (typeof EVOLUTION_STRATEGIES)[number],
   autoApproveThreshold: validateConfig(
     parseFloat(process.env.EVOLUTION_AUTO_APPROVE_THRESHOLD || '0.9'),
     (v) => typeof v === 'number' && v >= 0 && v <= 1,

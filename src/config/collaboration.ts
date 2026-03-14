@@ -58,7 +58,7 @@ export const COLLABORATION_CONFIG = {
     defaultCollaborationMode: validateConfig(
       process.env.COLLABORATION_DEFAULT_MODE || 'peer-to-peer',
       (v) => ['hierarchical', 'peer-to-peer', 'swarm'].includes(v),
-      'peer-to-peer' as any,
+      'peer-to-peer' as const,
       'COLLABORATION_DEFAULT_MODE',
     ),
     trustLevel: validateConfig(

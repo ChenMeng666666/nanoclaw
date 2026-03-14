@@ -14,9 +14,11 @@ export function generateAssetId(content: string): string {
   return `sha256:${hash}`;
 }
 
+export type EvolutionCategory = 'repair' | 'optimize' | 'innovate' | 'learn';
+
 export interface GEPGene extends GEPAsset {
   type: 'Gene';
-  category: 'repair' | 'optimize' | 'innovate';
+  category: EvolutionCategory;
   signals_match: string[];
   summary: string;
   preconditions: string[];

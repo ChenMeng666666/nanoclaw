@@ -1,4 +1,4 @@
-import type { GDIScore } from './gep.js';
+import type { EvolutionCategory, GDIScore } from './gep.js';
 
 export interface DailyLearningSummary {
   id: string;
@@ -31,7 +31,7 @@ export interface LearningAutomationConfig {
 export interface Gene {
   type: 'Gene';
   id: number;
-  category: 'repair' | 'optimize' | 'innovate' | 'learn';
+  category: EvolutionCategory;
   signalsMatch: string[];
   strategy: string[];
   constraints: {
@@ -71,7 +71,7 @@ export interface MainExperienceInput {
   content: string;
   description?: string;
   tags?: string[];
-  category?: 'repair' | 'optimize' | 'innovate' | 'learn';
+  category?: EvolutionCategory;
   component?: MainComponent;
 }
 
@@ -91,7 +91,7 @@ export type EvolutionEntry = Omit<
   | 'constraints'
   | 'validation'
 > & {
-  category?: 'repair' | 'optimize' | 'innovate' | 'learn';
+  category?: EvolutionCategory;
   signalsMatch?: string[];
   strategy?: string[];
   constraints?: Gene['constraints'];
