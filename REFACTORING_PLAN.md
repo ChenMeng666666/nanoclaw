@@ -74,14 +74,14 @@
 
 ## Phase 5：Memory 子系统纵向拆分（检索/治理/迁移分治）
 
-- [ ] [P1] 将 `src/memory-manager.ts` 的 `发布控制类型与解析（L29-L155, L1564-L1577）` 抽离到 `src/memory-manager/release-control-types.ts`
-- [ ] [P1] 将 `src/memory-manager.ts` 的 `嵌入适配函数（L157-L171）` 抽离到 `src/memory-manager/embedding.ts`
-- [ ] [P1] 将 `src/memory-manager.ts` 的 `检索主流程（L619-L795）` 抽离到 `src/memory-manager/retrieval.ts`
-- [ ] [P1] 将 `src/memory-manager.ts` 的 `查询改写（L909-L990）` 抽离到 `src/memory-manager/query-variants.ts`
-- [ ] [P1] 将 `src/memory-manager.ts` 的 `生命周期治理（L992-L1134）` 抽离到 `src/memory-manager/lifecycle-governance.ts`
-- [ ] [P1] 将 `src/memory-manager.ts` 的 `迁移决策与执行（L1119-L1261）` 抽离到 `src/memory-manager/migration.ts`
-- [ ] [P1] 将 `src/memory-manager.ts` 的 `指标统计（L61-L113, L1309-L1561）` 抽离到 `src/memory-manager/metrics.ts`
-- [ ] [P1] 将 `src/memory-manager.ts` 的 `重排/热度工具（L1161-L1227, L1263-L1279）` 抽离到 `src/memory-manager/ranking-utils.ts`
+- [x] [P1] 将 `src/memory-manager.ts` 的 `发布控制类型与解析（L29-L155, L1564-L1577）` 抽离到 `src/memory-manager/release-control-types.ts`
+- [x] [P1] 将 `src/memory-manager.ts` 的 `嵌入适配函数（L157-L171）` 抽离到 `src/memory-manager/embedding.ts`
+- [x] [P1] 将 `src/memory-manager.ts` 的 `检索主流程（L619-L795）` 抽离到 `src/memory-manager/retrieval.ts`
+- [x] [P1] 将 `src/memory-manager.ts` 的 `查询改写（L909-L990）` 抽离到 `src/memory-manager/query-variants.ts`
+- [x] [P1] 将 `src/memory-manager.ts` 的 `生命周期治理（L992-L1134）` 抽离到 `src/memory-manager/lifecycle-governance.ts`
+- [x] [P1] 将 `src/memory-manager.ts` 的 `迁移决策与执行（L1119-L1261）` 抽离到 `src/memory-manager/migration.ts`
+- [x] [P1] 将 `src/memory-manager.ts` 的 `指标统计（L61-L113, L1309-L1561）` 抽离到 `src/memory-manager/metrics.ts`
+- [x] [P1] 将 `src/memory-manager.ts` 的 `重排/热度工具（L1161-L1227, L1263-L1279）` 抽离到 `src/memory-manager/ranking-utils.ts`
 
 ---
 
