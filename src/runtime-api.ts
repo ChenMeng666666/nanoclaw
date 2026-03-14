@@ -40,12 +40,41 @@ import {
 } from './db-agents.js';
 import { getAllTasks, getTasksForGroup, updateTask } from './db.js';
 import { logger } from './logger.js';
-import { safeJsonParse } from './security.js';
 import {
   MEMORY_CONFIG,
   RUNTIME_API_CONFIG,
   SECURITY_CONFIG,
 } from './config.js';
+import { createRuntimeRateLimitGuard } from './interfaces/http/middleware/rate-limit.js';
+import { createEvolutionHandlers } from './interfaces/http/handlers/evolution-handlers.js';
+import { handleLearningCollaborationEndpoints } from './interfaces/http/handlers/learning-collaboration-handlers.js';
+import { createMemoryHandlers } from './interfaces/http/handlers/memory-handlers.js';
+import {
+  parseEvolutionCategory,
+  parseLearningResultStatus,
+  parseMemoryLevel,
+  parseOptionalBlastRadius,
+  parseOptionalIntegerInRange,
+  parseOptionalMemoryMessageType,
+  parseOptionalMemoryScope,
+  parseOptionalMemorySourceType,
+  parseOptionalNumberInRange,
+  parseOptionalString,
+  parseOptionalStringArray,
+  parseOptionalStringWithLimit,
+  parseReleaseControlPatch,
+  parseRequiredIntegerInRange,
+  parseRequiredString,
+  readJSON,
+  normalizeMemoryScope,
+  parseMemoryLimit,
+  parseEvolutionLimit,
+} from './interfaces/http/parsers/runtime-api-parsers.js';
+import {
+  createApiError,
+  isApiError,
+  writeJSON,
+} from './interfaces/http/response.js';
 import { LocalLLMQueryExpansionProvider } from './query-expansion/local-llm-provider.js';
 import type {
   LearningNeed,
@@ -73,21 +102,6 @@ const LEARNING_AUTOMATION_DAILY_SUMMARY_PROMPT =
   '[learning-automation:daily-summary] 触发每日学习总结';
 let learningNeedsLlmProvider: LocalLLMQueryExpansionProvider | null = null;
 let learningNeedsLlmInitPromise: Promise<void> | null = null;
-const MEMORY_LEVELS = new Set(['L1', 'L2', 'L3']);
-const MEMORY_SCOPES = new Set(['session', 'user', 'agent', 'global']);
-const MEMORY_SOURCE_TYPES = new Set(['direct', 'extracted', 'summary']);
-const MEMORY_MESSAGE_TYPES = new Set([
-  'user',
-  'system',
-  'bot',
-  'code',
-  'document',
-]);
-const memoryRateBucket = new Map<
-  string,
-  { count: number; windowStart: number }
->();
-const MEMORY_RATE_BUCKET_MAX_KEYS = 20000;
 
 // 检查端口是否可用
 function checkPortAvailable(port: number): Promise<boolean> {
@@ -143,7 +157,6 @@ export async function startRuntimeAPI(
   const opts = { ...DEFAULT_OPTIONS, ...options };
   let inFlightMemorySearches = 0;
   let inFlightEvolutionQueries = 0;
-  memoryRateBucket.clear();
 
   if (!opts.enabled) {
     logger.info('Runtime API disabled');
@@ -183,6 +196,11 @@ export async function startRuntimeAPI(
     );
   }
 
+  const rateLimitGuard = createRuntimeRateLimitGuard();
+  rateLimitGuard.reset();
+  const memoryHandlers = createMemoryHandlers();
+  const evolutionHandlers = createEvolutionHandlers();
+
   const server = http.createServer(async (req, res) => {
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -217,17 +235,28 @@ export async function startRuntimeAPI(
 
     try {
       if (
-        isRateLimitedApiPath(path) &&
+        rateLimitGuard.isRateLimitedApiPath(path) &&
         SECURITY_CONFIG.networkSecurity.enableRateLimiting
       ) {
-        const clientId = resolveClientIdentity(req);
-        if (!consumeRateLimitToken(clientId, Date.now())) {
+        if (!rateLimitGuard.consume(req, Date.now())) {
           throw createApiError(
             429,
             'RATE_LIMIT_EXCEEDED',
             'Too many runtime API requests',
           );
         }
+      }
+
+      if (await memoryHandlers.handle(req, res, url, path)) {
+        return;
+      }
+
+      if (await evolutionHandlers.handle(req, res, url, path)) {
+        return;
+      }
+
+      if (await handleLearningCollaborationEndpoints(req, res, url, path)) {
+        return;
       }
 
       // ===== 记忆 API =====
@@ -2466,621 +2495,6 @@ export async function orchestrateLearningIntent(input: {
   };
 }
 
-function readJSON(
-  req: http.IncomingMessage,
-  maxBytes: number = MEMORY_CONFIG.api.maxRequestBodyBytes,
-): Promise<Record<string, unknown>> {
-  return new Promise((resolve, reject) => {
-    let body = '';
-    let size = 0;
-    let aborted = false;
-    req.on('data', (chunk) => {
-      const chunkText = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : chunk;
-      body += chunkText;
-      size += Buffer.byteLength(chunkText);
-      if (size > maxBytes && !aborted) {
-        aborted = true;
-        reject(
-          createApiError(
-            413,
-            'REQUEST_BODY_TOO_LARGE',
-            `request body exceeds ${maxBytes} bytes`,
-          ),
-        );
-        req.destroy();
-      }
-    });
-    req.on('end', () => {
-      if (aborted) {
-        return;
-      }
-      try {
-        resolve(safeJsonParse(body) as Record<string, unknown>);
-      } catch (err) {
-        reject(createApiError(400, 'INVALID_JSON', 'Invalid JSON body'));
-      }
-    });
-    req.on('error', reject);
-  });
-}
-
-function parseRequiredString(value: unknown, field: string): string {
-  if (typeof value !== 'string' || value.trim().length === 0) {
-    throw createApiError(
-      400,
-      `INVALID_${field.toUpperCase()}`,
-      `${field} is required`,
-    );
-  }
-  return value.trim();
-}
-
-function parseOptionalString(value: unknown): string | undefined {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function parseOptionalStringWithLimit(
-  value: unknown,
-  field: string,
-  maxLength: number,
-): string | undefined {
-  const parsed = parseOptionalString(value);
-  if (parsed === undefined) {
-    return undefined;
-  }
-  if (parsed.length > maxLength) {
-    throw createApiError(
-      400,
-      `INVALID_${field.toUpperCase()}`,
-      `${field} exceeds ${maxLength} characters`,
-    );
-  }
-  return parsed;
-}
-
-function parseLearningResultStatus(
-  value: unknown,
-  field: string,
-): 'keep' | 'discard' | 'crash' {
-  if (value === 'keep' || value === 'discard' || value === 'crash') {
-    return value;
-  }
-  throw createApiError(
-    400,
-    `INVALID_${field.toUpperCase()}`,
-    `${field} must be one of keep, discard, crash`,
-  );
-}
-
-function parseOptionalBlastRadius(
-  value: unknown,
-  field: string,
-): { files: number; lines: number } | undefined {
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-  if (typeof value !== 'object' || Array.isArray(value)) {
-    throw createApiError(
-      400,
-      `INVALID_${field.toUpperCase()}`,
-      `${field} must be an object`,
-    );
-  }
-  const raw = value as Record<string, unknown>;
-  const files = parseRequiredIntegerInRange(
-    raw.files,
-    `${field}.files`,
-    0,
-    1000000,
-  );
-  const lines = parseRequiredIntegerInRange(
-    raw.lines,
-    `${field}.lines`,
-    0,
-    100000000,
-  );
-  return { files, lines };
-}
-
-function parseMemoryLevel(value: unknown, field: string): 'L1' | 'L2' | 'L3' {
-  if (typeof value !== 'string' || !MEMORY_LEVELS.has(value)) {
-    throw createApiError(
-      400,
-      `INVALID_${field.toUpperCase()}`,
-      `${field} must be one of L1, L2, L3`,
-    );
-  }
-  return value as 'L1' | 'L2' | 'L3';
-}
-
-function parseOptionalMemoryScope(
-  value: unknown,
-  field: string,
-): 'session' | 'user' | 'agent' | 'global' | undefined {
-  if (value === undefined || value === null || value === '') {
-    return undefined;
-  }
-  if (typeof value !== 'string' || !MEMORY_SCOPES.has(value)) {
-    throw createApiError(
-      400,
-      `INVALID_${field.toUpperCase()}`,
-      `${field} must be one of session, user, agent, global`,
-    );
-  }
-  return value as 'session' | 'user' | 'agent' | 'global';
-}
-
-function parseOptionalMemorySourceType(
-  value: unknown,
-  field: string,
-): 'direct' | 'extracted' | 'summary' | undefined {
-  if (value === undefined || value === null || value === '') {
-    return undefined;
-  }
-  if (typeof value !== 'string' || !MEMORY_SOURCE_TYPES.has(value)) {
-    throw createApiError(
-      400,
-      `INVALID_${field.toUpperCase()}`,
-      `${field} must be one of direct, extracted, summary`,
-    );
-  }
-  return value as 'direct' | 'extracted' | 'summary';
-}
-
-function parseOptionalMemoryMessageType(
-  value: unknown,
-  field: string,
-): 'user' | 'system' | 'bot' | 'code' | 'document' | undefined {
-  if (value === undefined || value === null || value === '') {
-    return undefined;
-  }
-  if (typeof value !== 'string' || !MEMORY_MESSAGE_TYPES.has(value)) {
-    throw createApiError(
-      400,
-      `INVALID_${field.toUpperCase()}`,
-      `${field} must be one of user, system, bot, code, document`,
-    );
-  }
-  return value as 'user' | 'system' | 'bot' | 'code' | 'document';
-}
-
-function parseOptionalStringArray(
-  value: unknown,
-  field: string,
-): string[] | undefined {
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-  if (!Array.isArray(value)) {
-    throw createApiError(
-      400,
-      `INVALID_${field.toUpperCase()}`,
-      `${field} must be an array`,
-    );
-  }
-  const parsed = value
-    .filter((item) => typeof item === 'string')
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
-  return parsed.length > 0 ? parsed : undefined;
-}
-
-function normalizeMemoryScope(
-  scope: 'session' | 'user' | 'agent' | 'global' | undefined,
-  sessionId: string | undefined,
-): 'session' | 'user' | 'agent' | 'global' | undefined {
-  if (scope === 'session' && !sessionId) {
-    throw createApiError(
-      400,
-      'INVALID_SESSIONID',
-      'sessionId is required when scope=session',
-    );
-  }
-  if (scope && scope !== 'session' && sessionId) {
-    throw createApiError(
-      400,
-      'INVALID_SCOPE_SESSION_COMBINATION',
-      'sessionId can only be used with scope=session',
-    );
-  }
-  if (!scope && sessionId) {
-    return 'session';
-  }
-  return scope;
-}
-
-function parseMemoryLimit(value: unknown): number {
-  const defaultLimit = 10;
-  if (value === undefined) {
-    return defaultLimit;
-  }
-  if (typeof value !== 'number' || !Number.isInteger(value)) {
-    throw createApiError(400, 'INVALID_LIMIT', 'limit must be an integer');
-  }
-  if (
-    value < MEMORY_CONFIG.api.minLimit ||
-    value > MEMORY_CONFIG.api.maxLimit
-  ) {
-    throw createApiError(
-      400,
-      'INVALID_LIMIT',
-      `limit must be between ${MEMORY_CONFIG.api.minLimit} and ${MEMORY_CONFIG.api.maxLimit}`,
-    );
-  }
-  return value;
-}
-
-function parseEvolutionLimit(value: unknown): number {
-  const defaultLimit = 20;
-  if (value === undefined) {
-    return defaultLimit;
-  }
-  const parsed = parseOptionalIntegerInRange(
-    value,
-    'limit',
-    MEMORY_CONFIG.api.minLimit,
-    MEMORY_CONFIG.api.maxLimit,
-  );
-  return parsed ?? defaultLimit;
-}
-
-function parseRequiredIntegerInRange(
-  value: unknown,
-  field: string,
-  min: number,
-  max: number,
-): number {
-  const parsed = parseOptionalIntegerInRange(value, field, min, max);
-  if (parsed === undefined) {
-    throw createApiError(
-      400,
-      `INVALID_${field.toUpperCase()}`,
-      `${field} is required`,
-    );
-  }
-  return parsed;
-}
-
-function isMemoryApiPath(path: string): boolean {
-  return (
-    path === '/api/memory/search' ||
-    path === '/api/memory/add' ||
-    path === '/api/memory/list' ||
-    path === '/api/memory/metrics/dashboard' ||
-    path === '/api/memory/release/control' ||
-    path === '/api/memory/release/rollback'
-  );
-}
-
-function isEvolutionApiPath(path: string): boolean {
-  return (
-    path === '/api/evolution/metrics/dashboard' ||
-    path === '/api/governance/metrics/dashboard' ||
-    path === '/api/evolution/query' ||
-    path === '/api/evolution/submit' ||
-    path === '/api/evolution/feedback' ||
-    path === '/api/evolution/select-gene'
-  );
-}
-
-function isRateLimitedApiPath(path: string): boolean {
-  return isMemoryApiPath(path) || isEvolutionApiPath(path);
-}
-
-function parseOptionalIntegerInRange(
-  value: unknown,
-  field: string,
-  min: number,
-  max: number,
-): number | undefined {
-  if (value === undefined || value === null || value === '') {
-    return undefined;
-  }
-  const parsed =
-    typeof value === 'number'
-      ? value
-      : typeof value === 'string'
-        ? Number(value)
-        : Number.NaN;
-  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
-    throw createApiError(
-      400,
-      `INVALID_${field.toUpperCase()}`,
-      `${field} must be an integer between ${min} and ${max}`,
-    );
-  }
-  return parsed;
-}
-
-function parseEvolutionCategory(
-  value: unknown,
-): 'repair' | 'optimize' | 'innovate' | 'learn' | undefined {
-  if (value === undefined || value === null || value === '') {
-    return undefined;
-  }
-  if (
-    value !== 'repair' &&
-    value !== 'optimize' &&
-    value !== 'innovate' &&
-    value !== 'learn'
-  ) {
-    throw createApiError(
-      400,
-      'INVALID_CATEGORY',
-      'category must be one of repair, optimize, innovate, learn',
-    );
-  }
-  return value;
-}
-
-function parseOptionalNumberInRange(
-  value: unknown,
-  field: string,
-  min: number,
-  max: number,
-): number | undefined {
-  if (value === undefined || value === null || value === '') {
-    return undefined;
-  }
-  const parsed =
-    typeof value === 'number'
-      ? value
-      : typeof value === 'string'
-        ? Number(value)
-        : Number.NaN;
-  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
-    throw createApiError(
-      400,
-      `INVALID_${field.toUpperCase()}`,
-      `${field} must be between ${min} and ${max}`,
-    );
-  }
-  return parsed;
-}
-
-function parseReleaseMode(
-  value: unknown,
-  field: string,
-): 'stable' | 'canary' | 'auto' | undefined {
-  if (value === undefined || value === null || value === '') {
-    return undefined;
-  }
-  if (value !== 'stable' && value !== 'canary' && value !== 'auto') {
-    throw createApiError(
-      400,
-      `INVALID_${field.toUpperCase()}`,
-      `${field} must be one of stable, canary, auto`,
-    );
-  }
-  return value;
-}
-
-function parseReleaseControlPatch(body: Record<string, unknown>): {
-  retrieval?: Record<string, unknown>;
-  migration?: Record<string, unknown>;
-} {
-  const retrievalInput =
-    body.retrieval && typeof body.retrieval === 'object'
-      ? (body.retrieval as Record<string, unknown>)
-      : undefined;
-  const migrationInput =
-    body.migration && typeof body.migration === 'object'
-      ? (body.migration as Record<string, unknown>)
-      : undefined;
-  if (!retrievalInput && !migrationInput) {
-    throw createApiError(
-      400,
-      'INVALID_RELEASE_PATCH',
-      'retrieval or migration patch is required',
-    );
-  }
-
-  const retrievalPatch = retrievalInput
-    ? {
-        mode: parseReleaseMode(retrievalInput.mode, 'retrieval.mode'),
-        canaryEnabled:
-          typeof retrievalInput.canaryEnabled === 'boolean'
-            ? retrievalInput.canaryEnabled
-            : undefined,
-        canaryPercentage: parseOptionalIntegerInRange(
-          retrievalInput.canaryPercentage,
-          'retrieval.canaryPercentage',
-          0,
-          100,
-        ),
-        vectorSearchMinScore: parseOptionalNumberInRange(
-          retrievalInput.vectorSearchMinScore,
-          'retrieval.vectorSearchMinScore',
-          0,
-          1,
-        ),
-        lowConfidenceThreshold: parseOptionalNumberInRange(
-          retrievalInput.lowConfidenceThreshold,
-          'retrieval.lowConfidenceThreshold',
-          0,
-          1,
-        ),
-        rerankWeights: parseOptionalRerankWeights(retrievalInput.rerankWeights),
-      }
-    : undefined;
-
-  const migrationRulesInput =
-    migrationInput?.canaryRules &&
-    typeof migrationInput.canaryRules === 'object'
-      ? (migrationInput.canaryRules as Record<string, unknown>)
-      : undefined;
-  const migrationPatch = migrationInput
-    ? {
-        mode: parseReleaseMode(migrationInput.mode, 'migration.mode'),
-        canaryEnabled:
-          typeof migrationInput.canaryEnabled === 'boolean'
-            ? migrationInput.canaryEnabled
-            : undefined,
-        canaryPercentage: parseOptionalIntegerInRange(
-          migrationInput.canaryPercentage,
-          'migration.canaryPercentage',
-          0,
-          100,
-        ),
-        canaryRules: migrationRulesInput
-          ? {
-              l1ToL2MinAccessCount: parseOptionalIntegerInRange(
-                migrationRulesInput.l1ToL2MinAccessCount,
-                'migration.canaryRules.l1ToL2MinAccessCount',
-                1,
-                100,
-              ),
-              l1ToL2MinIdleDays: parseOptionalNumberInRange(
-                migrationRulesInput.l1ToL2MinIdleDays,
-                'migration.canaryRules.l1ToL2MinIdleDays',
-                0,
-                365,
-              ),
-              l2ToL3MinIdleDays: parseOptionalNumberInRange(
-                migrationRulesInput.l2ToL3MinIdleDays,
-                'migration.canaryRules.l2ToL3MinIdleDays',
-                0,
-                365,
-              ),
-              l2ToL3MinImportance: parseOptionalNumberInRange(
-                migrationRulesInput.l2ToL3MinImportance,
-                'migration.canaryRules.l2ToL3MinImportance',
-                0,
-                1,
-              ),
-              migratedContentPrefix: parseOptionalString(
-                migrationRulesInput.migratedContentPrefix,
-              ),
-            }
-          : undefined,
-      }
-    : undefined;
-
-  return {
-    retrieval: compactRecord(retrievalPatch),
-    migration: compactRecord(migrationPatch),
-  };
-}
-
-function parseOptionalRerankWeights(value: unknown):
-  | {
-      fused?: number;
-      vector?: number;
-      bm25?: number;
-      quality?: number;
-      timestamp?: number;
-      importance?: number;
-    }
-  | undefined {
-  if (!value) {
-    return undefined;
-  }
-  if (typeof value !== 'object') {
-    throw createApiError(
-      400,
-      'INVALID_RERANK_WEIGHTS',
-      'rerankWeights must be an object',
-    );
-  }
-  const obj = value as Record<string, unknown>;
-  return compactRecord({
-    fused: parseOptionalNumberInRange(obj.fused, 'rerankWeights.fused', 0, 5),
-    vector: parseOptionalNumberInRange(
-      obj.vector,
-      'rerankWeights.vector',
-      0,
-      5,
-    ),
-    bm25: parseOptionalNumberInRange(obj.bm25, 'rerankWeights.bm25', 0, 5),
-    quality: parseOptionalNumberInRange(
-      obj.quality,
-      'rerankWeights.quality',
-      0,
-      5,
-    ),
-    timestamp: parseOptionalNumberInRange(
-      obj.timestamp,
-      'rerankWeights.timestamp',
-      0,
-      5,
-    ),
-    importance: parseOptionalNumberInRange(
-      obj.importance,
-      'rerankWeights.importance',
-      0,
-      5,
-    ),
-  });
-}
-
-function compactRecord<T extends Record<string, unknown>>(
-  input: T | undefined,
-): T | undefined {
-  if (!input) {
-    return undefined;
-  }
-  const filtered = Object.fromEntries(
-    Object.entries(input).filter(([, value]) => value !== undefined),
-  ) as T;
-  if (Object.keys(filtered).length === 0) {
-    return undefined;
-  }
-  return filtered;
-}
-
-function resolveClientIdentity(req: http.IncomingMessage): string {
-  if (RUNTIME_API_CONFIG.trustProxy) {
-    const xForwardedFor = req.headers['x-forwarded-for'];
-    if (typeof xForwardedFor === 'string') {
-      const forwarded = xForwardedFor.split(',')[0]?.trim();
-      if (forwarded) {
-        return forwarded;
-      }
-    }
-  }
-  return req.socket.remoteAddress || 'unknown';
-}
-
-function consumeRateLimitToken(clientId: string, now: number): boolean {
-  const windowMs = SECURITY_CONFIG.networkSecurity.rateLimitWindow;
-  const maxCount = SECURITY_CONFIG.networkSecurity.rateLimit;
-  if (memoryRateBucket.size > MEMORY_RATE_BUCKET_MAX_KEYS) {
-    cleanupRateLimitBucket(now, windowMs);
-  }
-  const current = memoryRateBucket.get(clientId);
-  if (!current || now - current.windowStart >= windowMs) {
-    memoryRateBucket.set(clientId, { count: 1, windowStart: now });
-    return true;
-  }
-  if (current.count >= maxCount) {
-    return false;
-  }
-  current.count += 1;
-  memoryRateBucket.set(clientId, current);
-  return true;
-}
-
-function cleanupRateLimitBucket(now: number, windowMs: number): void {
-  for (const [key, value] of memoryRateBucket.entries()) {
-    if (now - value.windowStart > windowMs * 2) {
-      memoryRateBucket.delete(key);
-    }
-  }
-  if (memoryRateBucket.size > MEMORY_RATE_BUCKET_MAX_KEYS) {
-    const entries = [...memoryRateBucket.entries()].sort(
-      (a, b) => a[1].windowStart - b[1].windowStart,
-    );
-    const removeCount = memoryRateBucket.size - MEMORY_RATE_BUCKET_MAX_KEYS;
-    for (let i = 0; i < removeCount; i++) {
-      memoryRateBucket.delete(entries[i][0]);
-    }
-  }
-}
-
 function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
@@ -3098,37 +2512,4 @@ function withTimeout<T>(
         reject(err);
       });
   });
-}
-
-interface ApiError extends Error {
-  statusCode: number;
-  code: string;
-}
-
-function createApiError(
-  statusCode: number,
-  code: string,
-  message: string,
-): ApiError {
-  const err = new Error(message) as ApiError;
-  err.statusCode = statusCode;
-  err.code = code;
-  return err;
-}
-
-function isApiError(err: unknown): err is ApiError {
-  return (
-    err instanceof Error &&
-    typeof (err as ApiError).statusCode === 'number' &&
-    typeof (err as ApiError).code === 'string'
-  );
-}
-
-function writeJSON(
-  res: http.ServerResponse,
-  status: number,
-  data: unknown,
-): void {
-  res.writeHead(status, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(data));
 }

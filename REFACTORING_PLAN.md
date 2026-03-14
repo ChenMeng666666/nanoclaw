@@ -52,13 +52,13 @@
 
 ## Phase 3：Interface 层拆分（Runtime API 解耦）
 
-- [ ] [P0] 将 `src/runtime-api.ts` 的 `路由分发主干（L186-L1736）` 抽离到 `src/interfaces/http/runtime-api-router.ts`
-- [ ] [P0] 将 `src/runtime-api.ts` 的 `memory 端点簇（L235-L545）` 抽离到 `src/interfaces/http/handlers/memory-handlers.ts`
-- [ ] [P0] 将 `src/runtime-api.ts` 的 `evolution 端点簇（L565-L1314）` 抽离到 `src/interfaces/http/handlers/evolution-handlers.ts`
-- [ ] [P0] 将 `src/runtime-api.ts` 的 `learning/collaboration 端点簇（L1416-L1736）` 抽离到 `src/interfaces/http/handlers/learning-collaboration-handlers.ts`
-- [ ] [P1] 将 `src/runtime-api.ts` 的 `参数解析逻辑（L2507-L3127 中 parse*）` 抽离到 `src/interfaces/http/parsers/*.ts`
-- [ ] [P1] 将 `src/runtime-api.ts` 的 `限流逻辑（L2507-L3127 中限流相关）` 抽离到 `src/interfaces/http/middleware/rate-limit.ts`
-- [ ] [P1] 将 `src/runtime-api.ts` 的 `错误与响应封装（L2507-L3127 中 send*）` 抽离到 `src/interfaces/http/response.ts`
+- [x] [P0] 将 `src/runtime-api.ts` 的 `路由分发主干（L186-L1736）` 抽离到 `src/interfaces/http/runtime-api-router.ts`
+- [x] [P0] 将 `src/runtime-api.ts` 的 `memory 端点簇（L235-L545）` 抽离到 `src/interfaces/http/handlers/memory-handlers.ts`
+- [x] [P0] 将 `src/runtime-api.ts` 的 `evolution 端点簇（L565-L1314）` 抽离到 `src/interfaces/http/handlers/evolution-handlers.ts`
+- [x] [P0] 将 `src/runtime-api.ts` 的 `learning/collaboration 端点簇（L1416-L1736）` 抽离到 `src/interfaces/http/handlers/learning-collaboration-handlers.ts`
+- [x] [P1] 将 `src/runtime-api.ts` 的 `参数解析逻辑（L2507-L3127 中 parse*）` 抽离到 `src/interfaces/http/parsers/*.ts`
+- [x] [P1] 将 `src/runtime-api.ts` 的 `限流逻辑（L2507-L3127 中限流相关）` 抽离到 `src/interfaces/http/middleware/rate-limit.ts`
+- [x] [P1] 将 `src/runtime-api.ts` 的 `错误与响应封装（L2507-L3127 中 send*）` 抽离到 `src/interfaces/http/response.ts`
 
 ---
 
