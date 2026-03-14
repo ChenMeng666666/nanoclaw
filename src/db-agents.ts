@@ -29,7 +29,19 @@ import {
   type MemoryRow,
 } from './infrastructure/persistence/mappers/memory-mapper.js';
 
-let db: Database.Database;
+const db = new Proxy({} as Database.Database, {
+  get(_target, property) {
+    const database = getPersistenceDatabase() as unknown as Record<
+      string,
+      unknown
+    >;
+    const value = database[property as keyof typeof database];
+    if (typeof value === 'function') {
+      return value.bind(database);
+    }
+    return value;
+  },
+});
 
 /** 从 .env 文件读取默认模型，fallback 到官方默认值 */
 function getDefaultModel(): string {
@@ -39,7 +51,6 @@ function getDefaultModel(): string {
 
 /** 初始化数据库引用（由主 db.ts 调用） */
 export function setDatabase(database: Database.Database): void {
-  db = database;
   setPersistenceDatabase(database);
 }
 

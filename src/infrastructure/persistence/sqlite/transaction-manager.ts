@@ -2,24 +2,33 @@ import Database from 'better-sqlite3';
 
 let db: Database.Database;
 
+function assertDatabaseInitialized(): Database.Database {
+  if (!db) {
+    throw new Error(
+      'Database handle is not initialized. Call setDatabase() before using persistence operations.',
+    );
+  }
+  return db;
+}
+
 export function setDatabase(database: Database.Database): void {
   db = database;
 }
 
 export function getDatabase(): Database.Database {
-  return db;
+  return assertDatabaseInitialized();
 }
 
 export function beginTransaction(): void {
-  db.exec('BEGIN TRANSACTION');
+  assertDatabaseInitialized().exec('BEGIN TRANSACTION');
 }
 
 export function commit(): void {
-  db.exec('COMMIT');
+  assertDatabaseInitialized().exec('COMMIT');
 }
 
 export function rollback(): void {
-  db.exec('ROLLBACK');
+  assertDatabaseInitialized().exec('ROLLBACK');
 }
 
 export function transaction<T>(fn: () => T): T {
@@ -29,7 +38,11 @@ export function transaction<T>(fn: () => T): T {
     commit();
     return result;
   } catch (error) {
-    rollback();
+    try {
+      rollback();
+    } catch {
+      throw error;
+    }
     throw error;
   }
 }

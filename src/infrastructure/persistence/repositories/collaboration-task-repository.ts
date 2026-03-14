@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { safeJsonParse } from '../../../security.js';
+import { parseStringArray } from '../mappers/json-mapper.js';
 
 export function createCollaborationTask(
   database: Database.Database,
@@ -71,11 +71,11 @@ export function getCollaborationTaskById(
     title: row.title,
     description: row.description,
     teamId: row.team_id,
-    assignedAgents: safeJsonParse(row.assigned_agents) as string[],
+    assignedAgents: parseStringArray(row.assigned_agents),
     status: row.status as 'pending' | 'in_progress' | 'completed' | 'failed',
     priority: row.priority as 'low' | 'medium' | 'high' | 'critical',
     progress: row.progress,
-    dependencies: safeJsonParse(row.dependencies) as string[],
+    dependencies: parseStringArray(row.dependencies),
     context: row.context,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -107,11 +107,11 @@ export function getAllCollaborationTasks(database: Database.Database) {
     title: row.title,
     description: row.description,
     teamId: row.team_id,
-    assignedAgents: safeJsonParse(row.assigned_agents) as string[],
+    assignedAgents: parseStringArray(row.assigned_agents),
     status: row.status as 'pending' | 'in_progress' | 'completed' | 'failed',
     priority: row.priority as 'low' | 'medium' | 'high' | 'critical',
     progress: row.progress,
-    dependencies: safeJsonParse(row.dependencies) as string[],
+    dependencies: parseStringArray(row.dependencies),
     context: row.context,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { safeJsonParse } from '../../../security.js';
+import { parseObject } from '../mappers/json-mapper.js';
 
 export function createBotIdentity(
   database: Database.Database,
@@ -61,7 +61,7 @@ export function getBotIdentityByChatJid(
     botName: row.bot_name,
     botAvatar: row.bot_avatar,
     isActive: Boolean(row.is_active),
-    config: row.config ? safeJsonParse(row.config) : undefined,
+    config: parseObject<Record<string, any> | undefined>(row.config, undefined),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -87,7 +87,7 @@ export function getAllBotIdentities(database: Database.Database) {
     botName: row.bot_name,
     botAvatar: row.bot_avatar,
     isActive: Boolean(row.is_active),
-    config: row.config ? safeJsonParse(row.config) : undefined,
+    config: parseObject<Record<string, any> | undefined>(row.config, undefined),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));

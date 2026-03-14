@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { safeJsonParse } from '../../../security.js';
+import { parseStringArray } from '../mappers/json-mapper.js';
 
 export function createTeamState(
   database: Database.Database,
@@ -55,7 +55,7 @@ export function getTeamStateById(database: Database.Database, id: string) {
     id: row.id,
     name: row.name,
     description: row.description,
-    members: safeJsonParse(row.members) as string[],
+    members: parseStringArray(row.members),
     leaderId: row.leader_id,
     status: row.status as 'active' | 'inactive' | 'dissolved',
     collaborationMode: row.collaboration_mode as
@@ -84,7 +84,7 @@ export function getAllTeamStates(database: Database.Database) {
     id: row.id,
     name: row.name,
     description: row.description,
-    members: safeJsonParse(row.members) as string[],
+    members: parseStringArray(row.members),
     leaderId: row.leader_id,
     status: row.status as 'active' | 'inactive' | 'dissolved',
     collaborationMode: row.collaboration_mode as
@@ -217,7 +217,7 @@ export function getTeamCollaborationStateById(
     taskId: row.task_id,
     status: row.status as 'planning' | 'executing' | 'reviewing' | 'completed',
     progress: row.progress,
-    activeAgents: safeJsonParse(row.active_agents) as string[],
+    activeAgents: parseStringArray(row.active_agents),
     lastActivity: row.last_activity,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
