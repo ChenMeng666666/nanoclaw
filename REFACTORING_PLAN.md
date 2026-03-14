@@ -104,10 +104,10 @@
 
 ## Phase 7：Container/IPC 基础设施拆分（运行时边界清晰化）
 
-- [ ] [P2] 将 `src/container-runner.ts` 的 `挂载策略与安全校验（L65-L241）` 抽离到 `src/domain/container/mount-policy.ts` 与 `src/infrastructure/container/mount-builder.ts`
-- [ ] [P2] 将 `src/container-runner.ts` 的 `命令参数构建（L258-L693 中构建部分）` 抽离到 `src/infrastructure/container/runtime-command-builder.ts`
-- [ ] [P2] 将 `src/container-runner.ts` 的 `进程执行与流处理（L258-L693 中执行部分）` 抽离到 `src/infrastructure/container/container-process-runner.ts`
-- [ ] [P2] 将 `src/container-runner.ts` 的 `IPC 快照写入（L695-L757）` 抽离到 `src/infrastructure/ipc/snapshot-writer.ts`
+- [x] [P2] 将 `src/container-runner.ts` 的 `挂载策略与安全校验（L65-L241）` 抽离到 `src/domain/container/mount-policy.ts` 与 `src/infrastructure/container/mount-builder.ts`
+- [x] [P2] 将 `src/container-runner.ts` 的 `命令参数构建（L258-L693 中构建部分）` 抽离到 `src/infrastructure/container/runtime-command-builder.ts`
+- [x] [P2] 将 `src/container-runner.ts` 的 `进程执行与流处理（L258-L693 中执行部分）` 抽离到 `src/infrastructure/container/container-process-runner.ts`
+- [x] [P2] 将 `src/container-runner.ts` 的 `IPC 快照写入（L695-L757）` 抽离到 `src/infrastructure/ipc/snapshot-writer.ts`
 
 ---
 
