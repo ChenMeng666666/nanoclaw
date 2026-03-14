@@ -304,12 +304,21 @@ export class SubmitExperienceUseCase {
   }
 
   async submitMainExperience(input: MainExperienceInput): Promise<number> {
-    return this.submitExperience(
-      input.abilityName,
-      input.content,
-      'main-process',
-      input.description,
-      input.tags,
-    );
+    const componentTags = input.component
+      ? [`component:${input.component}`]
+      : [];
+    const tags = Array.from(new Set([...(input.tags || []), ...componentTags]));
+    const signals = this.deps.extractSignals({ content: input.content });
+    const category = input.category || this.deps.getCategory(signals);
+    return this.submitGene({
+      abilityName: input.abilityName,
+      description: input.description,
+      sourceAgentId: 'main-process',
+      content: input.content,
+      tags,
+      category,
+      signalsMatch: signals.map((signal) => signal.type),
+      summary: input.description || input.abilityName,
+    });
   }
 }

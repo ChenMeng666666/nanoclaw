@@ -897,26 +897,33 @@ export class EvolutionManager {
   /**
    * 自动审核所有 pending 条目
    */
-  async autoReviewPendingEntries(): Promise<void> {
+  async autoReviewPendingEntries(): Promise<number> {
     const db = getDatabase();
     const pendingEntries = db
-      .prepare('SELECT * FROM evolution_log WHERE status = ?')
-      .all('pending') as any[];
+      .prepare('SELECT id FROM evolution_log WHERE status = ?')
+      .all('pending') as Array<{ id: number }>;
 
     logger.info(
       { count: pendingEntries.length },
       'Starting auto-review of pending entries (GEP)',
     );
 
-    for (const entry of pendingEntries) {
+    let reviewedCount = 0;
+    for (const { id } of pendingEntries) {
+      const entry = getEvolutionEntry(id);
+      if (!entry) {
+        continue;
+      }
       await this.autoReviewPendingEntry(entry);
+      reviewedCount += 1;
     }
+    return reviewedCount;
   }
 
   /**
    * 自动审核单个待审核条目
    */
-  async autoReviewPendingEntry(entry: any): Promise<void> {
+  async autoReviewPendingEntry(entry: EvolutionEntry): Promise<void> {
     await this.selectAndReviewUseCase.autoReviewPendingEntry(entry);
   }
 

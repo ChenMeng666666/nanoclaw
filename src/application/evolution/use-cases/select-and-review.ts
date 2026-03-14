@@ -176,7 +176,7 @@ export class SelectAndReviewUseCase {
     logger.info(
       {
         entryId: entry.id,
-        abilityName: (entry as any).ability_name || entry.abilityName,
+        abilityName: entry.abilityName,
         status: finalStatus,
         totalScore,
       },

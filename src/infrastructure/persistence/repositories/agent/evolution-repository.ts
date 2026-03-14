@@ -85,6 +85,7 @@ export function getEvolutionEntry(id: number): EvolutionEntry | undefined {
         reviewed_by: string | null;
         reviewed_at: string | null;
         feedback: string | null;
+        gdi_score: string | null;
         category: string | null;
         signals_match: string | null;
         strategy: string | null;
@@ -106,6 +107,8 @@ export function getEvolutionEntry(id: number): EvolutionEntry | undefined {
     reviewedBy: row.reviewed_by || undefined,
     reviewedAt: row.reviewed_at || undefined,
     feedback: safeJsonParse(row.feedback, []),
+    gdi_score: safeJsonParse(row.gdi_score, undefined),
+    gdiScore: safeJsonParse(row.gdi_score, undefined),
     category:
       (row.category as 'repair' | 'optimize' | 'innovate' | 'learn') || 'learn',
     signalsMatch: safeJsonParse(row.signals_match, []),
@@ -145,6 +148,8 @@ export function getDuplicateEvolutionEntry(
     reviewedBy: row.reviewed_by || undefined,
     reviewedAt: row.reviewed_at || undefined,
     feedback: safeJsonParse(row.feedback, []),
+    gdi_score: safeJsonParse((row as any).gdi_score, undefined),
+    gdiScore: safeJsonParse((row as any).gdi_score, undefined),
     category:
       (row.category as 'repair' | 'optimize' | 'innovate' | 'learn') || 'learn',
     signalsMatch: safeJsonParse(row.signals_match, []),
@@ -187,6 +192,7 @@ export function getApprovedEvolutionEntries(
     reviewed_by: string | null;
     reviewed_at: string | null;
     feedback: string | null;
+    gdi_score: string | null;
     category: string | null;
     signals_match: string | null;
     strategy: string | null;
@@ -207,6 +213,8 @@ export function getApprovedEvolutionEntries(
     reviewedBy: row.reviewed_by || undefined,
     reviewedAt: row.reviewed_at || undefined,
     feedback: safeJsonParse(row.feedback, []),
+    gdi_score: safeJsonParse(row.gdi_score, undefined),
+    gdiScore: safeJsonParse(row.gdi_score, undefined),
     category:
       (row.category as 'repair' | 'optimize' | 'innovate' | 'learn') || 'learn',
     signalsMatch: safeJsonParse(row.signals_match, []),
@@ -237,6 +245,7 @@ export function getEvolutionEntriesByCategory(
     reviewed_by: string | null;
     reviewed_at: string | null;
     feedback: string | null;
+    gdi_score: string | null;
     category: string | null;
     signals_match: string | null;
     strategy: string | null;
@@ -257,6 +266,8 @@ export function getEvolutionEntriesByCategory(
     reviewedBy: row.reviewed_by || undefined,
     reviewedAt: row.reviewed_at || undefined,
     feedback: safeJsonParse(row.feedback, []),
+    gdi_score: safeJsonParse(row.gdi_score, undefined),
+    gdiScore: safeJsonParse(row.gdi_score, undefined),
     category:
       (row.category as 'repair' | 'optimize' | 'innovate' | 'learn') || 'learn',
     signalsMatch: safeJsonParse(row.signals_match, []),
@@ -281,17 +292,23 @@ export function updateEvolutionStatus(
     values.push(reviewedBy, new Date().toISOString());
   }
   if (feedback) {
+    const row = db
+      .prepare('SELECT feedback FROM evolution_log WHERE id = ?')
+      .get(id) as { feedback: string | null } | undefined;
+    const existingFeedback = safeJsonParse(row?.feedback, []) as Array<{
+      agentId: string;
+      comment: string;
+      rating: number;
+      usedAt?: string;
+    }>;
+    existingFeedback.push({
+      agentId: reviewedBy || 'system',
+      comment: feedback,
+      rating: status === 'approved' ? 5 : 1,
+      usedAt: new Date().toISOString(),
+    });
     fields.push('feedback = ?');
-    values.push(
-      JSON.stringify([
-        {
-          agentId: reviewedBy || 'system',
-          comment: feedback,
-          rating: status === 'approved' ? 5 : 1,
-          usedAt: new Date().toISOString(),
-        },
-      ]),
-    );
+    values.push(JSON.stringify(existingFeedback));
   }
 
   values.push(id);
@@ -713,6 +730,7 @@ export function getEvolutionEntriesByStatus(
     preconditions: safeJsonParse(row.preconditions, []),
     validationCommands: safeJsonParse(row.validation_commands, []),
     chainId: row.chain_id,
+    gdi_score: safeJsonParse(row.gdi_score, undefined),
     gdiScore: safeJsonParse(row.gdi_score, undefined),
     ecosystemStatus: row.ecosystem_status,
     strategy: safeJsonParse(row.strategy, []),
@@ -746,6 +764,7 @@ export function getEvolutionEntryByAssetId(assetId: string): any | undefined {
     preconditions: safeJsonParse(row.preconditions, []),
     validationCommands: safeJsonParse(row.validation_commands, []),
     chainId: row.chain_id,
+    gdi_score: safeJsonParse(row.gdi_score, undefined),
     gdiScore: safeJsonParse(row.gdi_score, undefined),
     ecosystemStatus: row.ecosystem_status,
     strategy: safeJsonParse(row.strategy, []),

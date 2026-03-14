@@ -99,6 +99,7 @@ export type EvolutionEntry = Omit<
   schema_version?: string;
   asset_id?: string;
   gdi_score?: GDIScore;
+  gdiScore?: GDIScore;
   chain_id?: string;
   summary?: string;
   preconditions?: string[];

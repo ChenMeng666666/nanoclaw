@@ -22,14 +22,7 @@ export class MainEvolutionApplier {
       'Submitting main project experience (GEP 1.5.0)',
     );
 
-    // 使用 GEP 1.5.0 标准的 submitExperience 方法
-    const id = await evolutionManager.submitExperience(
-      input.abilityName,
-      input.content,
-      'main-process',
-      input.description,
-      input.tags,
-    );
+    const id = await evolutionManager.submitMainExperience(input);
 
     logger.info(
       { id, abilityName: input.abilityName },
@@ -74,7 +67,7 @@ export class MainEvolutionApplier {
       {
         geneId: gene.id,
         abilityName: gene.abilityName,
-        gdiScore: gene.gdi_score?.total,
+        gdiScore: (gene.gdi_score || gene.gdiScore)?.total,
       },
       'Applying Gene strategy (GEP 1.5.0)',
     );
@@ -87,7 +80,10 @@ export class MainEvolutionApplier {
    */
   static async applyGeneStrategy(gene: EvolutionEntry): Promise<void> {
     logger.debug(
-      { abilityName: gene.abilityName, gdiScore: gene.gdi_score?.total },
+      {
+        abilityName: gene.abilityName,
+        gdiScore: (gene.gdi_score || gene.gdiScore)?.total,
+      },
       'Main app applying gene strategy (GEP 1.5.0)',
     );
 
@@ -282,7 +278,7 @@ export class MainEvolutionApplier {
     gene: EvolutionEntry,
     fallback: number,
   ): number {
-    const normalized = (gene.gdi_score?.total ?? 0) / 10;
+    const normalized = ((gene.gdi_score || gene.gdiScore)?.total ?? 0) / 10;
     if (Number.isFinite(normalized) && normalized > 0) {
       return Number(Math.max(0.1, Math.min(1, normalized)).toFixed(2));
     }

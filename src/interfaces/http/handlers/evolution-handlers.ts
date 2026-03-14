@@ -5,7 +5,7 @@ import { MEMORY_CONFIG } from '../../../config.js';
 import { getEvolutionEntriesByCategory } from '../../../db-agents.js';
 import { evolutionManager } from '../../../evolution-manager.js';
 import { memoryManager } from '../../../memory-manager.js';
-import { getRecommendedGeneCategory } from '../../../signal-extractor.js';
+import type { Signal, SignalType } from '../../../signal-extractor.js';
 import {
   parseEvolutionCategory,
   parseEvolutionLimit,
@@ -172,14 +172,27 @@ export function createEvolutionHandlers(): {
 
       if (path === '/api/evolution/select-gene' && req.method === 'POST') {
         const body = await readJSON(req);
-        const signals = parseOptionalStringArray(body.signals, 'signals') || [];
+        const signalTypes =
+          parseOptionalStringArray(body.signals, 'signals') || [];
+        const signals: Signal[] = signalTypes.map((type) => ({
+          type: type as SignalType,
+          confidence: 0.8,
+        }));
         const category = parseEvolutionCategory(body.category);
-        const geneCategory =
-          category || getRecommendedGeneCategory(signals as any[]);
-        const genes = getEvolutionEntriesByCategory(
-          geneCategory as 'repair' | 'optimize' | 'innovate' | 'learn',
-          10,
-        );
+
+        if (category) {
+          const genes = getEvolutionEntriesByCategory(category, 10);
+          writeJSON(res, 200, {
+            category,
+            genes,
+            count: genes.length,
+          });
+          return true;
+        }
+
+        const selectedGene = await evolutionManager.selectGene(signals);
+        const genes = selectedGene ? [selectedGene] : [];
+        const geneCategory = selectedGene?.category || 'learn';
 
         writeJSON(res, 200, {
           category: geneCategory,
