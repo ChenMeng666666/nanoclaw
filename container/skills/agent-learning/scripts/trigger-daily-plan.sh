@@ -176,9 +176,9 @@ execute_plan() {
     for i in $(seq 0 $((task_count - 1))); do
         local task=$(echo "$plan" | jq -r ".tasks[$i]")
         local taskId=$(echo "$task" | jq -r '.id')
-        local topic=$(echo "$task" | jq -r '.topic')
+        local task_label=$(echo "$task" | jq -r '.description // .topic // .id // "未命名任务"')
 
-        log_info "执行任务 $((i + 1))/$task_count: $topic"
+        log_info "执行任务 $((i + 1))/$task_count: $task_label"
 
         # 调用 API 执行任务
         local exec_response=$(curl -s -X POST "$API_URL/api/learning/task/start" \
@@ -187,9 +187,9 @@ execute_plan() {
             -d "$task" 2>/dev/null)
 
         if [ $? -eq 0 ]; then
-            log_info "任务 $topic 开始执行"
+            log_info "任务 $task_label 开始执行"
         else
-            log_error "任务 $topic 执行失败"
+            log_error "任务 $task_label 执行失败"
         fi
     done
 

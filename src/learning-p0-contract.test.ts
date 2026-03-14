@@ -38,4 +38,11 @@ describe('learning p0 contracts', () => {
       expect(content).toContain('X-API-Key');
     }
   });
+
+  it('uses description-first label for daily plan task logging', () => {
+    const root = new URL('..', import.meta.url).pathname;
+    const scriptPath = `${root}/container/skills/agent-learning/scripts/trigger-daily-plan.sh`;
+    const content = fs.readFileSync(scriptPath, 'utf8');
+    expect(content).toContain('.description // .topic // .id // "未命名任务"');
+  });
 });
