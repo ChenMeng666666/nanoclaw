@@ -38,7 +38,7 @@
 
 ## Phase 2：Persistence 层拆分（数据库解耦）
 
-- [ ] [P0] 将 `src/db.ts` 的 `schema 初始化（L36-L430）` 抽离到 `src/infrastructure/persistence/sqlite/schema.ts`
+- [x] [P0] 将 `src/db.ts` 的 `schema 初始化（L36-L430）` 抽离到 `src/infrastructure/persistence/sqlite/schema.ts`
 - [x] [P0] 将 `src/db.ts` 的 `JSON 状态迁移（L1266-L1319）` 抽离到 `src/infrastructure/persistence/sqlite/migrations/json-state.ts`
 - [x] [P0] 将 `src/db.ts` 的 `任务与运行日志访问（L993-L1124）` 抽离到 `src/infrastructure/persistence/repositories/task-repository.ts`
 - [x] [P0] 将 `src/db.ts` 的 `路由/会话/群组访问（L1128-L1262）` 抽离到 `src/infrastructure/persistence/repositories/routing-repository.ts`
