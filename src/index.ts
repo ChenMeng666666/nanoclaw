@@ -1,17 +1,11 @@
-import {
-  validateAllConfig,
-} from './config.js';
+import { validateAllConfig } from './config.js';
 import { logger } from './logger.js';
 import { checkSystemDependencies } from './infrastructure/system/dependency-check.js';
 import {
   ensureContainerRuntimeRunning,
   cleanupOrphans,
 } from './container-runtime.js';
-import {
-  initDatabase,
-  storeMessage,
-  storeChatMetadata,
-} from './db.js';
+import { initDatabase, storeMessage, storeChatMetadata } from './db.js';
 import { preloadRoutingCache } from './db-routing.js';
 import {
   loadAppState,

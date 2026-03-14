@@ -15,16 +15,20 @@ import {
 } from './interfaces/http/response.js';
 
 export {
-  normalizeLearningNeeds,
-  inferPlanPriority,
   analyzeLearningNeeds,
+  inferPlanPriority,
+  normalizeLearningNeeds,
+} from './domain/learning/services/learning-needs-analyzer.js';
+export {
   analyzeLearningOutcome,
   extractKnowledgePoints,
-  generateRuntimeReflection,
-  generateDailySummary,
   splitToPoints,
-  orchestrateLearningIntent,
-} from './runtime-api-learning-helpers.js';
+} from './domain/learning/services/learning-outcome-analyzer.js';
+export {
+  generateDailySummary,
+  generateRuntimeReflection,
+} from './domain/learning/services/reflection-generator.js';
+export { orchestrateLearningIntent } from './domain/learning/services/learning-scheduler.js';
 
 export interface RuntimeAPIOptions {
   enabled: boolean;

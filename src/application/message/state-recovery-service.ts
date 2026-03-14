@@ -118,7 +118,7 @@ export function loadAppState(): AppState {
   const lastTimestamp = getRouterState('last_timestamp') || '';
   const agentTs = getRouterState('last_agent_timestamp');
   let lastAgentTimestamp: Record<string, string> = {};
-  
+
   try {
     const parsed = agentTs ? safeJsonParse(agentTs) : null;
     lastAgentTimestamp =
@@ -148,7 +148,7 @@ export function loadAppState(): AppState {
     { groupCount: Object.keys(registeredGroups).length },
     'State loaded',
   );
-  
+
   return {
     lastTimestamp,
     sessions,
@@ -159,14 +159,20 @@ export function loadAppState(): AppState {
 
 export function saveAppState(state: AppState): void {
   setRouterState('last_timestamp', state.lastTimestamp);
-  setRouterState('last_agent_timestamp', JSON.stringify(state.lastAgentTimestamp));
+  setRouterState(
+    'last_agent_timestamp',
+    JSON.stringify(state.lastAgentTimestamp),
+  );
 }
 
 /**
  * Startup recovery: check for unprocessed messages in registered groups.
  * Handles crash between advancing lastTimestamp and processing messages.
  */
-export function recoverPendingMessages(state: AppState, queue: GroupQueue): void {
+export function recoverPendingMessages(
+  state: AppState,
+  queue: GroupQueue,
+): void {
   for (const [chatJid, group] of Object.entries(state.registeredGroups)) {
     const sinceTimestamp = state.lastAgentTimestamp[chatJid] || '';
     const pending = getMessagesSince(chatJid, sinceTimestamp, ASSISTANT_NAME);

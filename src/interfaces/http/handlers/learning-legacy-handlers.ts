@@ -18,20 +18,26 @@ import { MEMORY_CONFIG } from '../../../config.js';
 import type { DailyLearningPlan, LearningNeed } from '../../../types.js';
 import {
   analyzeLearningNeeds,
-  analyzeLearningOutcome,
-  extractKnowledgePoints,
-  generateDailySummary,
-  generateRuntimeReflection,
-  getLearningAutomationTasks,
   inferPlanPriority,
   normalizeLearningNeeds,
+  resolveLearningModelDecision,
+} from '../../../domain/learning/services/learning-needs-analyzer.js';
+import {
+  analyzeLearningOutcome,
+  extractKnowledgePoints,
+} from '../../../domain/learning/services/learning-outcome-analyzer.js';
+import {
+  getLearningAutomationTasks,
   offsetSchedule,
   orchestrateLearningIntent,
   parseFixedTimePreference,
-  resolveLearningModelDecision,
   resolveLearningSchedulePreference,
   upsertLearningAutomationTask,
-} from '../../../runtime-api-learning-helpers.js';
+} from '../../../domain/learning/services/learning-scheduler.js';
+import {
+  generateDailySummary,
+  generateRuntimeReflection,
+} from '../../../domain/learning/services/reflection-generator.js';
 import {
   parseLearningResultStatus,
   parseOptionalBlastRadius,

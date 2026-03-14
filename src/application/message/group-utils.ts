@@ -6,7 +6,9 @@ import { AvailableGroup } from '../../container-runner.js';
  * Get available groups list for the agent.
  * Returns groups ordered by most recent activity.
  */
-export function getAvailableGroups(registeredGroups: Record<string, RegisteredGroup>): AvailableGroup[] {
+export function getAvailableGroups(
+  registeredGroups: Record<string, RegisteredGroup>,
+): AvailableGroup[] {
   const chats = getAllChats();
   const registeredJids = new Set(Object.keys(registeredGroups));
 

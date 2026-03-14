@@ -43,11 +43,9 @@ import {
   saveAppState,
   AppState,
 } from '../message/state-recovery-service.js';
-import {
-  validateUserInput,
-  sanitizeWebContent,
-} from '../../security.js';
+import { validateUserInput, sanitizeWebContent } from '../../security.js';
 import { getAvailableGroups } from '../message/group-utils.js';
+import { LearningSystemInitializer } from '../../infrastructure/system/learning-system-initializer.js';
 
 export class MessageOrchestrator {
   private messageLoopRunning = false;
@@ -88,87 +86,12 @@ export class MessageOrchestrator {
     fs.mkdirSync(path.join(groupDir, 'logs'), { recursive: true });
 
     // Initialize learning system template
-    this.initializeLearningSystem(jid, group, groupDir);
+    LearningSystemInitializer.initialize(jid, group, groupDir);
 
     logger.info(
       { jid, name: group.name, folder: group.folder },
       'Group registered',
     );
-  }
-
-  private initializeLearningSystem(
-    jid: string,
-    group: RegisteredGroup,
-    groupDir: string,
-  ): void {
-    const learningSystemDir = path.join(groupDir, '.learning-system');
-    const skillConfigDir = path.join(
-      process.cwd(),
-      'container/skills/agent-learning/config',
-    );
-    const skillScriptDir = path.join(
-      process.cwd(),
-      'container/skills/agent-learning/scripts',
-    );
-
-    if (fs.existsSync(skillConfigDir) && !fs.existsSync(learningSystemDir)) {
-      try {
-        // Create directory structure
-        fs.mkdirSync(path.join(learningSystemDir, 'config'), { recursive: true });
-        fs.mkdirSync(path.join(learningSystemDir, 'scripts'), { recursive: true });
-        fs.mkdirSync(path.join(learningSystemDir, 'cron'), { recursive: true });
-        fs.mkdirSync(path.join(learningSystemDir, 'status'), { recursive: true });
-        fs.mkdirSync(path.join(learningSystemDir, 'plans'), { recursive: true });
-        fs.mkdirSync(path.join(learningSystemDir, 'reflections'), { recursive: true });
-
-        // Copy config files
-        if (fs.existsSync(skillConfigDir)) {
-          const configFiles = fs.readdirSync(skillConfigDir);
-          configFiles.forEach((file) => {
-            const src = path.join(skillConfigDir, file);
-            const dest = path.join(learningSystemDir, 'config', file);
-            if (fs.statSync(src).isFile()) {
-              fs.copyFileSync(src, dest);
-            }
-          });
-        }
-
-        // Copy script files
-        if (fs.existsSync(skillScriptDir)) {
-          const scriptFiles = fs.readdirSync(skillScriptDir);
-          scriptFiles.forEach((file) => {
-            const src = path.join(skillScriptDir, file);
-            const dest = path.join(learningSystemDir, 'scripts', file);
-            if (fs.statSync(src).isFile()) {
-              fs.copyFileSync(src, dest);
-              fs.chmodSync(dest, '755');
-            }
-          });
-
-          // Copy init.sh to root
-          const initScriptSrc = path.join(skillScriptDir, 'init.sh');
-          const initScriptDest = path.join(learningSystemDir, 'init.sh');
-          if (fs.existsSync(initScriptSrc)) {
-            fs.copyFileSync(initScriptSrc, initScriptDest);
-            fs.chmodSync(initScriptDest, '755');
-          }
-        }
-
-        logger.info(
-          { jid, name: group.name, folder: group.folder },
-          'Learning system template initialized for new group',
-        );
-      } catch (err) {
-        logger.warn(
-          {
-            jid,
-            name: group.name,
-            err: err instanceof Error ? err.message : String(err),
-          },
-          'Failed to initialize learning system template, will use skill auto-init',
-        );
-      }
-    }
   }
 
   /**
@@ -284,7 +207,12 @@ export class MessageOrchestrator {
         }
       } else {
         logger.warn(
-          { chatJid, agentFolder: group.folder, sessionId, memoryPipelineRoute },
+          {
+            chatJid,
+            agentFolder: group.folder,
+            sessionId,
+            memoryPipelineRoute,
+          },
           'Unsupported memory pipeline route, skipping context injection',
         );
       }
@@ -314,40 +242,47 @@ export class MessageOrchestrator {
       let outputSentToUser = false;
       let responseText = '';
 
-      const output = await this.runAgent(group, prompt, chatJid, async (result) => {
-        if (didTimeout) {
-          return;
-        }
-        // Streaming output callback — called for each agent result
-        if (result.result) {
-          const raw =
-            typeof result.result === 'string'
-              ? result.result
-              : JSON.stringify(result.result);
-          // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
-          const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
-          logger.info(
-            { group: group.name },
-            `Agent output: ${raw.slice(0, 200)}`,
-          );
-          if (text) {
-            await channel.sendMessage(chatJid, text);
-            outputSentToUser = true;
-            responseText += responseText ? `\n${text}` : text;
-            this.queue.markOutputSent(chatJid);
+      const output = await this.runAgent(
+        group,
+        prompt,
+        chatJid,
+        async (result) => {
+          if (didTimeout) {
+            return;
           }
-          // Only reset idle timer on actual results, not session-update markers (result: null)
-          resetIdleTimer();
-        }
+          // Streaming output callback — called for each agent result
+          if (result.result) {
+            const raw =
+              typeof result.result === 'string'
+                ? result.result
+                : JSON.stringify(result.result);
+            // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
+            const text = raw
+              .replace(/<internal>[\s\S]*?<\/internal>/g, '')
+              .trim();
+            logger.info(
+              { group: group.name },
+              `Agent output: ${raw.slice(0, 200)}`,
+            );
+            if (text) {
+              await channel.sendMessage(chatJid, text);
+              outputSentToUser = true;
+              responseText += responseText ? `\n${text}` : text;
+              this.queue.markOutputSent(chatJid);
+            }
+            // Only reset idle timer on actual results, not session-update markers (result: null)
+            resetIdleTimer();
+          }
 
-        if (result.status === 'success') {
-          this.queue.notifyIdle(chatJid);
-        }
+          if (result.status === 'success') {
+            this.queue.notifyIdle(chatJid);
+          }
 
-        if (result.status === 'error') {
-          hadError = true;
-        }
-      });
+          if (result.status === 'error') {
+            hadError = true;
+          }
+        },
+      );
 
       await channel.setTyping?.(chatJid, false);
       if (idleTimer) clearTimeout(idleTimer);
@@ -393,7 +328,10 @@ export class MessageOrchestrator {
           clearTimeout(timeoutHandle);
         }
         if (outcome.code !== 'processed') {
-          logger.debug({ chatJid, outcome }, 'Group message processing outcome');
+          logger.debug(
+            { chatJid, outcome },
+            'Group message processing outcome',
+          );
         }
         return outcome.ok;
       })
@@ -468,7 +406,12 @@ export class MessageOrchestrator {
           agentConfig, // 多智能体配置
         },
         (proc, containerName) =>
-          this.queue.registerProcess(chatJid, proc, containerName, group.folder),
+          this.queue.registerProcess(
+            chatJid,
+            proc,
+            containerName,
+            group.folder,
+          ),
         wrappedOnOutput,
       );
 
@@ -519,7 +462,12 @@ export class MessageOrchestrator {
           for (const msg of messages) {
             // 检查消息是否重复
             if (
-              isDuplicateMessage(msg.chat_jid, msg.id, msg.content, msg.timestamp)
+              isDuplicateMessage(
+                msg.chat_jid,
+                msg.id,
+                msg.content,
+                msg.timestamp,
+              )
             ) {
               logger.warn(
                 { chatJid: msg.chat_jid, messageId: msg.id },
@@ -568,13 +516,17 @@ export class MessageOrchestrator {
 
             const group = this.state.registeredGroups[chatJid];
             if (!group) {
-              logger.warn({ chatJid }, 'Group not registered, skipping messages');
+              logger.warn(
+                { chatJid },
+                'Group not registered, skipping messages',
+              );
               continue;
             }
 
             const consumedCursor = this.queue.consumePipedMessageAck(chatJid);
             if (consumedCursor) {
-              const previousCursor = this.state.lastAgentTimestamp[chatJid] || '';
+              const previousCursor =
+                this.state.lastAgentTimestamp[chatJid] || '';
               const shouldAdvance =
                 !previousCursor ||
                 new Date(consumedCursor).getTime() >=
@@ -591,7 +543,10 @@ export class MessageOrchestrator {
 
             const channel = findChannel(this.channels, chatJid);
             if (!channel) {
-              logger.warn({ chatJid }, 'No channel owns JID, skipping messages');
+              logger.warn(
+                { chatJid },
+                'No channel owns JID, skipping messages',
+              );
               continue;
             }
 
@@ -678,7 +633,10 @@ export class MessageOrchestrator {
               channel
                 .setTyping?.(chatJid, true)
                 ?.catch((err) =>
-                  logger.warn({ chatJid, err }, 'Failed to set typing indicator'),
+                  logger.warn(
+                    { chatJid, err },
+                    'Failed to set typing indicator',
+                  ),
                 );
             } else {
               if (pipeResult.code === 'task_container_pending') {

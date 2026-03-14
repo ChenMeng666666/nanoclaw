@@ -141,7 +141,7 @@ export class AppLifecycleManager {
         logger.warn({ e }, 'Failed to submit rejection experience'),
       );
     });
-    
+
     process.on('SIGTERM', () => this.shutdown('SIGTERM'));
     process.on('SIGINT', () => this.shutdown('SIGINT'));
   }
@@ -181,7 +181,7 @@ export class AppLifecycleManager {
     if (this.queue) {
       await this.queue.shutdown(10000);
     }
-    
+
     for (const ch of this.channels) await ch.disconnect();
     process.exit(0);
   }
