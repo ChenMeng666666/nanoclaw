@@ -1,9 +1,9 @@
 skill: agent-flow-tester
-version: 1.0.0
-description: 'Run NanoClaw agent flow tests for minimal, e2e, and full scenarios.'
+version: 1.1.0
+description: 'Run NanoClaw full agent-flow regression for learning, memory, and evolution systems.'
 core_version: 1.2.10
 adds: []
 modifies: []
 conflicts: []
 depends: []
-test: 'npm run test:minimal'
+test: 'npm run test:full'

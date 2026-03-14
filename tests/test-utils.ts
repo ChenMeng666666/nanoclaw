@@ -232,12 +232,36 @@ export class TestDatabaseHelper {
 
   static async cleanupTestAgent(agentId: string) {
     const db = getDatabase();
-    // 先删除与 agent 相关的所有数据，避免外键约束错误
-    db.prepare('DELETE FROM evolution_log WHERE source_agent_id = ?').run(agentId);
-    db.prepare('DELETE FROM memories WHERE agent_folder IN (SELECT folder FROM agents WHERE id = ?)').run(agentId);
-    db.prepare('DELETE FROM learning_tasks WHERE agent_folder IN (SELECT folder FROM agents WHERE id = ?)').run(agentId);
-    db.prepare('DELETE FROM reflections WHERE agent_folder IN (SELECT folder FROM agents WHERE id = ?)').run(agentId);
-    db.prepare('DELETE FROM agents WHERE id = ?').run(agentId);
+    const agent = db.prepare('SELECT folder FROM agents WHERE id = ?').get(agentId) as
+      | { folder: string }
+      | undefined;
+
+    if (!agent) {
+      return;
+    }
+
+    const cleanup = db.transaction(() => {
+      db.prepare('DELETE FROM capsules WHERE gene_id IN (SELECT id FROM evolution_log WHERE source_agent_id = ?)')
+        .run(agentId);
+      db.prepare(
+        'DELETE FROM validation_reports WHERE gene_id IN (SELECT id FROM evolution_log WHERE source_agent_id = ?)',
+      ).run(agentId);
+      db.prepare(
+        'DELETE FROM evolution_versions WHERE evolution_id IN (SELECT id FROM evolution_log WHERE source_agent_id = ?)',
+      ).run(agentId);
+      db.prepare(
+        'DELETE FROM knowledge_flow_events WHERE gene_id IN (SELECT id FROM evolution_log WHERE source_agent_id = ?)',
+      ).run(agentId);
+      db.prepare('DELETE FROM evolution_log WHERE source_agent_id = ?').run(agentId);
+      db.prepare('DELETE FROM memories WHERE agent_folder = ?').run(agent.folder);
+      db.prepare('DELETE FROM learning_tasks WHERE agent_folder = ?').run(agent.folder);
+      db.prepare('DELETE FROM reflections WHERE agent_folder = ?').run(agent.folder);
+      db.prepare('DELETE FROM bot_identities WHERE agent_id = ?').run(agentId);
+      db.prepare('DELETE FROM collaboration_task_assignments WHERE agent_id = ?').run(agentId);
+      db.prepare('DELETE FROM agents WHERE id = ?').run(agentId);
+    });
+
+    cleanup();
   }
 
   static async setupTestLearningTask(taskData: any) {

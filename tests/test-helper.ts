@@ -24,6 +24,35 @@ export function clearTestData(groupFolder: string = 'test'): void {
       `DELETE FROM memories WHERE agent_folder = ? OR id LIKE ?`
     ).run(groupFolder, '%test%');
 
+    // 清理进化库关联数据（先子表后主表）
+    db.prepare(
+      `DELETE FROM capsules
+       WHERE gene_id IN (
+         SELECT id FROM evolution_log WHERE source_agent_id LIKE ? OR ability_name LIKE ?
+       )`,
+    ).run('%test%', '%test%');
+
+    db.prepare(
+      `DELETE FROM validation_reports
+       WHERE gene_id IN (
+         SELECT id FROM evolution_log WHERE source_agent_id LIKE ? OR ability_name LIKE ?
+       )`,
+    ).run('%test%', '%test%');
+
+    db.prepare(
+      `DELETE FROM evolution_versions
+       WHERE evolution_id IN (
+         SELECT id FROM evolution_log WHERE source_agent_id LIKE ? OR ability_name LIKE ?
+       )`,
+    ).run('%test%', '%test%');
+
+    db.prepare(
+      `DELETE FROM knowledge_flow_events
+       WHERE gene_id IN (
+         SELECT id FROM evolution_log WHERE source_agent_id LIKE ? OR ability_name LIKE ?
+       )`,
+    ).run('%test%', '%test%');
+
     // 清理进化库条目
     db.prepare(
       `DELETE FROM evolution_log WHERE source_agent_id LIKE ? OR ability_name LIKE ?`

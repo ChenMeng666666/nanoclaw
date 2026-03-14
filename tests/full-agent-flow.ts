@@ -806,8 +806,8 @@ function calculateFibonacciOptimized(n: number): number {
     // 清理进化经验
     logger.debug('  清理进化经验');
     TestDatabaseHelper.getDatabase()
-      .prepare('DELETE FROM evolution_log WHERE id LIKE ?')
-      .run('%full-test%');
+      .prepare('DELETE FROM evolution_log WHERE source_agent_id LIKE ? OR ability_name LIKE ?')
+      .run('%full-test%', '%full-test%');
 
     // 清理学习任务
     logger.debug('  清理学习任务');
