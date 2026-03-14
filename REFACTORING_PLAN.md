@@ -46,7 +46,7 @@
 - [x] [P0] 将 `src/db.ts` 收敛为 `连接工厂 + 事务门面`，移除跨域查询细节
 - [x] [P0] 将 `src/db-agents.ts` 的 `事务与句柄管理（L29-L74）` 抽离到 `src/infrastructure/persistence/sqlite/transaction-manager.ts`
 - [x] [P0] 将 `src/db-agents.ts` 的 `safeJsonParse 映射逻辑（如 L518-L545）` 抽离到 `src/infrastructure/persistence/mappers/*.ts`
-- [ ] [P0] 将 `src/db-agents.ts` 的 `agents/channel/memory/reflection/learning/evolution/audit 访问逻辑（L76-L1968）` 拆分到 `src/infrastructure/persistence/repositories/agent/*.ts`
+- [x] [P0] 将 `src/db-agents.ts` 的 `agents/channel/memory/reflection/learning/evolution/audit 访问逻辑（L76-L1968）` 拆分到 `src/infrastructure/persistence/repositories/agent/*.ts`
 
 ---
 
