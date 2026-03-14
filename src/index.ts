@@ -62,7 +62,7 @@ import { Channel, NewMessage, RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
 import { reflectionScheduler } from './reflection-scheduler.js';
 import { contextEngineRegistry } from './context-engine/registry.js';
-import './context-engine/default-engine.js';
+import './context-engine/providers.js';
 import type { ContextEngine } from './context-engine/interface.js';
 import { memoryManager } from './memory-manager.js';
 import { LocalLLMQueryExpansionProvider } from './query-expansion/local-llm-provider.js';

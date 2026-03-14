@@ -87,18 +87,18 @@
 
 ## Phase 6：Context Engine 与 Signal 引擎拆分（算法层内聚）
 
-- [ ] [P1] 将 `src/context-engine/default-engine.ts` 的 `嵌入缓存与淘汰（L30-L115）` 抽离到 `src/context-engine/embedding-cache.ts`
-- [ ] [P1] 将 `src/context-engine/default-engine.ts` 的 `ingest 分块链路（L152-L457）` 抽离到 `src/context-engine/ingest-pipeline.ts`
-- [ ] [P1] 将 `src/context-engine/default-engine.ts` 的 `assemble 检索链路（L459-L547, L839-L943, L985-L1001）` 抽离到 `src/context-engine/assemble-retrieval.ts`
-- [ ] [P1] 将 `src/context-engine/default-engine.ts` 的 `查询扩展（L588-L762）` 抽离到 `src/context-engine/query-expansion.ts`
-- [ ] [P1] 将 `src/context-engine/default-engine.ts` 的 `重排策略（L764-L820, L864-L930）` 抽离到 `src/context-engine/rerank.ts`
-- [ ] [P1] 将 `src/context-engine/default-engine.ts` 的 `provider 工厂（L1014-L1075）` 抽离到 `src/context-engine/providers.ts`
-- [ ] [P1] 将 `src/signal-extractor.ts` 的 `信号类型定义（L21-L59）` 抽离到 `src/signal-extractor/types.ts`
-- [ ] [P1] 将 `src/signal-extractor.ts` 的 `多语言模式库（L71-L685）` 抽离到 `src/signal-extractor/patterns.ts`
-- [ ] [P1] 将 `src/signal-extractor.ts` 的 `工具函数（L689-L759）` 抽离到 `src/signal-extractor/utils.ts`
-- [ ] [P1] 将 `src/signal-extractor.ts` 的 `提取流程（L769-L852）` 抽离到 `src/signal-extractor/extractor.ts`
-- [ ] [P1] 将 `src/signal-extractor.ts` 的 `分类与动作映射（L857-L947）` 抽离到 `src/signal-extractor/action-mapping.ts`
-- [ ] [P1] 将 `src/signal-extractor.ts` 的 `主项目增强逻辑（L952-L1101）` 抽离到 `src/signal-extractor/main-signals.ts`
+- [x] [P1] 将 `src/context-engine/default-engine.ts` 的 `嵌入缓存与淘汰（L30-L115）` 抽离到 `src/context-engine/embedding-cache.ts`
+- [x] [P1] 将 `src/context-engine/default-engine.ts` 的 `ingest 分块链路（L152-L457）` 抽离到 `src/context-engine/ingest-pipeline.ts`
+- [x] [P1] 将 `src/context-engine/default-engine.ts` 的 `assemble 检索链路（L459-L547, L839-L943, L985-L1001）` 抽离到 `src/context-engine/assemble-retrieval.ts`
+- [x] [P1] 将 `src/context-engine/default-engine.ts` 的 `查询扩展（L588-L762）` 抽离到 `src/context-engine/query-expansion.ts`
+- [x] [P1] 将 `src/context-engine/default-engine.ts` 的 `重排策略（L764-L820, L864-L930）` 抽离到 `src/context-engine/rerank.ts`
+- [x] [P1] 将 `src/context-engine/default-engine.ts` 的 `provider 工厂（L1014-L1075）` 抽离到 `src/context-engine/providers.ts`
+- [x] [P1] 将 `src/signal-extractor.ts` 的 `信号类型定义（L21-L59）` 抽离到 `src/signal-extractor/types.ts`
+- [x] [P1] 将 `src/signal-extractor.ts` 的 `多语言模式库（L71-L685）` 抽离到 `src/signal-extractor/patterns.ts`
+- [x] [P1] 将 `src/signal-extractor.ts` 的 `工具函数（L689-L759）` 抽离到 `src/signal-extractor/utils.ts`
+- [x] [P1] 将 `src/signal-extractor.ts` 的 `提取流程（L769-L852）` 抽离到 `src/signal-extractor/extractor.ts`
+- [x] [P1] 将 `src/signal-extractor.ts` 的 `分类与动作映射（L857-L947）` 抽离到 `src/signal-extractor/action-mapping.ts`
+- [x] [P1] 将 `src/signal-extractor.ts` 的 `主项目增强逻辑（L952-L1101）` 抽离到 `src/signal-extractor/main-signals.ts`
 
 ---
 

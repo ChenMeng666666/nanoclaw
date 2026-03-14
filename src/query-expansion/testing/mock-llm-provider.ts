@@ -1,4 +1,4 @@
-import type { QueryExpansionProvider } from '../../context-engine/default-engine.js';
+import type { QueryExpansionProvider } from '../../context-engine/query-expansion.js';
 
 /**
  * 模拟的本地 LLM 提供者（用于测试，不依赖 node-llama-cpp）

@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ContextEngineRegistry } from '../registry.js';
-import { createDefaultContextEngine } from '../default-engine.js';
+import { createDefaultContextEngine } from '../providers.js';
 import type { ContextEngine } from '../interface.js';
 import type { Context, CompactResult, TurnResult } from '../types.js';
 import { NewMessage } from '../../types.js';

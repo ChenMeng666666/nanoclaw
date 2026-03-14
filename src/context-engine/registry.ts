@@ -1,5 +1,5 @@
 import type { ContextEngine } from './interface.js';
-import type { CreateEngineOptions } from './default-engine.js';
+import type { CreateEngineOptions } from './providers.js';
 import { sharedStateManager } from './shared-state.js';
 import { logger } from '../logger.js';
 

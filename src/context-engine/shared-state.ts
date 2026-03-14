@@ -5,7 +5,7 @@
  * BM25 索引等状态，减少内存占用和重复计算
  */
 
-import type { CreateEngineOptions } from './default-engine.js';
+import type { CreateEngineOptions } from './providers.js';
 import { BM25Index } from '../hybrid-search.js';
 import { logger } from '../logger.js';
 

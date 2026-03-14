@@ -6,7 +6,7 @@
  * 用户可以选择安装 node-llama-cpp 来启用本地 LLM 查询扩展
  */
 
-import type { QueryExpansionProvider } from '../context-engine/default-engine.js';
+import type { QueryExpansionProvider } from '../context-engine/query-expansion.js';
 import { logger } from '../logger.js';
 import fs from 'fs';
 
