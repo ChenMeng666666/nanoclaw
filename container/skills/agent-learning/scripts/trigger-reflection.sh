@@ -8,7 +8,8 @@ set -e
 
 LEARNING_DIR="/workspace/group/.learning-system"
 LOG_FILE="$LEARNING_DIR/logs/reflections-$(date +%Y%m%d).log"
-CONFIG_FILE="$LEARNING_DIR/config/automation.json"
+CONFIG_FILE="$LEARNING_DIR/config/learning-automation.json"
+LEGACY_CONFIG_FILE="$LEARNING_DIR/config/automation.json"
 
 # 颜色输出
 RED='\033[0;31m'
@@ -31,11 +32,26 @@ log_error() {
     echo -e "${RED}[Reflection]${NC} $(date +"%Y-%m-%d %H:%M:%S") - $msg" | tee -a "$LOG_FILE"
 }
 
+resolve_config_file() {
+    if [ -f "$CONFIG_FILE" ]; then
+        echo "$CONFIG_FILE"
+        return 0
+    fi
+    if [ -f "$LEGACY_CONFIG_FILE" ]; then
+        echo "$LEGACY_CONFIG_FILE"
+        return 0
+    fi
+    echo "$CONFIG_FILE"
+    return 0
+}
+
 # 检查配置中是否启用该类型的反思
 check_reflection_enabled() {
     local reflection_type="$1"
+    local config_file
+    config_file=$(resolve_config_file)
 
-    if [ ! -f "$CONFIG_FILE" ]; then
+    if [ ! -f "$config_file" ]; then
         log_warn "配置文件不存在，默认启用所有反思"
         return 0
     fi
@@ -45,7 +61,7 @@ check_reflection_enabled() {
         return 0
     fi
 
-    local enabled=$(cat "$CONFIG_FILE" | jq -r ".reflections.$reflection_type" 2>/dev/null || echo "true")
+    local enabled=$(cat "$config_file" | jq -r ".reflections.$reflection_type" 2>/dev/null || echo "true")
 
     if [ "$enabled" = "false" ]; then
         log_info "$reflection_type 反思已在配置中禁用，跳过"

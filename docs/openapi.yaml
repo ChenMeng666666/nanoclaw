@@ -816,6 +816,9 @@ paths:
               required: [agentFolder]
               properties:
                 agentFolder: { type: string }
+                chatJid: { type: string }
+                dailyPlanTime: { type: string, pattern: '^([01]\d|2[0-3]):([0-5]\d)$' }
+                dailySummaryTime: { type: string, pattern: '^([01]\d|2[0-3]):([0-5]\d)$' }
       responses:
         '200':
           description: Started
@@ -825,6 +828,15 @@ paths:
                 type: object
                 properties:
                   status: { type: string }
+                  desiredState: { type: string, enum: [running, stopped] }
+                  observedState: { type: string, enum: [running, stopped] }
+                  tasks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type: { type: string, enum: [daily_plan, daily_summary] }
+                        taskId: { type: string }
 
   /api/learning/automation/stop:
     post:
@@ -848,6 +860,15 @@ paths:
                 type: object
                 properties:
                   status: { type: string }
+                  desiredState: { type: string, enum: [running, stopped] }
+                  observedState: { type: string, enum: [running, stopped] }
+                  tasks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type: { type: string, enum: [daily_plan, daily_summary] }
+                        taskId: { type: string }
 
   /api/learning/automation/status:
     get:
@@ -869,6 +890,22 @@ paths:
                   status:
                     type: string
                     enum: [running, stopped]
+                  desiredState:
+                    type: string
+                    enum: [running, stopped]
+                  observedState:
+                    type: string
+                    enum: [running, stopped]
+                  tasks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type: { type: string, enum: [daily_plan, daily_summary] }
+                        taskId: { type: string, nullable: true }
+                        status: { type: string }
+                        nextRun: { type: string, nullable: true }
+                        lastRun: { type: string, nullable: true }
 
   /api/learning/reflection/generate:
     post:
@@ -1037,7 +1074,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [agentFolder, taskId]
+              required: [agentFolder]
               properties:
                 agentFolder: { type: string }
                 taskId: { type: string }
@@ -1056,6 +1093,7 @@ paths:
                   taskId: { type: string }
                   status: { type: string }
                   reflection: { type: string, nullable: true }
+                  timeSpent: { type: number, nullable: true }
 
   /api/learning/task/start:
     post:
@@ -1067,10 +1105,11 @@ paths:
           application/json:
             schema:
               type: object
-              required: [agentFolder, taskId]
+              required: [agentFolder]
               properties:
                 agentFolder: { type: string }
                 taskId: { type: string }
+                id: { type: string }
                 phaseName: { type: string }
       responses:
         '200':

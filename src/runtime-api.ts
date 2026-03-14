@@ -18,7 +18,6 @@
  */
 import http from 'http';
 import net from 'net';
-import { exec } from 'child_process';
 import { URL } from 'url';
 
 import { memoryManager } from './memory-manager.js';
@@ -39,7 +38,7 @@ import {
   getLearningResultsByAgent,
   getRecentLearningResults,
 } from './db-agents.js';
-import { getAllTasks, getTasksForGroup } from './db.js';
+import { getAllTasks, getTasksForGroup, updateTask } from './db.js';
 import { logger } from './logger.js';
 import { safeJsonParse } from './security.js';
 import {
@@ -68,6 +67,10 @@ const DEFAULT_OPTIONS: RuntimeAPIOptions = {
 };
 
 const learningAutomationState = new Set<string>();
+const LEARNING_AUTOMATION_DAILY_PLAN_PROMPT =
+  '[learning-automation:daily-plan] 触发每日学习计划';
+const LEARNING_AUTOMATION_DAILY_SUMMARY_PROMPT =
+  '[learning-automation:daily-summary] 触发每日学习总结';
 let learningNeedsLlmProvider: LocalLLMQueryExpansionProvider | null = null;
 let learningNeedsLlmInitPromise: Promise<void> | null = null;
 const MEMORY_LEVELS = new Set(['L1', 'L2', 'L3']);
@@ -617,7 +620,7 @@ export async function startRuntimeAPI(
         req.method === 'POST'
       ) {
         const body = await readJSON(req);
-        const { agentFolder, learningNeeds, scheduleConfig } = body;
+        const { agentFolder, learningNeeds } = body;
 
         if (!agentFolder || !learningNeeds) {
           writeJSON(res, 400, { error: 'Missing required fields' });
@@ -701,15 +704,52 @@ export async function startRuntimeAPI(
 
       if (path === '/api/learning/automation/start' && req.method === 'POST') {
         const body = await readJSON(req);
-        const { agentFolder } = body;
+        const { agentFolder, chatJid, dailyPlanTime, dailySummaryTime } = body;
 
         if (!agentFolder) {
           writeJSON(res, 400, { error: 'Missing agentFolder' });
           return;
         }
 
-        learningAutomationState.add(String(agentFolder));
-        writeJSON(res, 200, { status: 'started' });
+        const agentFolderStr = String(agentFolder);
+        const existingTasks = getLearningAutomationTasks(agentFolderStr);
+        const dailyPlanSchedule = resolveLearningSchedulePreference(
+          parseFixedTimePreference(dailyPlanTime, '08:00'),
+          new Date(),
+        );
+        const dailySummarySchedule = resolveLearningSchedulePreference(
+          parseFixedTimePreference(dailySummaryTime, '23:00'),
+          new Date(),
+        );
+
+        const dailyPlanTaskId = upsertLearningAutomationTask({
+          agentFolder: agentFolderStr,
+          chatJid: typeof chatJid === 'string' ? chatJid : '',
+          prompt: LEARNING_AUTOMATION_DAILY_PLAN_PROMPT,
+          scheduleType: dailyPlanSchedule.scheduleType,
+          scheduleValue: dailyPlanSchedule.scheduleValue,
+          nextRun: dailyPlanSchedule.nextRun,
+          existingTask: existingTasks.dailyPlan,
+        });
+        const dailySummaryTaskId = upsertLearningAutomationTask({
+          agentFolder: agentFolderStr,
+          chatJid: typeof chatJid === 'string' ? chatJid : '',
+          prompt: LEARNING_AUTOMATION_DAILY_SUMMARY_PROMPT,
+          scheduleType: dailySummarySchedule.scheduleType,
+          scheduleValue: dailySummarySchedule.scheduleValue,
+          nextRun: dailySummarySchedule.nextRun,
+          existingTask: existingTasks.dailySummary,
+        });
+        learningAutomationState.add(agentFolderStr);
+        writeJSON(res, 200, {
+          status: 'started',
+          desiredState: 'running',
+          observedState: 'running',
+          tasks: [
+            { type: 'daily_plan', taskId: dailyPlanTaskId },
+            { type: 'daily_summary', taskId: dailySummaryTaskId },
+          ],
+        });
         return;
       }
 
@@ -722,8 +762,28 @@ export async function startRuntimeAPI(
           return;
         }
 
-        learningAutomationState.delete(String(agentFolder));
-        writeJSON(res, 200, { status: 'stopped' });
+        const agentFolderStr = String(agentFolder);
+        const tasks = getLearningAutomationTasks(agentFolderStr);
+        if (tasks.dailyPlan) {
+          updateTask(tasks.dailyPlan.id, { status: 'paused' });
+        }
+        if (tasks.dailySummary) {
+          updateTask(tasks.dailySummary.id, { status: 'paused' });
+        }
+        learningAutomationState.delete(agentFolderStr);
+        writeJSON(res, 200, {
+          status: 'stopped',
+          desiredState: 'stopped',
+          observedState: 'stopped',
+          tasks: [
+            tasks.dailyPlan
+              ? { type: 'daily_plan', taskId: tasks.dailyPlan.id }
+              : null,
+            tasks.dailySummary
+              ? { type: 'daily_summary', taskId: tasks.dailySummary.id }
+              : null,
+          ].filter(Boolean),
+        });
         return;
       }
 
@@ -735,10 +795,35 @@ export async function startRuntimeAPI(
           return;
         }
 
-        writeJSON(res, 200, {
-          status: learningAutomationState.has(agentFolder)
+        const tasks = getLearningAutomationTasks(agentFolder);
+        const observedState =
+          tasks.dailyPlan?.status === 'active' &&
+          tasks.dailySummary?.status === 'active'
             ? 'running'
-            : 'stopped',
+            : 'stopped';
+        const desiredState = learningAutomationState.has(agentFolder)
+          ? 'running'
+          : 'stopped';
+        writeJSON(res, 200, {
+          status: observedState,
+          desiredState,
+          observedState,
+          tasks: [
+            {
+              type: 'daily_plan',
+              taskId: tasks.dailyPlan?.id || null,
+              status: tasks.dailyPlan?.status || 'missing',
+              nextRun: tasks.dailyPlan?.next_run || null,
+              lastRun: tasks.dailyPlan?.last_run || null,
+            },
+            {
+              type: 'daily_summary',
+              taskId: tasks.dailySummary?.id || null,
+              status: tasks.dailySummary?.status || 'missing',
+              nextRun: tasks.dailySummary?.next_run || null,
+              lastRun: tasks.dailySummary?.last_run || null,
+            },
+          ],
         });
         return;
       }
@@ -917,15 +1002,34 @@ export async function startRuntimeAPI(
 
       if (path === '/api/learning/task/complete' && req.method === 'POST') {
         const body = await readJSON(req);
-        const { agentFolder, taskId, phaseName, reflection, timeSpent } = body;
+        const { agentFolder, taskId, id, phaseName, reflection, timeSpent } =
+          body;
+        const resolvedTaskId =
+          typeof taskId === 'string' && taskId.trim()
+            ? taskId.trim()
+            : typeof id === 'string' && id.trim()
+              ? id.trim()
+              : '';
 
-        if (!agentFolder || !taskId) {
+        if (!agentFolder || !resolvedTaskId) {
           writeJSON(res, 400, { error: 'Missing required fields' });
           return;
         }
 
+        const task = getLearningTask(resolvedTaskId);
+        if (!task) {
+          writeJSON(res, 404, { error: 'Learning task not found' });
+          return;
+        }
+        if (task.agentFolder !== String(agentFolder)) {
+          writeJSON(res, 409, {
+            error: 'Learning task does not belong to agentFolder',
+          });
+          return;
+        }
+
         // 触发完整的学习任务完成流程（包括反思和进化提交）
-        await reflectionScheduler.completeLearningTask(taskId as string);
+        await reflectionScheduler.completeLearningTask(resolvedTaskId);
 
         // 将反思内容存储到记忆系统
         if (reflection) {
@@ -943,9 +1047,13 @@ export async function startRuntimeAPI(
         }
 
         writeJSON(res, 200, {
-          taskId,
+          taskId: resolvedTaskId,
           status: 'completed',
           reflection: reflection || null,
+          timeSpent:
+            typeof timeSpent === 'number' && Number.isFinite(timeSpent)
+              ? timeSpent
+              : null,
         });
         return;
       }
@@ -2104,6 +2212,84 @@ function resolveLearningModelDecision(
     degraded: true,
     degradeReason: 'sdk_unavailable',
   };
+}
+
+function parseFixedTimePreference(
+  value: unknown,
+  fallback: string,
+): { mode: 'fixed_time'; fixedTime: string } {
+  if (typeof value === 'string' && /^([01]\d|2[0-3]):([0-5]\d)$/.test(value)) {
+    return {
+      mode: 'fixed_time',
+      fixedTime: value,
+    };
+  }
+  return {
+    mode: 'fixed_time',
+    fixedTime: fallback,
+  };
+}
+
+function getLearningAutomationTasks(agentFolder: string): {
+  dailyPlan?: {
+    id: string;
+    status: 'active' | 'paused' | 'completed';
+    next_run: string | null;
+    last_run: string | null;
+  };
+  dailySummary?: {
+    id: string;
+    status: 'active' | 'paused' | 'completed';
+    next_run: string | null;
+    last_run: string | null;
+  };
+} {
+  const tasks = getTasksForGroup(agentFolder) as Array<{
+    id: string;
+    prompt: string;
+    status: 'active' | 'paused' | 'completed';
+    next_run: string | null;
+    last_run: string | null;
+  }>;
+  return {
+    dailyPlan: tasks.find(
+      (task) => task.prompt === LEARNING_AUTOMATION_DAILY_PLAN_PROMPT,
+    ),
+    dailySummary: tasks.find(
+      (task) => task.prompt === LEARNING_AUTOMATION_DAILY_SUMMARY_PROMPT,
+    ),
+  };
+}
+
+function upsertLearningAutomationTask(input: {
+  agentFolder: string;
+  chatJid: string;
+  prompt: string;
+  scheduleType: 'cron' | 'interval' | 'once';
+  scheduleValue: string;
+  nextRun: string;
+  existingTask?: {
+    id: string;
+    status: 'active' | 'paused' | 'completed';
+  };
+}): string {
+  if (input.existingTask) {
+    updateTask(input.existingTask.id, {
+      status: 'active',
+      schedule_type: input.scheduleType,
+      schedule_value: input.scheduleValue,
+      next_run: input.nextRun,
+    });
+    return input.existingTask.id;
+  }
+  return createScheduledTaskForLearning(
+    input.agentFolder,
+    input.chatJid,
+    input.prompt,
+    input.scheduleType,
+    input.scheduleValue,
+    input.nextRun,
+  );
 }
 
 function resolveLearningSchedulePreference(

@@ -167,6 +167,52 @@ describe('learning p1 contracts', () => {
     expect(mismatchBody.error).toContain('does not belong');
   });
 
+  it('rejects complete when task does not exist or agentFolder mismatches', async () => {
+    const missingResp = await fetch(`${baseUrl}/api/learning/task/complete`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': 'test-key',
+      },
+      body: JSON.stringify({
+        agentFolder: 'agent-learning-p1',
+        taskId: 'missing-task-id',
+      }),
+    });
+    const missingBody = (await missingResp.json()) as { error?: string };
+
+    const createResp = await fetch(`${baseUrl}/api/learning/task/create`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': 'test-key',
+      },
+      body: JSON.stringify({
+        agentFolder: 'agent-learning-p1',
+        description: '跨agent完成校验',
+      }),
+    });
+    const created = (await createResp.json()) as { id: string };
+
+    const mismatchResp = await fetch(`${baseUrl}/api/learning/task/complete`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': 'test-key',
+      },
+      body: JSON.stringify({
+        agentFolder: 'agent-learning-p1-2',
+        taskId: created.id,
+      }),
+    });
+    const mismatchBody = (await mismatchResp.json()) as { error?: string };
+
+    expect(missingResp.status).toBe(404);
+    expect(missingBody.error).toContain('not found');
+    expect(mismatchResp.status).toBe(409);
+    expect(mismatchBody.error).toContain('does not belong');
+  });
+
   it('creates standardized plan outputs for schedule and phase task alignment', async () => {
     const response = await fetch(`${baseUrl}/api/learning/plan/create`, {
       method: 'POST',

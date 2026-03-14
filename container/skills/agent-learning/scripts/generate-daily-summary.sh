@@ -8,7 +8,8 @@ set -e
 
 LEARNING_DIR="/workspace/group/.learning-system"
 LOG_FILE="$LEARNING_DIR/logs/daily-summary-$(date +%Y%m%d).log"
-CONFIG_FILE="$LEARNING_DIR/config/automation.json"
+CONFIG_FILE="$LEARNING_DIR/config/learning-automation.json"
+LEGACY_CONFIG_FILE="$LEARNING_DIR/config/automation.json"
 
 # 颜色输出
 RED='\033[0;31m'
@@ -31,9 +32,24 @@ log_error() {
     echo -e "${RED}[Daily Summary]${NC} $(date +"%Y-%m-%d %H:%M:%S") - $msg" | tee -a "$LOG_FILE"
 }
 
+resolve_config_file() {
+    if [ -f "$CONFIG_FILE" ]; then
+        echo "$CONFIG_FILE"
+        return 0
+    fi
+    if [ -f "$LEGACY_CONFIG_FILE" ]; then
+        echo "$LEGACY_CONFIG_FILE"
+        return 0
+    fi
+    echo "$CONFIG_FILE"
+    return 0
+}
+
 # 检查配置
 check_config() {
-    if [ ! -f "$CONFIG_FILE" ]; then
+    local config_file
+    config_file=$(resolve_config_file)
+    if [ ! -f "$config_file" ]; then
         log_warn "配置文件不存在，使用默认配置"
         return 0
     fi
@@ -43,7 +59,7 @@ check_config() {
         return 0
     fi
 
-    local enabled=$(cat "$CONFIG_FILE" | jq -r '.enabled' 2>/dev/null || echo "true")
+    local enabled=$(cat "$config_file" | jq -r '.enabled' 2>/dev/null || echo "true")
     if [ "$enabled" = "false" ]; then
         log_warn "学习自动化已禁用，跳过每日总结"
         return 1
@@ -242,12 +258,14 @@ EOF
 # 发送通知（如果启用）
 send_notification() {
     local summary="$1"
+    local config_file
+    config_file=$(resolve_config_file)
 
-    if [ ! -f "$CONFIG_FILE" ] || ! command -v jq &> /dev/null; then
+    if [ ! -f "$config_file" ] || ! command -v jq &> /dev/null; then
         return 0
     fi
 
-    local notifications_enabled=$(cat "$CONFIG_FILE" | jq -r '.notifications.enabled' 2>/dev/null || echo "false")
+    local notifications_enabled=$(cat "$config_file" | jq -r '.notifications.enabled' 2>/dev/null || echo "false")
 
     if [ "$notifications_enabled" = "false" ]; then
         return 0
@@ -255,8 +273,8 @@ send_notification() {
 
     log_info "准备发送每日总结通知..."
 
-    local channel=$(cat "$CONFIG_FILE" | jq -r '.notifications.channel' 2>/dev/null || echo "")
-    local userId=$(cat "$CONFIG_FILE" | jq -r '.notifications.userId' 2>/dev/null || echo "")
+    local channel=$(cat "$config_file" | jq -r '.notifications.channel' 2>/dev/null || echo "")
+    local userId=$(cat "$config_file" | jq -r '.notifications.userId' 2>/dev/null || echo "")
 
     if [ -z "$channel" ] || [ -z "$userId" ]; then
         log_warn "通知配置不完整，跳过通知"

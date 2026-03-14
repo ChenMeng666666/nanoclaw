@@ -11,7 +11,8 @@
 set -e
 
 LEARNING_DIR="/workspace/group/.learning-system"
-CONFIG_FILE="$LEARNING_DIR/config/automation.json"
+CONFIG_FILE="$LEARNING_DIR/config/learning-automation.json"
+LEGACY_CONFIG_FILE="$LEARNING_DIR/config/automation.json"
 CRON_FILE="$LEARNING_DIR/cron/learning-crontab"
 RUNNING_MARKER="$LEARNING_DIR/status/automation-running"
 
@@ -33,15 +34,31 @@ log_error() {
     echo -e "${RED}[Learning Automation]${NC} $1"
 }
 
+resolve_config_file() {
+    if [ -f "$CONFIG_FILE" ]; then
+        echo "$CONFIG_FILE"
+        return 0
+    fi
+    if [ -f "$LEGACY_CONFIG_FILE" ]; then
+        echo "$LEGACY_CONFIG_FILE"
+        return 0
+    fi
+    echo "$CONFIG_FILE"
+    return 0
+}
+
 # 检查配置是否启用学习自动化
 check_config() {
-    if [ ! -f "$CONFIG_FILE" ]; then
+    local config_file
+    config_file=$(resolve_config_file)
+
+    if [ ! -f "$config_file" ]; then
         log_warn "配置文件不存在，将使用默认配置"
         return 0
     fi
 
     if command -v jq &> /dev/null; then
-        local enabled=$(cat "$CONFIG_FILE" | jq -r '.enabled' 2>/dev/null || echo "true")
+        local enabled=$(cat "$config_file" | jq -r '.enabled' 2>/dev/null || echo "true")
         if [ "$enabled" = "false" ]; then
             log_warn "学习自动化已在配置中禁用"
             return 1
@@ -56,10 +73,12 @@ create_cron_tasks() {
     # 读取配置文件获取时间设置
     local daily_plan_time="08:00"
     local daily_summary_time="23:00"
+    local config_file
+    config_file=$(resolve_config_file)
 
-    if [ -f "$CONFIG_FILE" ] && command -v jq &> /dev/null; then
-        daily_plan_time=$(cat "$CONFIG_FILE" | jq -r '.dailyPlanTime' 2>/dev/null || echo "08:00")
-        daily_summary_time=$(cat "$CONFIG_FILE" | jq -r '.dailySummaryTime' 2>/dev/null || echo "23:00")
+    if [ -f "$config_file" ] && command -v jq &> /dev/null; then
+        daily_plan_time=$(cat "$config_file" | jq -r '.dailyPlanTime' 2>/dev/null || echo "08:00")
+        daily_summary_time=$(cat "$config_file" | jq -r '.dailySummaryTime' 2>/dev/null || echo "23:00")
     fi
 
     # 解析时间格式 (HH:MM)
@@ -76,21 +95,6 @@ ${plan_min} ${plan_hour} * * * bash $LEARNING_DIR/scripts/trigger-daily-plan.sh
 
 # 每日学习总结
 ${summary_min} ${summary_hour} * * * bash $LEARNING_DIR/scripts/generate-daily-summary.sh
-
-# 每小时反思
-0 * * * * bash $LEARNING_DIR/scripts/trigger-reflection.sh hourly
-
-# 每日反思
-0 ${summary_hour} * * * bash $LEARNING_DIR/scripts/trigger-reflection.sh daily
-
-# 每周反思 (周日)
-0 ${summary_hour} * * 0 bash $LEARNING_DIR/scripts/trigger-reflection.sh weekly
-
-# 每月反思 (1号)
-0 ${summary_hour} 1 * * bash $LEARNING_DIR/scripts/trigger-reflection.sh monthly
-
-# 每年反思 (1月1号)
-0 ${summary_hour} 1 1 * bash $LEARNING_DIR/scripts/trigger-reflection.sh yearly
 EOF
 
     log_info "已创建 cron 配置文件：$CRON_FILE"
@@ -211,11 +215,11 @@ show_help() {
 功能:
   - 自动管理学习定时任务 (cron)
   - 每日学习计划生成和执行
-  - 自动反思调度
   - 每日学习总结
 
 配置文件:
-  $LEARNING_DIR/config/automation.json
+  $LEARNING_DIR/config/learning-automation.json
+  $LEARNING_DIR/config/automation.json (兼容旧路径)
 EOF
 }
 

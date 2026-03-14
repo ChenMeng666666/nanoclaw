@@ -33,18 +33,30 @@ log_error() {
     echo -e "${RED}[Daily Plan]${NC} $(date +"%Y-%m-%d %H:%M:%S") - $msg" | tee -a "$LOG_FILE"
 }
 
+resolve_config_file() {
+    if [ -f "$CONFIG_FILE" ]; then
+        echo "$CONFIG_FILE"
+        return 0
+    fi
+    if [ -f "$LEGACY_CONFIG_FILE" ]; then
+        echo "$LEGACY_CONFIG_FILE"
+        return 0
+    fi
+    echo "$CONFIG_FILE"
+    return 0
+}
+
 # 检查配置
 check_config() {
-    if [ ! -f "$CONFIG_FILE" ] && [ -f "$LEGACY_CONFIG_FILE" ]; then
-        CONFIG_FILE="$LEGACY_CONFIG_FILE"
-    fi
-    if [ ! -f "$CONFIG_FILE" ]; then
+    local config_file
+    config_file=$(resolve_config_file)
+    if [ ! -f "$config_file" ]; then
         log_warn "配置文件不存在，使用默认配置"
         return 0
     fi
 
     if command -v jq &> /dev/null; then
-        local enabled=$(cat "$CONFIG_FILE" | jq -r '.enabled' 2>/dev/null || echo "true")
+        local enabled=$(cat "$config_file" | jq -r '.enabled' 2>/dev/null || echo "true")
         if [ "$enabled" = "false" ]; then
             log_warn "学习自动化已禁用，跳过每日计划"
             return 1
@@ -163,14 +175,14 @@ generate_plan() {
 
 # 执行学习任务
 execute_plan() {
-    local plan="$1"
+    local agentFolder="$1"
+    local plan="$2"
     local API_URL="${RUNTIME_API_URL:-http://host.docker.internal:3456}"
     local auth_args=()
     if [ -n "${RUNTIME_API_KEY:-}" ]; then
         auth_args=(-H "X-API-Key: $RUNTIME_API_KEY")
     fi
 
-    local tasks=$(echo "$plan" | jq -r '.tasks[]')
     local task_count=$(echo "$plan" | jq -r '.tasks | length' 2>/dev/null || echo "0")
 
     if [ "$task_count" -eq 0 ]; then
@@ -183,10 +195,31 @@ execute_plan() {
     # 遍历任务并执行
     for i in $(seq 0 $((task_count - 1))); do
         local task=$(echo "$plan" | jq -r ".tasks[$i]")
-        local taskId=$(echo "$task" | jq -r '.id')
+        local plannedTaskId=$(echo "$task" | jq -r '.id')
         local task_label=$(echo "$task" | jq -r '.description // .topic // .id // "未命名任务"')
+        local task_resources=$(echo "$task" | jq -c '.resources // []')
 
-        log_info "执行任务 $((i + 1))/$task_count: $task_label"
+        log_info "执行任务 $((i + 1))/$task_count: $task_label (planTaskId=$plannedTaskId)"
+
+        local create_payload=$(jq -n \
+            --arg agentFolder "$agentFolder" \
+            --arg description "$task_label" \
+            --argjson resources "$task_resources" \
+            '{agentFolder: $agentFolder, description: $description, resources: $resources}')
+        local create_response=$(curl -s -X POST "$API_URL/api/learning/task/create" \
+            -H "Content-Type: application/json" \
+            "${auth_args[@]}" \
+            -d "$create_payload" 2>/dev/null)
+        local create_error=$(echo "$create_response" | jq -r '.error // empty' 2>/dev/null || echo "")
+        if [ -n "$create_error" ]; then
+            log_error "任务 $task_label 创建失败：$create_error"
+            continue
+        fi
+        local taskId=$(echo "$create_response" | jq -r '.id // empty' 2>/dev/null || echo "")
+        if [ -z "$taskId" ]; then
+            log_error "任务 $task_label 创建失败：未返回 taskId"
+            continue
+        fi
 
         # 调用 API 执行任务
         local start_payload=$(jq -n \
@@ -198,12 +231,29 @@ execute_plan() {
             -H "Content-Type: application/json" \
             "${auth_args[@]}" \
             -d "$start_payload" 2>/dev/null)
-
-        if [ $? -eq 0 ]; then
-            log_info "任务 $task_label 开始执行"
-        else
-            log_error "任务 $task_label 执行失败"
+        local start_error=$(echo "$exec_response" | jq -r '.error // empty' 2>/dev/null || echo "")
+        if [ -n "$start_error" ]; then
+            log_error "任务 $task_label 开始失败：$start_error"
+            continue
         fi
+
+        log_info "任务 $task_label 开始执行"
+
+        local complete_payload=$(jq -n \
+            --arg agentFolder "$agentFolder" \
+            --arg taskId "$taskId" \
+            --arg phaseName "$task_label" \
+            '{agentFolder: $agentFolder, taskId: $taskId, phaseName: $phaseName}')
+        local complete_response=$(curl -s -X POST "$API_URL/api/learning/task/complete" \
+            -H "Content-Type: application/json" \
+            "${auth_args[@]}" \
+            -d "$complete_payload" 2>/dev/null)
+        local complete_error=$(echo "$complete_response" | jq -r '.error // empty' 2>/dev/null || echo "")
+        if [ -n "$complete_error" ]; then
+            log_error "任务 $task_label 完成失败：$complete_error"
+            continue
+        fi
+        log_info "任务 $task_label 已完成"
     done
 
     return 0
@@ -243,7 +293,7 @@ main() {
     log_info "学习计划已保存到：$plan_file"
 
     # 执行学习任务
-    execute_plan "$daily_plan"
+    execute_plan "$agentFolder" "$daily_plan"
 
     # 更新最后执行时间
     date -Iseconds > "$STATUS_FILE"

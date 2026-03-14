@@ -32,11 +32,11 @@ describe('reflection scheduler lifecycle', () => {
     const scheduler = new ReflectionScheduler();
 
     scheduler.start();
-    expect(scheduleMock).toHaveBeenCalledTimes(6);
+    expect(scheduleMock).toHaveBeenCalledTimes(7);
 
     scheduler.stop();
-    expect(stopSpies).toHaveLength(6);
-    expect(destroySpies).toHaveLength(6);
+    expect(stopSpies).toHaveLength(7);
+    expect(destroySpies).toHaveLength(7);
     for (const stop of stopSpies) {
       expect(stop).toHaveBeenCalledTimes(1);
     }
@@ -51,7 +51,7 @@ describe('reflection scheduler lifecycle', () => {
     scheduler.start();
     scheduler.start();
 
-    expect(scheduleMock).toHaveBeenCalledTimes(6);
+    expect(scheduleMock).toHaveBeenCalledTimes(7);
     scheduler.stop();
   });
 });

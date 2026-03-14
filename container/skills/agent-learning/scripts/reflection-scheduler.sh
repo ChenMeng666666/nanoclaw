@@ -8,7 +8,9 @@ set -e
 
 LEARNING_DIR="/workspace/group/.learning-system"
 CRON_FILE="$LEARNING_DIR/cron/learning-crontab"
-CONFIG_FILE="$LEARNING_DIR/config/automation.json"
+CONFIG_FILE="$LEARNING_DIR/config/learning-automation.json"
+LEGACY_CONFIG_FILE="$LEARNING_DIR/config/automation.json"
+SCHEDULER_MODE="${REFLECTION_SCHEDULER_MODE:-runtime}"
 
 # 颜色输出
 RED='\033[0;31m'
@@ -28,12 +30,27 @@ log_error() {
     echo -e "${RED}[Reflection Scheduler]${NC} $1"
 }
 
+resolve_config_file() {
+    if [ -f "$CONFIG_FILE" ]; then
+        echo "$CONFIG_FILE"
+        return 0
+    fi
+    if [ -f "$LEGACY_CONFIG_FILE" ]; then
+        echo "$LEGACY_CONFIG_FILE"
+        return 0
+    fi
+    echo "$CONFIG_FILE"
+    return 0
+}
+
 # 读取配置文件中的时间设置
 read_config() {
     local daily_summary_time="23:00"
+    local config_file
+    config_file=$(resolve_config_file)
 
-    if [ -f "$CONFIG_FILE" ] && command -v jq &> /dev/null; then
-        daily_summary_time=$(cat "$CONFIG_FILE" | jq -r '.dailySummaryTime' 2>/dev/null || echo "23:00")
+    if [ -f "$config_file" ] && command -v jq &> /dev/null; then
+        daily_summary_time=$(cat "$config_file" | jq -r '.dailySummaryTime' 2>/dev/null || echo "23:00")
     fi
 
     echo "$daily_summary_time"
@@ -41,6 +58,14 @@ read_config() {
 
 # 生成 cron 配置
 generate_cron_config() {
+    if [ "$SCHEDULER_MODE" = "runtime" ]; then
+        cat > "$CRON_FILE" <<EOF
+# 反思调度已交由主进程 ReflectionScheduler 管理（SSOT）
+EOF
+        log_info "已切换为 runtime 单轨反思调度（主进程负责）"
+        return 0
+    fi
+
     local daily_summary_time=$(read_config)
     local summary_hour=$(echo "$daily_summary_time" | cut -d':' -f1)
     local summary_min=$(echo "$daily_summary_time" | cut -d':' -f2)
@@ -68,6 +93,10 @@ EOF
 
 # 加载 cron 任务
 load_cron() {
+    if [ "$SCHEDULER_MODE" = "runtime" ]; then
+        log_info "当前为 runtime 单轨模式，跳过容器内反思 cron 加载"
+        return 0
+    fi
     if [ ! -f "$CRON_FILE" ]; then
         generate_cron_config
     fi
@@ -117,6 +146,10 @@ show_cron() {
 
 # 检查状态
 check_status() {
+    if [ "$SCHEDULER_MODE" = "runtime" ]; then
+        log_info "当前为 runtime 单轨模式，反思调度由主进程负责"
+        return 0
+    fi
     local current_crontab=$(crontab -l 2>/dev/null || echo "")
     local has_reflection_cron=$(grep -F "$LEARNING_DIR/scripts/trigger-reflection.sh" <<<"$current_crontab")
 
@@ -147,9 +180,11 @@ show_help() {
   - 管理反思定时任务 (cron)
   - 支持多种频率：hourly/daily/weekly/monthly/yearly
   - 从配置文件读取时间设置
+  - 默认由主进程 ReflectionScheduler 统一调度
 
 配置文件:
-  $CONFIG_FILE
+  $LEARNING_DIR/config/learning-automation.json
+  $LEARNING_DIR/config/automation.json (兼容旧路径)
 EOF
 }
 
