@@ -427,6 +427,38 @@ export interface LearningTask {
   completedAt?: string;
 }
 
+export interface LearningSchedulePreference {
+  mode: 'fixed_time' | 'interval' | 'cron';
+  fixedTime?: string;
+  intervalMinutes?: number;
+  cron?: string;
+  timezone?: string;
+}
+
+export interface LearningModelDecision {
+  stage: 'analyze-needs' | 'reflection-generate';
+  primary: 'sdk' | 'local' | 'rules';
+  selected: 'sdk' | 'local' | 'rules';
+  degraded: boolean;
+  degradeReason?: string;
+}
+
+export interface LearningIntentOrchestrationResult {
+  topic: string;
+  reflectionPlan: {
+    reused: boolean;
+    taskId: string;
+    scheduleType: 'cron' | 'interval' | 'once';
+    scheduleValue: string;
+  };
+  learningTaskId: string;
+  scheduleTaskId: string;
+  scheduleType: 'cron' | 'interval' | 'once';
+  scheduleValue: string;
+  nextRun: string;
+  modelDecisions: LearningModelDecision[];
+}
+
 /**
  * 详细反思（扩展现有 Reflection 类型）
  */

@@ -8,7 +8,8 @@ set -e
 
 LEARNING_DIR="/workspace/group/.learning-system"
 LOG_FILE="$LEARNING_DIR/logs/daily-plan-$(date +%Y%m%d).log"
-CONFIG_FILE="$LEARNING_DIR/config/automation.json"
+CONFIG_FILE="$LEARNING_DIR/config/learning-automation.json"
+LEGACY_CONFIG_FILE="$LEARNING_DIR/config/automation.json"
 STATUS_FILE="$LEARNING_DIR/status/last-daily-plan"
 
 # 颜色输出
@@ -34,6 +35,9 @@ log_error() {
 
 # 检查配置
 check_config() {
+    if [ ! -f "$CONFIG_FILE" ] && [ -f "$LEGACY_CONFIG_FILE" ]; then
+        CONFIG_FILE="$LEGACY_CONFIG_FILE"
+    fi
     if [ ! -f "$CONFIG_FILE" ]; then
         log_warn "配置文件不存在，使用默认配置"
         return 0
@@ -124,8 +128,12 @@ generate_plan() {
     log_info "生成当日学习计划..."
 
     local schedule_config=""
-    if [ -f "$LEARNING_DIR/config/schedule.json" ]; then
-        schedule_config=$(cat "$LEARNING_DIR/config/schedule.json")
+    local schedule_file="$LEARNING_DIR/config/skill-learning-schedule.json"
+    if [ ! -f "$schedule_file" ] && [ -f "$LEARNING_DIR/config/schedule.json" ]; then
+        schedule_file="$LEARNING_DIR/config/schedule.json"
+    fi
+    if [ -f "$schedule_file" ]; then
+        schedule_config=$(cat "$schedule_file")
     else
         log_warn "学习时间表配置不存在，使用默认配置"
         schedule_config='{"hourlyRotation":true,"timeSlots":[{"time":"08:00-10:00","focus":"技能学习","types":["technical_skill","soft_skill"],"priority":"high"}]}'
@@ -181,10 +189,15 @@ execute_plan() {
         log_info "执行任务 $((i + 1))/$task_count: $task_label"
 
         # 调用 API 执行任务
+        local start_payload=$(jq -n \
+            --arg agentFolder "$agentFolder" \
+            --arg taskId "$taskId" \
+            --arg phaseName "$task_label" \
+            '{agentFolder: $agentFolder, taskId: $taskId, phaseName: $phaseName}')
         local exec_response=$(curl -s -X POST "$API_URL/api/learning/task/start" \
             -H "Content-Type: application/json" \
             "${auth_args[@]}" \
-            -d "$task" 2>/dev/null)
+            -d "$start_payload" 2>/dev/null)
 
         if [ $? -eq 0 ]; then
             log_info "任务 $task_label 开始执行"

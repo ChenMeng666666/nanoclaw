@@ -53,6 +53,8 @@ import type {
   DailyLearningPlan,
   DetailedReflection,
   DailyLearningSummary,
+  LearningIntentOrchestrationResult,
+  LearningModelDecision,
 } from './types.js';
 
 export interface RuntimeAPIOptions {
@@ -567,8 +569,46 @@ export async function startRuntimeAPI(
         }
 
         const needs = await analyzeLearningNeeds(String(agentFolder));
+        const modelDecision = resolveLearningModelDecision(
+          'analyze-needs',
+          'local',
+        );
 
-        writeJSON(res, 200, { needs });
+        writeJSON(res, 200, { needs, modelDecision });
+        return;
+      }
+
+      if (
+        path === '/api/learning/orchestrate-intent' &&
+        req.method === 'POST'
+      ) {
+        const body = await readJSON(req);
+        const {
+          agentFolder,
+          topic,
+          goal,
+          resources,
+          schedulePreference,
+          chatJid,
+        } = body;
+        if (!agentFolder || !topic) {
+          writeJSON(res, 400, { error: 'Missing required fields' });
+          return;
+        }
+        const result = await orchestrateLearningIntent({
+          agentFolder: String(agentFolder),
+          topic: String(topic),
+          goal: typeof goal === 'string' ? goal : undefined,
+          resources: Array.isArray(resources)
+            ? resources.filter(
+                (item): item is string => typeof item === 'string',
+              )
+            : [],
+          schedulePreference,
+          chatJid: typeof chatJid === 'string' ? chatJid : undefined,
+        });
+
+        writeJSON(res, 200, result);
         return;
       }
 
@@ -796,7 +836,8 @@ export async function startRuntimeAPI(
           phases,
           resources,
           estimatedDuration,
-          chatJid, // 可选，用于创建定时任务
+          chatJid,
+          schedulePreference,
         } = body;
 
         if (!agentFolder || !topic || !goal) {
@@ -804,51 +845,52 @@ export async function startRuntimeAPI(
           return;
         }
 
-        // 创建主学习任务
+        const agentFolderStr = String(agentFolder);
+        const topicStr = String(topic);
+        const goalStr = String(goal);
+        const resolvedSchedule = resolveLearningSchedulePreference(
+          schedulePreference,
+          new Date(),
+        );
         const id = await reflectionScheduler.createLearningTask(
-          agentFolder as string,
-          `${topic}: ${goal}`,
+          agentFolderStr,
+          `${topicStr}: ${goalStr}`,
           resources as string[] | undefined,
         );
 
         // 将计划信息存储到记忆系统（作为 L2 短期记忆）
         await memoryManager.addMemory(
-          agentFolder as string,
-          `学习计划：${topic} - ${goal}，预计${estimatedDuration || '未指定'}，阶段：${JSON.stringify(phases)}`,
+          agentFolderStr,
+          `学习计划：${topicStr} - ${goalStr}，预计${estimatedDuration || '未指定'}，阶段：${JSON.stringify(phases)}`,
           'L2',
           undefined,
         );
 
-        // 为每个阶段创建定时任务（自动调度学习）
         const scheduledTaskIds: string[] = [];
+        const phaseTaskIds: string[] = [];
         if (phases && Array.isArray(phases) && phases.length > 0) {
-          const now = new Date();
-          // 默认每天晚上 8 点执行学习
-          const defaultScheduleTime = '20:00';
-          const [defaultHour, defaultMinute] = defaultScheduleTime
-            .split(':')
-            .map((value) => Number.parseInt(value, 10));
-          const cronValue = `${defaultMinute} ${defaultHour} * * *`;
-
           for (let i = 0; i < phases.length; i++) {
             const phase = phases[i];
             const phaseName = phase.name || `阶段${i + 1}`;
-            // 每个阶段间隔 1 天，从明天开始
-            const phaseDate = new Date(now);
-            phaseDate.setDate(phaseDate.getDate() + i + 1);
-            const nextRun =
-              phaseDate.toISOString().split('T')[0] +
-              'T' +
-              defaultScheduleTime +
-              ':00';
+            const phaseTaskId = await reflectionScheduler.createLearningTask(
+              agentFolderStr,
+              `${topicStr} - ${phaseName}`,
+              resources as string[] | undefined,
+            );
+            phaseTaskIds.push(phaseTaskId);
+            const phaseSchedule = offsetSchedule(
+              resolvedSchedule,
+              i,
+              phases.length,
+            );
 
             const taskId = createScheduledTaskForLearning(
-              agentFolder as string,
+              agentFolderStr,
               (chatJid as string) || '',
-              `学习${topic} - ${phaseName}`,
-              'cron',
-              cronValue,
-              nextRun,
+              `学习${topicStr} - ${phaseName} [taskId:${phaseTaskId}]`,
+              phaseSchedule.scheduleType,
+              phaseSchedule.scheduleValue,
+              phaseSchedule.nextRun,
             );
             scheduledTaskIds.push(taskId);
           }
@@ -859,8 +901,12 @@ export async function startRuntimeAPI(
           topic,
           goal,
           phases,
+          phaseTaskIds,
           status: 'created',
           scheduledTaskIds,
+          scheduleType: resolvedSchedule.scheduleType,
+          scheduleValue: resolvedSchedule.scheduleValue,
+          nextRun: resolvedSchedule.nextRun,
           message:
             scheduledTaskIds.length > 0
               ? `已创建学习计划并自动安排${scheduledTaskIds.length}个定时学习任务`
@@ -906,27 +952,33 @@ export async function startRuntimeAPI(
 
       if (path === '/api/learning/task/start' && req.method === 'POST') {
         const body = await readJSON(req);
-        const { agentFolder, taskId, phaseName } = body;
+        const { agentFolder, taskId, id, phaseName } = body;
+        const resolvedTaskId =
+          typeof taskId === 'string' && taskId.trim()
+            ? taskId.trim()
+            : typeof id === 'string' && id.trim()
+              ? id.trim()
+              : '';
 
-        if (!agentFolder || !taskId) {
+        if (!agentFolder || !resolvedTaskId) {
           writeJSON(res, 400, { error: 'Missing required fields' });
           return;
         }
 
-        updateLearningTask(taskId as string, {
+        updateLearningTask(resolvedTaskId, {
           status: 'in_progress',
         });
 
         // 记录开始学习到记忆系统
         await memoryManager.addMemory(
           agentFolder as string,
-          `开始学习任务：${phaseName || taskId}`,
+          `开始学习任务：${phaseName || resolvedTaskId}`,
           'L1',
           undefined,
         );
 
         writeJSON(res, 200, {
-          taskId,
+          taskId: resolvedTaskId,
           status: 'in_progress',
         });
         return;
@@ -1717,7 +1769,11 @@ export async function analyzeLearningNeeds(
       if (needs.length >= 6) break;
     }
   }
-  const llmNeeds = await analyzeLearningNeedsWithLLM(agentFolder, needs);
+  const modelDecision = resolveLearningModelDecision('analyze-needs', 'local');
+  const llmNeeds =
+    modelDecision.selected === 'local'
+      ? await analyzeLearningNeedsWithLLM(agentFolder, needs)
+      : [];
   for (const need of llmNeeds) {
     pushNeed(need);
   }
@@ -1976,6 +2032,213 @@ async function analyzeLearningNeedsWithLLM(
     logger.warn({ err }, 'Learning-needs LLM analysis failed');
     return [];
   }
+}
+
+function resolveLearningModelDecision(
+  stage: 'analyze-needs' | 'reflection-generate',
+  fallback: 'local' | 'rules',
+): LearningModelDecision {
+  const sdkRequested = process.env.LEARNING_SDK_PREFERRED !== 'false';
+  const sdkAvailable =
+    process.env.LEARNING_SDK_ENABLED === 'true' &&
+    !!process.env.ANTHROPIC_API_KEY;
+  if (!sdkRequested) {
+    return {
+      stage,
+      primary: 'local',
+      selected: fallback,
+      degraded: false,
+    };
+  }
+  if (sdkAvailable) {
+    return {
+      stage,
+      primary: 'sdk',
+      selected: 'sdk',
+      degraded: false,
+    };
+  }
+  return {
+    stage,
+    primary: 'sdk',
+    selected: fallback,
+    degraded: true,
+    degradeReason: 'sdk_unavailable',
+  };
+}
+
+function resolveLearningSchedulePreference(
+  preference: unknown,
+  now: Date = new Date(),
+): {
+  scheduleType: 'cron' | 'interval' | 'once';
+  scheduleValue: string;
+  nextRun: string;
+} {
+  if (preference && typeof preference === 'object') {
+    const raw = preference as Record<string, unknown>;
+    if (raw.mode === 'interval') {
+      const minutes = Number(raw.intervalMinutes);
+      if (Number.isFinite(minutes) && minutes > 0) {
+        const nextRun = new Date(
+          now.getTime() + Math.floor(minutes) * 60 * 1000,
+        );
+        return {
+          scheduleType: 'interval',
+          scheduleValue: `${Math.floor(minutes)}m`,
+          nextRun: nextRun.toISOString(),
+        };
+      }
+    }
+    if (
+      raw.mode === 'cron' &&
+      typeof raw.cron === 'string' &&
+      raw.cron.trim()
+    ) {
+      const nextRun = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      return {
+        scheduleType: 'cron',
+        scheduleValue: raw.cron.trim(),
+        nextRun: nextRun.toISOString(),
+      };
+    }
+    if (
+      raw.mode === 'fixed_time' &&
+      typeof raw.fixedTime === 'string' &&
+      /^([01]\d|2[0-3]):([0-5]\d)$/.test(raw.fixedTime.trim())
+    ) {
+      const [hourStr, minuteStr] = raw.fixedTime.trim().split(':');
+      const hour = Number.parseInt(hourStr, 10);
+      const minute = Number.parseInt(minuteStr, 10);
+      const nextRun = new Date(now);
+      nextRun.setHours(hour, minute, 0, 0);
+      if (nextRun <= now) {
+        nextRun.setDate(nextRun.getDate() + 1);
+      }
+      return {
+        scheduleType: 'cron',
+        scheduleValue: `${minute} ${hour} * * *`,
+        nextRun: nextRun.toISOString(),
+      };
+    }
+  }
+
+  const fallback = new Date(now);
+  fallback.setHours(20, 0, 0, 0);
+  if (fallback <= now) {
+    fallback.setDate(fallback.getDate() + 1);
+  }
+  return {
+    scheduleType: 'cron',
+    scheduleValue: '0 20 * * *',
+    nextRun: fallback.toISOString(),
+  };
+}
+
+function offsetSchedule(
+  base: {
+    scheduleType: 'cron' | 'interval' | 'once';
+    scheduleValue: string;
+    nextRun: string;
+  },
+  index: number,
+  total: number,
+): {
+  scheduleType: 'cron' | 'interval' | 'once';
+  scheduleValue: string;
+  nextRun: string;
+} {
+  if (total <= 1 || index === 0) {
+    return base;
+  }
+  const baseRun = new Date(base.nextRun);
+  if (base.scheduleType === 'interval') {
+    const minutesMatch = /^(\d+)m$/.exec(base.scheduleValue);
+    const minutes = minutesMatch ? Number.parseInt(minutesMatch[1], 10) : 60;
+    return {
+      scheduleType: base.scheduleType,
+      scheduleValue: base.scheduleValue,
+      nextRun: new Date(
+        baseRun.getTime() + index * minutes * 60 * 1000,
+      ).toISOString(),
+    };
+  }
+  return {
+    scheduleType: base.scheduleType,
+    scheduleValue: base.scheduleValue,
+    nextRun: new Date(
+      baseRun.getTime() + index * 24 * 60 * 60 * 1000,
+    ).toISOString(),
+  };
+}
+
+export async function orchestrateLearningIntent(input: {
+  agentFolder: string;
+  topic: string;
+  goal?: string;
+  resources?: string[];
+  schedulePreference?: unknown;
+  chatJid?: string;
+}): Promise<LearningIntentOrchestrationResult> {
+  const schedule = resolveLearningSchedulePreference(input.schedulePreference);
+  const reflectionSchedule = resolveLearningSchedulePreference(
+    { mode: 'fixed_time', fixedTime: '23:00' },
+    new Date(),
+  );
+  const reflectionPrompt = '[reflection:daily] 自动反思计划';
+  const groupTasks = getTasksForGroup(input.agentFolder) as Array<{
+    id: string;
+    prompt: string;
+    schedule_type: 'cron' | 'interval' | 'once';
+    schedule_value: string;
+  }>;
+  const existingReflection = groupTasks.find(
+    (task) => task.prompt === reflectionPrompt,
+  );
+  const reflectionTaskId =
+    existingReflection?.id ||
+    createScheduledTaskForLearning(
+      input.agentFolder,
+      input.chatJid || '',
+      reflectionPrompt,
+      reflectionSchedule.scheduleType,
+      reflectionSchedule.scheduleValue,
+      reflectionSchedule.nextRun,
+    );
+  const learningTaskId = await reflectionScheduler.createLearningTask(
+    input.agentFolder,
+    `${input.topic}: ${input.goal || '持续学习'}`,
+    input.resources,
+  );
+  const scheduleTaskId = createScheduledTaskForLearning(
+    input.agentFolder,
+    input.chatJid || '',
+    `学习${input.topic} [taskId:${learningTaskId}]`,
+    schedule.scheduleType,
+    schedule.scheduleValue,
+    schedule.nextRun,
+  );
+  const modelDecisions: LearningModelDecision[] = [
+    resolveLearningModelDecision('analyze-needs', 'local'),
+    resolveLearningModelDecision('reflection-generate', 'rules'),
+  ];
+  return {
+    topic: input.topic,
+    reflectionPlan: {
+      reused: Boolean(existingReflection),
+      taskId: reflectionTaskId,
+      scheduleType:
+        existingReflection?.schedule_type || reflectionSchedule.scheduleType,
+      scheduleValue:
+        existingReflection?.schedule_value || reflectionSchedule.scheduleValue,
+    },
+    learningTaskId,
+    scheduleTaskId,
+    scheduleType: schedule.scheduleType,
+    scheduleValue: schedule.scheduleValue,
+    nextRun: schedule.nextRun,
+    modelDecisions,
+  };
 }
 
 function readJSON(

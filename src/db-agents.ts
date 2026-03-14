@@ -1324,7 +1324,7 @@ export function createScheduledTaskForLearning(
   scheduleValue: string,
   nextRun: string,
 ): string {
-  const id = `learning_${groupFolder}_${Date.now()}`;
+  const id = `learning_${groupFolder}_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
   const now = new Date().toISOString();
 
   db.prepare(

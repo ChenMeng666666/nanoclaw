@@ -177,7 +177,7 @@ components:
           type: string
         type:
           type: string
-          enum: [hourly, daily, weekly, monthly, task]
+          enum: [hourly, daily, weekly, monthly, yearly, task]
         content:
           type: string
         triggeredBy:
@@ -662,6 +662,57 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/LearningNeed'
+                  modelDecision:
+                    type: object
+                    properties:
+                      stage: { type: string }
+                      primary: { type: string, enum: [sdk, local, rules] }
+                      selected: { type: string, enum: [sdk, local, rules] }
+                      degraded: { type: boolean }
+                      degradeReason: { type: string }
+
+  /api/learning/orchestrate-intent:
+    post:
+      summary: Deterministically orchestrate a learning intent
+      tags: [Learning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentFolder, topic]
+              properties:
+                agentFolder: { type: string }
+                topic: { type: string }
+                goal: { type: string }
+                resources:
+                  type: array
+                  items: { type: string }
+                chatJid: { type: string }
+                schedulePreference:
+                  type: object
+                  properties:
+                    mode:
+                      type: string
+                      enum: [fixed_time, interval, cron]
+                    fixedTime: { type: string, example: '20:30' }
+                    intervalMinutes: { type: number, minimum: 1 }
+                    cron: { type: string }
+      responses:
+        '200':
+          description: Orchestration result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  topic: { type: string }
+                  learningTaskId: { type: string }
+                  scheduleTaskId: { type: string }
+                  scheduleType: { type: string, enum: [cron, interval, once] }
+                  scheduleValue: { type: string }
+                  nextRun: { type: string, format: date-time }
 
   /api/learning/generate-daily-plan:
     post:
@@ -834,7 +885,7 @@ paths:
                 agentFolder: { type: string }
                 type:
                   type: string
-                  enum: [hourly, daily, weekly, monthly, task]
+                  enum: [hourly, daily, weekly, monthly, yearly, task]
       responses:
         '200':
           description: Generated reflection
@@ -944,6 +995,15 @@ paths:
                   items: { type: string }
                 estimatedDuration: { type: string }
                 chatJid: { type: string }
+                schedulePreference:
+                  type: object
+                  properties:
+                    mode:
+                      type: string
+                      enum: [fixed_time, interval, cron]
+                    fixedTime: { type: string, example: '20:30' }
+                    intervalMinutes: { type: number, minimum: 1 }
+                    cron: { type: string }
       responses:
         '200':
           description: Plan created
@@ -956,6 +1016,14 @@ paths:
                   scheduledTaskIds:
                     type: array
                     items: { type: string }
+                  phaseTaskIds:
+                    type: array
+                    items: { type: string }
+                  scheduleType:
+                    type: string
+                    enum: [cron, interval, once]
+                  scheduleValue: { type: string }
+                  nextRun: { type: string, format: date-time }
                   status: { type: string }
                   message: { type: string }
 
@@ -973,6 +1041,7 @@ paths:
               properties:
                 agentFolder: { type: string }
                 taskId: { type: string }
+                id: { type: string }
                 phaseName: { type: string }
                 reflection: { type: string }
                 timeSpent: { type: number }
