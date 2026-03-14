@@ -39,13 +39,13 @@
 ## Phase 2：Persistence 层拆分（数据库解耦）
 
 - [ ] [P0] 将 `src/db.ts` 的 `schema 初始化（L36-L430）` 抽离到 `src/infrastructure/persistence/sqlite/schema.ts`
-- [ ] [P0] 将 `src/db.ts` 的 `JSON 状态迁移（L1266-L1319）` 抽离到 `src/infrastructure/persistence/sqlite/migrations/json-state.ts`
-- [ ] [P0] 将 `src/db.ts` 的 `任务与运行日志访问（L993-L1124）` 抽离到 `src/infrastructure/persistence/repositories/task-repository.ts`
-- [ ] [P0] 将 `src/db.ts` 的 `路由/会话/群组访问（L1128-L1262）` 抽离到 `src/infrastructure/persistence/repositories/routing-repository.ts`
-- [ ] [P0] 将 `src/db.ts` 的 `协作与身份访问（L1567-L2218）` 拆分到 `src/infrastructure/persistence/repositories/bot-identity-repository.ts`、`collaboration-task-repository.ts`、`team-state-repository.ts`
-- [ ] [P0] 将 `src/db.ts` 收敛为 `连接工厂 + 事务门面`，移除跨域查询细节
-- [ ] [P0] 将 `src/db-agents.ts` 的 `事务与句柄管理（L29-L74）` 抽离到 `src/infrastructure/persistence/sqlite/transaction-manager.ts`
-- [ ] [P0] 将 `src/db-agents.ts` 的 `safeJsonParse 映射逻辑（如 L518-L545）` 抽离到 `src/infrastructure/persistence/mappers/*.ts`
+- [x] [P0] 将 `src/db.ts` 的 `JSON 状态迁移（L1266-L1319）` 抽离到 `src/infrastructure/persistence/sqlite/migrations/json-state.ts`
+- [x] [P0] 将 `src/db.ts` 的 `任务与运行日志访问（L993-L1124）` 抽离到 `src/infrastructure/persistence/repositories/task-repository.ts`
+- [x] [P0] 将 `src/db.ts` 的 `路由/会话/群组访问（L1128-L1262）` 抽离到 `src/infrastructure/persistence/repositories/routing-repository.ts`
+- [x] [P0] 将 `src/db.ts` 的 `协作与身份访问（L1567-L2218）` 拆分到 `src/infrastructure/persistence/repositories/bot-identity-repository.ts`、`collaboration-task-repository.ts`、`team-state-repository.ts`
+- [x] [P0] 将 `src/db.ts` 收敛为 `连接工厂 + 事务门面`，移除跨域查询细节
+- [x] [P0] 将 `src/db-agents.ts` 的 `事务与句柄管理（L29-L74）` 抽离到 `src/infrastructure/persistence/sqlite/transaction-manager.ts`
+- [x] [P0] 将 `src/db-agents.ts` 的 `safeJsonParse 映射逻辑（如 L518-L545）` 抽离到 `src/infrastructure/persistence/mappers/*.ts`
 - [ ] [P0] 将 `src/db-agents.ts` 的 `agents/channel/memory/reflection/learning/evolution/audit 访问逻辑（L76-L1968）` 拆分到 `src/infrastructure/persistence/repositories/agent/*.ts`
 
 ---

@@ -16,6 +16,18 @@ import {
 } from './types.js';
 import { readEnvFile } from './env.js';
 import { safeJsonParse } from './security.js';
+import {
+  setDatabase as setPersistenceDatabase,
+  getDatabase as getPersistenceDatabase,
+  beginTransaction as beginSqliteTransaction,
+  commit as commitSqliteTransaction,
+  rollback as rollbackSqliteTransaction,
+  transaction as withSqliteTransaction,
+} from './infrastructure/persistence/sqlite/transaction-manager.js';
+import {
+  mapMemoryRow,
+  type MemoryRow,
+} from './infrastructure/persistence/mappers/memory-mapper.js';
 
 let db: Database.Database;
 
@@ -28,11 +40,12 @@ function getDefaultModel(): string {
 /** 初始化数据库引用（由主 db.ts 调用） */
 export function setDatabase(database: Database.Database): void {
   db = database;
+  setPersistenceDatabase(database);
 }
 
 /** 获取数据库引用（供其他模块使用） */
 export function getDatabase(): Database.Database {
-  return db;
+  return getPersistenceDatabase();
 }
 
 // ===== 事务支持 =====
@@ -41,36 +54,28 @@ export function getDatabase(): Database.Database {
  * 开始事务
  */
 export function beginTransaction(): void {
-  db.exec('BEGIN TRANSACTION');
+  beginSqliteTransaction();
 }
 
 /**
  * 提交事务
  */
 export function commit(): void {
-  db.exec('COMMIT');
+  commitSqliteTransaction();
 }
 
 /**
  * 回滚事务
  */
 export function rollback(): void {
-  db.exec('ROLLBACK');
+  rollbackSqliteTransaction();
 }
 
 /**
  * 事务包装函数
  */
 export function transaction<T>(fn: () => T): T {
-  beginTransaction();
-  try {
-    const result = fn();
-    commit();
-    return result;
-  } catch (error) {
-    rollback();
-    throw error;
-  }
+  return withSqliteTransaction(fn);
 }
 
 // ===== Agents =====
@@ -467,27 +472,6 @@ export interface MemoryQueryOptions {
   messageType?: Memory['messageType'];
 }
 
-type MemoryRow = {
-  id: string;
-  agent_folder: string;
-  user_jid: string | null;
-  session_id: string | null;
-  scope: string | null;
-  level: string;
-  content: string;
-  embedding: string | null;
-  importance: number;
-  quality_score: number | null;
-  access_count: number;
-  last_accessed_at: string | null;
-  message_type: string | null;
-  timestamp_weight: number | null;
-  tags: string | null;
-  source_type: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
 function resolveMemoryScope(
   memory: Omit<Memory, 'accessCount' | 'lastAccessedAt'>,
 ): NonNullable<Memory['scope']> {
@@ -513,33 +497,6 @@ function validateScopeSession(
   if (scope && scope !== 'session' && sessionId) {
     throw new Error('sessionId can only be used when scope is session');
   }
-}
-
-function mapMemoryRow(row: MemoryRow): Memory {
-  return {
-    id: row.id,
-    agentFolder: row.agent_folder,
-    userJid: row.user_jid || undefined,
-    sessionId: row.session_id || undefined,
-    scope: (row.scope as Memory['scope']) || undefined,
-    level: row.level as 'L1' | 'L2' | 'L3',
-    content: row.content,
-    embedding: safeJsonParse(row.embedding, undefined),
-    importance: row.importance,
-    qualityScore:
-      typeof row.quality_score === 'number' ? row.quality_score : undefined,
-    accessCount: row.access_count,
-    lastAccessedAt: row.last_accessed_at || undefined,
-    messageType: (row.message_type as Memory['messageType']) || undefined,
-    timestampWeight:
-      typeof row.timestamp_weight === 'number'
-        ? row.timestamp_weight
-        : undefined,
-    tags: safeJsonParse(row.tags, undefined),
-    sourceType: (row.source_type as Memory['sourceType']) || undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
 }
 
 export function createMemory(
