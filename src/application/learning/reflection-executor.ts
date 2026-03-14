@@ -1,10 +1,8 @@
 /**
- * 反思和总结调度器
- * 实现定时反思：hourly/daily/weekly/monthly/task
- * 与记忆和进化机制联动
+ * Reflection Executor
+ * Handles the execution of reflection and learning tasks.
  */
 import crypto from 'crypto';
-import cron from 'node-cron';
 
 import {
   createReflection,
@@ -14,85 +12,33 @@ import {
   getDatabase,
   getMemories,
   updateMemory,
-} from './db-agents.js';
-import { getAllActiveAgents } from './db-agents.js';
-import { AgentConfig, LearningTask, DetailedReflection } from './types.js';
-import { logger } from './logger.js';
-import { memoryManager } from './memory-manager.js';
-import { evolutionManager } from './evolution-manager.js';
+} from '../../db-agents.js';
+import { getAllActiveAgents } from '../../db-agents.js';
+import { AgentConfig, LearningTask, DetailedReflection } from '../../types.js';
+import { logger } from '../../logger.js';
+import { memoryManager } from '../../memory-manager.js';
+import { evolutionManager } from '../../evolution-manager.js';
 
-/**
- * 反思调度器类
- */
-export class ReflectionScheduler {
-  private running = false;
-  private cronTasks: Array<{ stop: () => void; destroy?: () => void }> = [];
-
+export class ReflectionExecutor {
   /**
-   * 启动调度器
+   * Trigger reflection for all agents by type
    */
-  start(): void {
-    if (this.running) {
-      logger.warn('Reflection scheduler already running');
-      return;
+  async triggerReflectionsForAllAgents(
+    type: 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly',
+  ): Promise<void> {
+    const agents = getAllActiveAgents();
+    for (const agent of agents) {
+      this.triggerReflection(agent, type).catch((err) => {
+        logger.error(
+          { agent: agent.name, type, err },
+          'Failed to trigger reflection',
+        );
+      });
     }
-
-    this.running = true;
-    logger.info('Reflection scheduler started');
-
-    this.registerCronTask('0 * * * *', () => {
-      this.triggerReflectionsForAllAgents('hourly');
-    });
-
-    this.registerCronTask('0 23 * * *', () => {
-      this.triggerReflectionsForAllAgents('daily');
-    });
-
-    this.registerCronTask('30 23 * * *', async () => {
-      logger.info('Starting scheduled memory consolidation');
-      await this.consolidateMemoriesForAllAgents();
-      logger.info('Scheduled memory consolidation completed');
-    });
-
-    this.registerCronTask('0 20 * * 0', async () => {
-      await this.checkLearningProgressForAllAgents();
-    });
-    this.registerCronTask('0 23 * * 0', () => {
-      this.triggerReflectionsForAllAgents('weekly');
-    });
-
-    this.registerCronTask('0 23 28-31 * *', () => {
-      const today = new Date();
-      const lastDay = new Date(
-        today.getFullYear(),
-        today.getMonth() + 1,
-        0,
-      ).getDate();
-      if (today.getDate() === lastDay) {
-        this.triggerReflectionsForAllAgents('monthly');
-      }
-    });
-
-    this.registerCronTask('0 23 31 12 *', () => {
-      this.triggerReflectionsForAllAgents('yearly');
-    });
   }
 
   /**
-   * 停止调度器
-   */
-  stop(): void {
-    for (const task of this.cronTasks) {
-      task.stop();
-      task.destroy?.();
-    }
-    this.cronTasks = [];
-    this.running = false;
-    logger.info('Reflection scheduler stopped');
-  }
-
-  /**
-   * 触发单个智能体的反思
+   * Trigger reflection for a single agent
    */
   async triggerReflection(
     agent: AgentConfig,
@@ -104,7 +50,7 @@ export class ReflectionScheduler {
       'Triggering reflection',
     );
 
-    // 创建反思记录
+    // Create reflection content
     const content = await this.generateReflectionContent(agent, type);
     const reflectionId = createReflection({
       agentFolder: agent.folder,
@@ -113,7 +59,7 @@ export class ReflectionScheduler {
       triggeredBy,
     });
 
-    // 将反思内容添加到长期记忆
+    // Add reflection content to long-term memory
     await memoryManager.addMemory(agent.folder, content, 'L3', undefined);
 
     logger.info(
@@ -123,7 +69,7 @@ export class ReflectionScheduler {
   }
 
   /**
-   * 完成任务并触发反思
+   * Complete a learning task and trigger reflection
    */
   async completeLearningTask(taskId: string): Promise<void> {
     const task = getLearningTask(taskId);
@@ -132,7 +78,7 @@ export class ReflectionScheduler {
       return;
     }
 
-    // 创建任务完成后的反思
+    // Create reflection after task completion
     const reflectionContent = await this.generateTaskReflection(task);
     const reflectionId = createReflection({
       agentFolder: task.agentFolder,
@@ -141,17 +87,17 @@ export class ReflectionScheduler {
       triggeredBy: taskId,
     });
 
-    // 更新任务状态
+    // Update task status
     updateLearningTask(taskId, {
       status: 'completed',
       reflectionId,
       completedAt: new Date().toISOString(),
     });
 
-    // 将反思添加到记忆
+    // Add reflection to memory
     await memoryManager.addMemory(task.agentFolder, reflectionContent, 'L3');
 
-    // 检查是否需要提交到进化系统
+    // Check if it's worthy of evolution submission
     const evolutionWorthy = await this.evaluateForEvolution(
       task,
       reflectionContent,
@@ -161,7 +107,7 @@ export class ReflectionScheduler {
         { taskId, taskName: task.description },
         'Task experience worthy of evolution, submitting to evolution system',
       );
-      // 调用进化系统 API 提交经验
+      // Call Evolution System API to submit experience
       const abilityName = `学习：${task.description.slice(0, 50)}`;
       const id = await evolutionManager.submitExperience(
         abilityName,
@@ -183,7 +129,7 @@ export class ReflectionScheduler {
   }
 
   /**
-   * 创建学习任务
+   * Create a learning task
    */
   async createLearningTask(
     agentFolder: string,
@@ -205,33 +151,27 @@ export class ReflectionScheduler {
     return taskId;
   }
 
-  // ===== 私有方法 =====
-
-  private triggerReflectionsForAllAgents(
-    type: 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly',
-  ): void {
+  /**
+   * Consolidate memories for all agents (L1->L2->L3)
+   */
+  async consolidateMemoriesForAllAgents(): Promise<void> {
     const agents = getAllActiveAgents();
     for (const agent of agents) {
-      this.triggerReflection(agent, type).catch((err) => {
-        logger.error(
-          { agent: agent.name, type, err },
-          'Failed to trigger reflection',
-        );
-      });
+      await this.consolidateAgentMemories(agent);
     }
   }
 
-  private registerCronTask(
-    expression: string,
-    task: () => void | Promise<void>,
-  ): void {
-    const scheduledTask = cron.schedule(expression, () => {
-      Promise.resolve(task()).catch((err) => {
-        logger.error({ expression, err }, 'Reflection cron task failed');
-      });
-    });
-    this.cronTasks.push(scheduledTask);
+  /**
+   * Check learning progress for all agents and trigger reflection
+   */
+  async checkLearningProgressForAllAgents(): Promise<void> {
+    const agents = getAllActiveAgents();
+    for (const agent of agents) {
+      await this.checkLearningProgress(agent);
+    }
   }
+
+  // ===== Private Methods =====
 
   private async generateReflectionContent(
     agent: AgentConfig,
@@ -247,14 +187,14 @@ export class ReflectionScheduler {
 
     const timeLabel = timeLabels[type] || type;
 
-    // 获取相关记忆
+    // Get relevant memories
     const memories = await memoryManager.searchMemories(
       agent.folder,
       `recent ${type} activities`,
       20,
     );
 
-    // 分析记忆以提取知识、困难、解决方案等
+    // Analyze memories
     const analysis = this.analyzeMemoriesForReflection(memories);
 
     return `# ${type.charAt(0).toUpperCase() + type.slice(1)} Reflection - ${agent.name}
@@ -305,7 +245,7 @@ ${this.generateReflectionInsights(agent, type, memories)}
     const nextSteps: string[] = [];
     let rating: 1 | 2 | 3 | 4 | 5 = 3;
 
-    // 简单的关键词分析
+    // Simple keyword analysis
     memories.forEach((memory) => {
       const content = memory.content.toLowerCase();
 
@@ -358,7 +298,7 @@ ${this.generateReflectionInsights(agent, type, memories)}
       }
     });
 
-    // 简单的评分逻辑
+    // Simple rating logic
     if (knowledgeGained.length > 3) rating = 5;
     else if (knowledgeGained.length > 1) rating = 4;
     else if (difficulties.length > 2) rating = 2;
@@ -380,14 +320,12 @@ ${this.generateReflectionInsights(agent, type, memories)}
     type: string,
     memories: any[],
   ): string {
-    // 基于记忆内容生成反思洞察
     if (memories.length === 0) {
       return '暂无足够的记忆数据进行深度反思。';
     }
 
     const insights: string[] = [];
 
-    // 分析记忆模式
     const userInteractions = memories.filter((m) => m.userJid).length;
     const taskCompletions = memories.filter(
       (m) => m.content.includes('completed') || m.content.includes('finished'),
@@ -403,11 +341,12 @@ ${this.generateReflectionInsights(agent, type, memories)}
     return insights.join('\n') || '- 暂无特别洞察';
   }
 
+  // Note: This method was present in original file but not used in generateReflectionContent directly?
+  // Ah, it was a separate private method. Keeping it just in case.
   private generateImprovementSuggestions(
     agent: AgentConfig,
     type: string,
   ): string {
-    // 生成改进建议
     const suggestions: string[] = [];
 
     if (type === 'daily') {
@@ -476,15 +415,9 @@ ${analysis.rating} / 5
     task: LearningTask,
     reflectionContent: string,
   ): Promise<boolean> {
-    // 评估标准：
-    // 1. 任务完成且产生有价值的反思
-    // 2. 内容长度足够（> 100 字符）
-    // 3. 包含可复用的经验或模式
-
     if (task.status !== 'completed') return false;
     if (reflectionContent.length < 100) return false;
 
-    // 检查是否包含经验模式关键词
     const experienceKeywords = [
       '经验',
       '方法',
@@ -504,35 +437,12 @@ ${analysis.rating} / 5
     );
   }
 
-  /**
-   * 检查所有智能体的学习进度并触发反思
-   */
-  /**
-   * 对所有智能体执行记忆固化
-   */
-  /**
-   * 对所有智能体执行记忆固化（L1→L2→L3）
-   * 可以通过定时任务或手动调用触发
-   */
-  async consolidateMemoriesForAllAgents(): Promise<void> {
-    const agents = getAllActiveAgents();
-    for (const agent of agents) {
-      await this.consolidateAgentMemories(agent);
-    }
-  }
-
-  /**
-   * 对单个智能体执行记忆固化
-   */
   private async consolidateAgentMemories(agent: AgentConfig): Promise<void> {
-    // 获取该 agent 的所有 L2 记忆
     const l2Memories = getMemories(agent.folder, 'L2');
 
     for (const memory of l2Memories) {
-      // 评估记忆价值
       const shouldConsolidate = this.evaluateMemoryForL3(memory);
       if (shouldConsolidate) {
-        // 迁移到 L3
         updateMemory(memory.id, {
           level: 'L3',
           importance: Math.min(memory.importance + 0.1, 1.0),
@@ -545,15 +455,7 @@ ${analysis.rating} / 5
     }
   }
 
-  /**
-   * 评估记忆是否应该迁移到 L3
-   */
   private evaluateMemoryForL3(memory: any): boolean {
-    // 评估标准：
-    // 1. 重要性 > 0.7
-    // 2. 访问次数 > 2
-    // 3. 内容长度 > 100
-    // 4. 包含知识/经验关键词
     if (
       memory.importance > 0.7 &&
       memory.accessCount > 2 &&
@@ -574,19 +476,7 @@ ${analysis.rating} / 5
     return false;
   }
 
-  private async checkLearningProgressForAllAgents(): Promise<void> {
-    const agents = getAllActiveAgents();
-
-    for (const agent of agents) {
-      await this.checkLearningProgress(agent);
-    }
-  }
-
-  /**
-   * 检查单个智能体的学习进度
-   */
   private async checkLearningProgress(agent: AgentConfig): Promise<void> {
-    // 获取该智能体所有正在进行中的学习任务
     const db = getDatabase();
     const tasks = db
       .prepare(
@@ -601,7 +491,6 @@ ${analysis.rating} / 5
     }>;
 
     if (tasks.length === 0) {
-      // 没有进行中的任务，检查是否有待处理的任务
       const pendingTasks = db
         .prepare(
           'SELECT * FROM learning_tasks WHERE agent_folder = ? AND status = ?',
@@ -613,7 +502,6 @@ ${analysis.rating} / 5
           { agent: agent.name, pendingCount: pendingTasks.length },
           'Agent has pending learning tasks',
         );
-        // 可以添加逻辑：如果有待处理任务，生成提醒
         await memoryManager.addMemory(
           agent.folder,
           `你有${pendingTasks.length}个待处理的学习任务，建议开始执行。`,
@@ -624,7 +512,6 @@ ${analysis.rating} / 5
       return;
     }
 
-    // 有进行中的任务，生成进度反思
     logger.info(
       { agent: agent.name, taskCount: tasks.length },
       'Checking learning progress',
@@ -657,7 +544,6 @@ ${tasks
 *此反思由系统自动生成，每周日检查一次*
 `;
 
-    // 创建反思记录
     const reflectionId = createReflection({
       agentFolder: agent.folder,
       type: 'weekly',
@@ -665,7 +551,6 @@ ${tasks
       triggeredBy: 'learning_progress_check',
     });
 
-    // 添加到短期记忆
     await memoryManager.addMemory(
       agent.folder,
       progressContent,
@@ -680,5 +565,5 @@ ${tasks
   }
 }
 
-// 单例导出
-export const reflectionScheduler = new ReflectionScheduler();
+// Singleton export
+export const reflectionExecutor = new ReflectionExecutor();

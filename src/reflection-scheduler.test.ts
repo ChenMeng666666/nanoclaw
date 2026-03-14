@@ -19,7 +19,7 @@ vi.mock('node-cron', () => ({
   },
 }));
 
-import { ReflectionScheduler } from './reflection-scheduler.js';
+import { ReflectionScheduler } from './application/scheduling/reflection-scheduler.js';
 
 describe('reflection scheduler lifecycle', () => {
   beforeEach(() => {

@@ -1,5 +1,5 @@
 import { logger } from '../../logger.js';
-import { reflectionScheduler } from '../../reflection-scheduler.js';
+import { reflectionScheduler } from '../scheduling/reflection-scheduler.js';
 import { memoryManager } from '../../memory-manager.js';
 import { evolutionManager } from '../../evolution-manager.js';
 import { EVOLUTION_CONFIG } from '../../config.js';

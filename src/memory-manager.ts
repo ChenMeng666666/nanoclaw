@@ -20,9 +20,9 @@ import { logger } from './logger.js';
 // New imports from refactored modules
 import {
   MemoryMetricsTracker,
-  MemoryDashboardMetrics,
 } from './memory-manager/metrics.js';
-import {
+import type { MemoryDashboardMetrics } from './memory-manager/metrics.js';
+import type {
   MemoryReleaseControl,
   UpdateReleaseControlInput,
 } from './memory-manager/release-control-types.js';
@@ -41,7 +41,7 @@ import {
   searchMemories,
   searchMemoriesDetailed,
 } from './memory-manager/retrieval.js';
-import {
+import type {
   MemoryMetadataInput,
   MemorySearchHit,
   MemorySearchExplanation,

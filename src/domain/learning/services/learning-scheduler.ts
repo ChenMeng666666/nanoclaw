@@ -1,6 +1,6 @@
 import { getTasksForGroup, updateTask } from '../../../db.js';
 import { createScheduledTaskForLearning } from '../../../db-agents.js';
-import { reflectionScheduler } from '../../../reflection-scheduler.js';
+import { reflectionExecutor } from '../../../application/learning/reflection-executor.js';
 import { resolveLearningModelDecision } from './learning-needs-analyzer.js';
 import type {
   LearningIntentOrchestrationResult,

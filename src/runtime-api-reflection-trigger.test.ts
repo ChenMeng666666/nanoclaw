@@ -6,8 +6,8 @@ const mocks = vi.hoisted(() => ({
   getAgentByFolder: vi.fn(),
 }));
 
-vi.mock('./reflection-scheduler.js', () => ({
-  reflectionScheduler: {
+vi.mock('./application/learning/reflection-executor.js', () => ({
+  reflectionExecutor: {
     triggerReflection: mocks.triggerReflection,
     createLearningTask: vi.fn(),
     completeLearningTask: vi.fn(),

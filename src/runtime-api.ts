@@ -7,7 +7,7 @@ import { createRuntimeRateLimitGuard } from './interfaces/http/middleware/rate-l
 import { createEvolutionHandlers } from './interfaces/http/handlers/evolution-handlers.js';
 import { handleLearningCollaborationEndpoints } from './interfaces/http/handlers/learning-collaboration-handlers.js';
 import { createMemoryHandlers } from './interfaces/http/handlers/memory-handlers.js';
-import { createLearningLegacyHandlers } from './interfaces/http/handlers/learning-legacy-handlers.js';
+import { createLearningHandlers } from './interfaces/http/handlers/learning/index.js';
 import {
   createApiError,
   isApiError,
@@ -104,7 +104,7 @@ export async function startRuntimeAPI(
   rateLimitGuard.reset();
   const memoryHandlers = createMemoryHandlers();
   const evolutionHandlers = createEvolutionHandlers();
-  const learningLegacyHandlers = createLearningLegacyHandlers();
+  const learningHandlers = createLearningHandlers();
 
   const server = http.createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -166,7 +166,7 @@ export async function startRuntimeAPI(
         return;
       }
 
-      if (await learningLegacyHandlers.handle(req, res, url, path)) {
+      if (await learningHandlers.handle(req, res, url, path)) {
         return;
       }
 

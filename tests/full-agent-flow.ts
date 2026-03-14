@@ -23,7 +23,7 @@ import {
 } from '../src/db.js';
 import { MemoryManager } from '../src/memory-manager.js';
 import { EvolutionManager } from '../src/evolution-manager.js';
-import { ReflectionScheduler } from '../src/reflection-scheduler.js';
+import { reflectionExecutor } from '../src/application/learning/reflection-executor.js';
 import { logger } from '../src/logger.js';
 import {
   TestDataFactory,
@@ -84,18 +84,17 @@ const TEST_LEARNING_TRIGGER_TASK_ID = 'full-test-learning-trigger-task';
 // 全局变量
 let memoryManager: MemoryManager;
 let evolutionManager: EvolutionManager;
-let reflectionScheduler: ReflectionScheduler;
 
 async function testFullAgentFlow() {
   logger.info('=== 启动NanoClaw完整Agent流程测试 ===');
 
   try {
-    // 打印初始数据库状态
-    printDatabaseStats('初始状态');
-
     // 1. 初始化数据库和测试数据
     logger.info('1. 初始化测试环境');
     _initTestDatabase();
+
+    // 打印初始数据库状态
+    printDatabaseStats('初始状态');
 
     // 创建测试 Agent 1
     logger.debug('  创建测试 Agent 1');
@@ -106,9 +105,6 @@ async function testFullAgentFlow() {
     // 2. 测试记忆管理系统
     logger.info('2. 测试记忆管理系统');
     memoryManager = new MemoryManager();
-
-    // 初始化 reflectionScheduler（需要先初始化才能使用）
-    reflectionScheduler = new ReflectionScheduler();
 
     // 添加 L1 工作记忆
     logger.debug('  添加 L1 工作记忆');
@@ -172,7 +168,7 @@ async function testFullAgentFlow() {
     const initialL3Count = getDatabaseStats().memories; // 记录初始记忆数量
 
     // 调用记忆固化方法（模拟定时任务）
-    await reflectionScheduler.consolidateMemoriesForAllAgents();
+    await reflectionExecutor.consolidateMemoriesForAllAgents();
     logger.debug('  记忆固化完成');
 
     // 验证记忆层级变化
@@ -192,7 +188,6 @@ async function testFullAgentFlow() {
 
     // 3. 测试学习计划系统
     logger.info('3. 测试学习计划系统');
-    reflectionScheduler = new ReflectionScheduler();
 
     // 创建学习任务
     logger.debug('  创建学习任务');

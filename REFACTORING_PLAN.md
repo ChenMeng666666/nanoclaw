@@ -52,14 +52,14 @@ Focus on breaking down the monolithic Evolution Manager and Repository.
 
 Focus on separating scheduling mechanics from business logic execution.
 
-- [ ] **Separate Reflection Scheduling from Execution**
+- [x] **Separate Reflection Scheduling from Execution**
     - **Source**: `src/reflection-scheduler.ts`
     - **Destination**:
         - `src/application/scheduling/reflection-scheduler.ts` (Keep only cron triggering logic)
         - `src/application/learning/reflection-executor.ts` (Move `triggerReflection`, `completeLearningTask`, content generation orchestration)
     - **Goal**: The Scheduler should only know *when* to run, not *how* to run the business logic.
 
-- [ ] **Modularize Learning HTTP Handlers**
+- [x] **Modularize Learning HTTP Handlers**
     - **Source**: `src/interfaces/http/handlers/learning-legacy-handlers.ts`
     - **Destination**:
         - `src/interfaces/http/handlers/learning/automation-handlers.ts` (Start/Stop/Status)
