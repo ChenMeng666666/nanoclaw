@@ -544,19 +544,21 @@ interface DailyLearningSummary {
 | 每日反思   | 每天指定时间 | 定时任务 |
 | 每周反思   | 每周指定时间 | 定时任务 |
 | 每月反思   | 每月指定时间 | 定时任务 |
+| 每年反思   | 每年指定时间 | 定时任务 |
 | 任务后反思 | 任务完成后   | 事件触发 |
 
 ### 学习系统 API
 
 | 端点                                   | 方法 | 说明                                 |
 | -------------------------------------- | ---- | ------------------------------------ |
-| `/api/learning/analyze-needs`          | POST | 分析学习需求（规则+可选本地LLM增强） |
+| `/api/learning/analyze-needs`          | POST | 分析学习需求（SDK 优先，本地模型兜底） |
 | `/api/learning/generate-daily-plan`    | POST | 生成每日学习计划                     |
 | `/api/learning/analyze-outcome`        | POST | 分析学习任务结果                     |
 | `/api/learning/extract-knowledge`      | POST | 抽取知识点                           |
+| `/api/learning/orchestrate-intent`     | POST | 学习意图确定性编排（先校验反思任务） |
 | `/api/learning/automation/start`       | POST | 启动学习自动化                       |
 | `/api/learning/automation/stop`        | POST | 停止学习自动化                       |
-| `/api/learning/automation/status`      | GET  | 查询学习自动化状态                   |
+| `/api/learning/automation/status`      | GET  | 查询学习自动化状态（desired/observed） |
 | `/api/learning/reflection/generate`    | POST | 生成并落库反思                       |
 | `/api/learning/generate-daily-summary` | POST | 生成每日学习总结                     |
 | `/api/learning/tasks`                  | GET  | 查询学习任务                         |
@@ -571,7 +573,7 @@ interface DailyLearningSummary {
 | `/api/learning/system/update`          | POST | 触发学习体系更新                     |
 | `/api/learning/system/diff`            | GET  | 查询版本差异                         |
 
-学习 API 以 [openapi.yaml](./openapi.yaml) 为准，`docs/RUNTIME_API.md` 为使用示例。
+学习 API 以 [openapi.yaml](./openapi.yaml) 为准，`docs/RUNTIME_API.md` 为使用示例；学习体系版本信息以 Runtime API 与 OpenAPI 定义为准。
 
 ---
 
