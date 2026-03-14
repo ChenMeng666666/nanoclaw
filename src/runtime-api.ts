@@ -965,6 +965,18 @@ export async function startRuntimeAPI(
           return;
         }
 
+        const task = getLearningTask(resolvedTaskId);
+        if (!task) {
+          writeJSON(res, 404, { error: 'Learning task not found' });
+          return;
+        }
+        if (task.agentFolder !== String(agentFolder)) {
+          writeJSON(res, 409, {
+            error: 'Learning task does not belong to agentFolder',
+          });
+          return;
+        }
+
         updateLearningTask(resolvedTaskId, {
           status: 'in_progress',
         });
@@ -1081,7 +1093,42 @@ export async function startRuntimeAPI(
 
       if (path === '/api/learning/result' && req.method === 'POST') {
         const body = await readJSON(req);
-        const {
+        const agentFolder = parseRequiredString(
+          body.agentFolder,
+          'agentFolder',
+        );
+        const status = parseLearningResultStatus(body.status, 'status');
+        const taskId = parseOptionalString(body.taskId);
+        const metricBefore = parseOptionalNumberInRange(
+          body.metricBefore,
+          'metricBefore',
+          -1000000000,
+          1000000000,
+        );
+        const metricAfter = parseOptionalNumberInRange(
+          body.metricAfter,
+          'metricAfter',
+          -1000000000,
+          1000000000,
+        );
+        const metricName = parseOptionalStringWithLimit(
+          body.metricName,
+          'metricName',
+          120,
+        );
+        const description = parseOptionalStringWithLimit(
+          body.description,
+          'description',
+          MEMORY_CONFIG.api.maxContentLength,
+        );
+        const signals = parseOptionalStringArray(body.signals, 'signals');
+        const geneId = parseOptionalString(body.geneId);
+        const blastRadius = parseOptionalBlastRadius(
+          body.blastRadius,
+          'blastRadius',
+        );
+
+        const id = createLearningResult({
           taskId,
           agentFolder,
           metricBefore,
@@ -1092,26 +1139,6 @@ export async function startRuntimeAPI(
           signals,
           geneId,
           blastRadius,
-        } = body;
-
-        if (!agentFolder || !status) {
-          writeJSON(res, 400, { error: 'Missing agentFolder or status' });
-          return;
-        }
-
-        const id = createLearningResult({
-          taskId: taskId as string | undefined,
-          agentFolder: agentFolder as string,
-          metricBefore: metricBefore as number | undefined,
-          metricAfter: metricAfter as number | undefined,
-          metricName: metricName as string | undefined,
-          status: status as 'keep' | 'discard' | 'crash',
-          description: description as string | undefined,
-          signals: signals as string[] | undefined,
-          geneId: geneId as string | undefined,
-          blastRadius: blastRadius as
-            | { files: number; lines: number }
-            | undefined,
         });
 
         writeJSON(res, 200, { id, status: 'recorded' });
@@ -1120,7 +1147,13 @@ export async function startRuntimeAPI(
 
       if (path === '/api/learning/results' && req.method === 'GET') {
         const agentFolder = url.searchParams.get('agentFolder');
-        const limit = parseInt(url.searchParams.get('limit') || '50', 10);
+        const limit =
+          parseOptionalIntegerInRange(
+            url.searchParams.get('limit'),
+            'limit',
+            MEMORY_CONFIG.api.minLimit,
+            MEMORY_CONFIG.api.maxLimit,
+          ) || 50;
 
         if (!agentFolder) {
           writeJSON(res, 400, { error: 'Missing agentFolder' });
@@ -1232,7 +1265,13 @@ export async function startRuntimeAPI(
 
       if (path === '/api/saturation/detect' && req.method === 'GET') {
         const agentFolder = url.searchParams.get('agentFolder');
-        const limit = parseInt(url.searchParams.get('limit') || '10', 10);
+        const limit =
+          parseOptionalIntegerInRange(
+            url.searchParams.get('limit'),
+            'limit',
+            MEMORY_CONFIG.api.minLimit,
+            MEMORY_CONFIG.api.maxLimit,
+          ) || 10;
 
         // 获取最近的学习结果
         const recentResults = agentFolder
@@ -2296,6 +2335,69 @@ function parseOptionalString(value: unknown): string | undefined {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function parseOptionalStringWithLimit(
+  value: unknown,
+  field: string,
+  maxLength: number,
+): string | undefined {
+  const parsed = parseOptionalString(value);
+  if (parsed === undefined) {
+    return undefined;
+  }
+  if (parsed.length > maxLength) {
+    throw createApiError(
+      400,
+      `INVALID_${field.toUpperCase()}`,
+      `${field} exceeds ${maxLength} characters`,
+    );
+  }
+  return parsed;
+}
+
+function parseLearningResultStatus(
+  value: unknown,
+  field: string,
+): 'keep' | 'discard' | 'crash' {
+  if (value === 'keep' || value === 'discard' || value === 'crash') {
+    return value;
+  }
+  throw createApiError(
+    400,
+    `INVALID_${field.toUpperCase()}`,
+    `${field} must be one of keep, discard, crash`,
+  );
+}
+
+function parseOptionalBlastRadius(
+  value: unknown,
+  field: string,
+): { files: number; lines: number } | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw createApiError(
+      400,
+      `INVALID_${field.toUpperCase()}`,
+      `${field} must be an object`,
+    );
+  }
+  const raw = value as Record<string, unknown>;
+  const files = parseRequiredIntegerInRange(
+    raw.files,
+    `${field}.files`,
+    0,
+    1000000,
+  );
+  const lines = parseRequiredIntegerInRange(
+    raw.lines,
+    `${field}.lines`,
+    0,
+    100000000,
+  );
+  return { files, lines };
 }
 
 function parseMemoryLevel(value: unknown, field: string): 'L1' | 'L2' | 'L3' {

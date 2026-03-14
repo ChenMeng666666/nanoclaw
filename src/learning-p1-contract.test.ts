@@ -19,6 +19,14 @@ describe('learning p1 contracts', () => {
         anthropicModel: 'claude-sonnet-4-6',
       },
     });
+    createAgent({
+      id: 'agent-learning-p1-2',
+      name: 'Agent Learning P1-2',
+      folder: 'agent-learning-p1-2',
+      credentials: {
+        anthropicModel: 'claude-sonnet-4-6',
+      },
+    });
     process.env.RUNTIME_API_KEY = 'test-key';
     process.env.RUNTIME_API_ENABLED = 'true';
     server = await startRuntimeAPI({ port: 0, enabled: true });
@@ -113,6 +121,52 @@ describe('learning p1 contracts', () => {
     expect(started.status).toBe('in_progress');
   });
 
+  it('rejects start when task does not exist or agentFolder mismatches', async () => {
+    const missingResp = await fetch(`${baseUrl}/api/learning/task/start`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': 'test-key',
+      },
+      body: JSON.stringify({
+        agentFolder: 'agent-learning-p1',
+        taskId: 'missing-task-id',
+      }),
+    });
+    const missingBody = (await missingResp.json()) as { error?: string };
+
+    const createResp = await fetch(`${baseUrl}/api/learning/task/create`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': 'test-key',
+      },
+      body: JSON.stringify({
+        agentFolder: 'agent-learning-p1',
+        description: '跨agent启动校验',
+      }),
+    });
+    const created = (await createResp.json()) as { id: string };
+
+    const mismatchResp = await fetch(`${baseUrl}/api/learning/task/start`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': 'test-key',
+      },
+      body: JSON.stringify({
+        agentFolder: 'agent-learning-p1-2',
+        taskId: created.id,
+      }),
+    });
+    const mismatchBody = (await mismatchResp.json()) as { error?: string };
+
+    expect(missingResp.status).toBe(404);
+    expect(missingBody.error).toContain('not found');
+    expect(mismatchResp.status).toBe(409);
+    expect(mismatchBody.error).toContain('does not belong');
+  });
+
   it('creates standardized plan outputs for schedule and phase task alignment', async () => {
     const response = await fetch(`${baseUrl}/api/learning/plan/create`, {
       method: 'POST',
@@ -143,5 +197,59 @@ describe('learning p1 contracts', () => {
     expect(body.scheduleValue).toBe('90m');
     expect(body.phaseTaskIds?.length).toBe(2);
     expect(body.scheduledTaskIds?.length).toBe(2);
+  });
+
+  it('validates learning result payload and unified limit ranges', async () => {
+    const invalidResultResp = await fetch(`${baseUrl}/api/learning/result`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': 'test-key',
+      },
+      body: JSON.stringify({
+        agentFolder: 'agent-learning-p1',
+        status: 'unknown',
+        blastRadius: {
+          files: -1,
+          lines: 10,
+        },
+      }),
+    });
+    const invalidResultBody = (await invalidResultResp.json()) as {
+      code?: string;
+    };
+
+    const invalidLearningResultsLimit = await fetch(
+      `${baseUrl}/api/learning/results?agentFolder=agent-learning-p1&limit=99999`,
+      {
+        method: 'GET',
+        headers: {
+          'x-api-key': 'test-key',
+        },
+      },
+    );
+    const invalidLearningResultsLimitBody =
+      (await invalidLearningResultsLimit.json()) as { code?: string };
+
+    const invalidSaturationLimit = await fetch(
+      `${baseUrl}/api/saturation/detect?agentFolder=agent-learning-p1&limit=0`,
+      {
+        method: 'GET',
+        headers: {
+          'x-api-key': 'test-key',
+        },
+      },
+    );
+    const invalidSaturationLimitBody =
+      (await invalidSaturationLimit.json()) as {
+        code?: string;
+      };
+
+    expect(invalidResultResp.status).toBe(400);
+    expect(invalidResultBody.code).toBe('INVALID_STATUS');
+    expect(invalidLearningResultsLimit.status).toBe(400);
+    expect(invalidLearningResultsLimitBody.code).toBe('INVALID_LIMIT');
+    expect(invalidSaturationLimit.status).toBe(400);
+    expect(invalidSaturationLimitBody.code).toBe('INVALID_LIMIT');
   });
 });
