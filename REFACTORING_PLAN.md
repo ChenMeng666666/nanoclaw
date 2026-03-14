@@ -64,11 +64,11 @@
 
 ## Phase 4：Application + Domain（Evolution 纵向分层）
 
-- [ ] [P1] 将 `src/evolution-manager.ts` 的 `GDI 评分/晋升判定规则（L608-L1187）` 抽离到 `src/domain/evolution/services/scoring-service.ts`
-- [ ] [P1] 将 `src/evolution-manager.ts` 的 `命令安全校验规则（L939-L982）` 抽离到 `src/domain/evolution/services/command-safety-service.ts`
-- [ ] [P1] 将 `src/evolution-manager.ts` 的 `提交用例（L1223-L1481 中 submit 相关）` 抽离到 `src/application/evolution/use-cases/submit-experience.ts`
-- [ ] [P1] 将 `src/evolution-manager.ts` 的 `选择/审核用例（L1223-L1481 中 select/review 相关）` 抽离到 `src/application/evolution/use-cases/select-and-review.ts`
-- [ ] [P1] 将 `src/evolution-manager.ts` 收敛为门面，保留兼容 API，仅做编排与依赖注入
+- [x] [P1] 将 `src/evolution-manager.ts` 的 `GDI 评分/晋升判定规则（L608-L1187）` 抽离到 `src/domain/evolution/services/scoring-service.ts`
+- [x] [P1] 将 `src/evolution-manager.ts` 的 `命令安全校验规则（L939-L982）` 抽离到 `src/domain/evolution/services/command-safety-service.ts`
+- [x] [P1] 将 `src/evolution-manager.ts` 的 `提交用例（L1223-L1481 中 submit 相关）` 抽离到 `src/application/evolution/use-cases/submit-experience.ts`
+- [x] [P1] 将 `src/evolution-manager.ts` 的 `选择/审核用例（L1223-L1481 中 select/review 相关）` 抽离到 `src/application/evolution/use-cases/select-and-review.ts`
+- [x] [P1] 将 `src/evolution-manager.ts` 收敛为门面，保留兼容 API，仅做编排与依赖注入
 
 ---
 
