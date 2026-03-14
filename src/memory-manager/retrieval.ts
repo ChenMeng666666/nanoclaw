@@ -1,5 +1,9 @@
 import { Memory } from '../types.js';
-import { getMemories, incrementMemoryAccess, MemoryQueryOptions } from '../db-agents.js';
+import {
+  getMemories,
+  incrementMemoryAccess,
+  MemoryQueryOptions,
+} from '../db-agents.js';
 import { MEMORY_CONFIG } from '../config.js';
 import { BM25Index, reciprocalRankFusion } from '../hybrid-search.js';
 import { generateEmbedding } from './embedding.js';
@@ -51,11 +55,7 @@ export async function searchMemoriesDetailed(
   const allVectorIds: string[] = [];
   const vectorCandidates = selectVectorCandidates(memories, searchLimit);
   const variantBatchSize = MEMORY_CONFIG.retrieval.variantBatchSize;
-  for (
-    let start = 0;
-    start < queryVariants.length;
-    start += variantBatchSize
-  ) {
+  for (let start = 0; start < queryVariants.length; start += variantBatchSize) {
     const variantBatch = queryVariants.slice(start, start + variantBatchSize);
     const batchResults = await Promise.all(
       variantBatch.map(async (variant) => {
@@ -69,16 +69,13 @@ export async function searchMemoriesDetailed(
         }
         const vectorResults = vectorCandidates
           .filter(
-            (m) =>
-              m.embedding && m.embedding.length === queryEmbedding.length,
+            (m) => m.embedding && m.embedding.length === queryEmbedding.length,
           )
           .map((memory) => ({
             id: memory.id,
             score: cosineSimilarity(queryEmbedding, memory.embedding!),
           }))
-          .filter(
-            (item) => item.score >= retrievalRollout.vectorSearchMinScore,
-          )
+          .filter((item) => item.score >= retrievalRollout.vectorSearchMinScore)
           .sort((a, b) => b.score - a.score)
           .slice(0, searchLimit);
         return { bm25Results, vectorResults };
@@ -111,9 +108,7 @@ export async function searchMemoriesDetailed(
   const maxFused = safeMax([...fusedScoreMap.values()]);
   const maxVector = safeMax([...vectorScoreMap.values()]);
   const memoryMap = new Map(memories.map((memory) => [memory.id, memory]));
-  const normalizedWeights = normalizeWeights(
-    retrievalRollout.rerankWeights,
-  );
+  const normalizedWeights = normalizeWeights(retrievalRollout.rerankWeights);
   const queryTerms = extractKeywords(query);
   const scoredHits = [...new Set([...uniqueBm25, ...uniqueVector])]
     .map((id): MemorySearchHit | null => {
@@ -168,8 +163,7 @@ export async function searchMemoriesDetailed(
     .sort((a, b) => b.explain.scores.final - a.explain.scores.final)
     .slice(0, limit);
   const lowConfidenceHits = scoredHits.filter(
-    (hit) =>
-      hit.explain.scores.final < retrievalRollout.lowConfidenceThreshold,
+    (hit) => hit.explain.scores.final < retrievalRollout.lowConfidenceThreshold,
   ).length;
   tracker.recordSearchMetrics(
     limit,

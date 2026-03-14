@@ -186,7 +186,7 @@ function selectDeterministicSynonym(
  */
 export async function generateQueryVariants(
   text: string,
-  provider: QueryExpansionProvider | null
+  provider: QueryExpansionProvider | null,
 ): Promise<string[]> {
   // 如果有 LLM 提供者，优先使用 LLM
   if (provider) {

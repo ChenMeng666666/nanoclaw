@@ -16,8 +16,7 @@ export function splitIntoMemoryChunks(
 
   // 1. 提取代码块（```代码块```）
   const codeBlockRegex = /```[\s\S]*?```/g;
-  const codeBlocks: Array<{ content: string; start: number; end: number }> =
-    [];
+  const codeBlocks: Array<{ content: string; start: number; end: number }> = [];
   let match;
   while ((match = codeBlockRegex.exec(content)) !== null) {
     codeBlocks.push({
@@ -179,7 +178,9 @@ export function calculateImportance(content: string, type: string): number {
  * 计算时间戳权重（用于排序）
  * 越新的消息权重越高
  */
-export function calculateTimestampWeight(messageTimestamp?: string | Date): number {
+export function calculateTimestampWeight(
+  messageTimestamp?: string | Date,
+): number {
   const now = Date.now();
   const hourInMs = 60 * 60 * 1000;
   const dayInMs = 24 * hourInMs;

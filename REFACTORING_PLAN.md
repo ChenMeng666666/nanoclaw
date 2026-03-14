@@ -113,11 +113,11 @@
 
 ## Phase 8：入口文件极简瘦身（最终收口）
 
-- [ ] [P0] 将 `src/index.ts` 的 `依赖检查与端口探测（L73-L119）` 抽离到 `src/infrastructure/system/dependency-check.ts`
-- [ ] [P0] 将 `src/index.ts` 的 `状态恢复与去重（L151-L188, L866-L967）` 抽离到 `src/application/message/state-recovery-service.ts`
-- [ ] [P0] 将 `src/index.ts` 的 `应用启停生命周期（L1019-L1139）` 抽离到 `src/application/bootstrap/app-lifecycle.ts`
-- [ ] [P0] 将 `src/index.ts` 的 `消息路由与主流程编排（其余业务主干）` 下沉到 `src/application/bootstrap/message-orchestrator.ts`
-- [ ] [P0] 将 `src/index.ts` 收敛为极简入口，仅保留 `main()`、DI 装配、启动与致命错误兜底
+- [x] [P0] 将 `src/index.ts` 的 `依赖检查与端口探测（L73-L119）` 抽离到 `src/infrastructure/system/dependency-check.ts`
+- [x] [P0] 将 `src/index.ts` 的 `状态恢复与去重（L151-L188, L866-L967）` 抽离到 `src/application/message/state-recovery-service.ts`
+- [x] [P0] 将 `src/index.ts` 的 `应用启停生命周期（L1019-L1139）` 抽离到 `src/application/bootstrap/app-lifecycle.ts`
+- [x] [P0] 将 `src/index.ts` 的 `消息路由与主流程编排（其余业务主干）` 下沉到 `src/application/bootstrap/message-orchestrator.ts`
+- [x] [P0] 将 `src/index.ts` 收敛为极简入口，仅保留 `main()`、DI 装配、启动与致命错误兜底
 
 ---
 

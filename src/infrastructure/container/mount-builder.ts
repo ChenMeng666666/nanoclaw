@@ -1,7 +1,10 @@
 import fs from 'fs';
 import path from 'path';
 import { DATA_DIR, GROUPS_DIR } from '../../config.js';
-import { resolveGroupFolderPath, resolveGroupIpcPath } from '../../group-folder.js';
+import {
+  resolveGroupFolderPath,
+  resolveGroupIpcPath,
+} from '../../group-folder.js';
 import { logger } from '../../logger.js';
 import { validateAdditionalMounts } from '../../mount-security.js';
 import { RegisteredGroup } from '../../types.js';

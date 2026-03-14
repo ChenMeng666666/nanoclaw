@@ -15,7 +15,10 @@ import {
   stopContainer,
 } from '../../container-runtime.js';
 import { RegisteredGroup } from '../../types.js';
-import { ContainerInput, ContainerOutput } from '../../domain/container/types.js';
+import {
+  ContainerInput,
+  ContainerOutput,
+} from '../../domain/container/types.js';
 import { buildVolumeMounts } from './mount-builder.js';
 import { buildContainerArgs } from './runtime-command-builder.js';
 
@@ -109,7 +112,7 @@ export async function runContainerAgent(
     // graceful _close sentinel has time to trigger before the hard kill fires.
     const configTimeout = group.containerConfig?.timeout || CONTAINER_TIMEOUT;
     const timeoutMs = Math.max(configTimeout, IDLE_TIMEOUT + 30_000);
-    
+
     let timedOut = false;
 
     const killOnTimeout = () => {

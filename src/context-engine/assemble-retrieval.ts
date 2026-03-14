@@ -6,7 +6,10 @@ import { getMemories, incrementMemoryAccess } from '../db-agents.js';
 import { BM25Index, reciprocalRankFusion } from '../hybrid-search.js';
 import { generateEmbedding } from './embedding-cache.js';
 import { reRankResults, selectVectorCandidates } from './rerank.js';
-import { QueryExpansionProvider, generateQueryVariants } from './query-expansion.js';
+import {
+  QueryExpansionProvider,
+  generateQueryVariants,
+} from './query-expansion.js';
 
 /**
  * 3. assemble - 构建上下文（混合检索核心）
@@ -23,7 +26,11 @@ export async function assemble(
   const messages = getRecentMessages(chatJid, limit);
   const userJid = messages[0]?.sender;
   const effectiveSessionId = sessionId || chatJid;
-  const scopedMemories = getScopedMemories(agentFolder, userJid, effectiveSessionId);
+  const scopedMemories = getScopedMemories(
+    agentFolder,
+    userJid,
+    effectiveSessionId,
+  );
 
   // 构建查询文本
   const recentContent = messages.map((m) => m.content).join(' ');
@@ -39,21 +46,17 @@ export async function assemble(
   }
 
   // 查询扩展：生成多个查询变体
-  const queryVariants = await generateQueryVariants(recentContent, queryExpansionProvider);
+  const queryVariants = await generateQueryVariants(
+    recentContent,
+    queryExpansionProvider,
+  );
 
   // 对每个查询变体执行搜索，然后合并结果
   const allBm25Results: string[] = [];
   const allVectorResults: string[] = [];
-  const vectorCandidates = selectVectorCandidates(
-    scopedMemories,
-    limit * 2,
-  );
+  const vectorCandidates = selectVectorCandidates(scopedMemories, limit * 2);
   const variantBatchSize = MEMORY_CONFIG.retrieval.variantBatchSize;
-  for (
-    let start = 0;
-    start < queryVariants.length;
-    start += variantBatchSize
-  ) {
+  for (let start = 0; start < queryVariants.length; start += variantBatchSize) {
     const variantBatch = queryVariants.slice(start, start + variantBatchSize);
     const batchResults = await Promise.all(
       variantBatch.map(async (query) => {
@@ -112,7 +115,11 @@ function getRecentMessages(chatJid: string, limit: number): NewMessage[] {
   });
 }
 
-function getScopedMemories(agentFolder: string, userJid?: string, sessionId?: string): Memory[] {
+function getScopedMemories(
+  agentFolder: string,
+  userJid?: string,
+  sessionId?: string,
+): Memory[] {
   const ordered: Memory[] = [];
   const seen = new Set<string>();
   const groups: Memory[][] = [];

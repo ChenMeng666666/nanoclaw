@@ -76,7 +76,10 @@ export async function migrateMemory(
 
 export async function migrateMemories(
   tracker: MemoryMetricsTracker,
-  configResolver: (agentFolder: string, userJid?: string) => MigrationRuleConfig,
+  configResolver: (
+    agentFolder: string,
+    userJid?: string,
+  ) => MigrationRuleConfig,
   l1CacheInvalidator: (id: string) => void,
 ): Promise<number> {
   const allMemories = [...getAllMemories('L1'), ...getAllMemories('L2')];

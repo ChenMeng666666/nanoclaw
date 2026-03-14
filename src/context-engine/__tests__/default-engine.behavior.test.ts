@@ -7,7 +7,10 @@ vi.mock('../../embedding-providers/registry.js', () => ({
 import { _initTestDatabase } from '../../db.js';
 import { createAgent, getMemories } from '../../db-agents.js';
 import { createDefaultContextEngine } from '../providers.js';
-import { replaceSynonyms, generateKeywordVariants } from '../query-expansion.js';
+import {
+  replaceSynonyms,
+  generateKeywordVariants,
+} from '../query-expansion.js';
 import { MEMORY_CONFIG } from '../../config.js';
 
 describe('default context engine behavior', () => {
@@ -79,9 +82,7 @@ describe('default context engine behavior', () => {
   });
 
   it('uses deterministic synonyms and configured variant limit', async () => {
-    await createDefaultContextEngine(
-      'agent-default-engine-behavior',
-    );
+    await createDefaultContextEngine('agent-default-engine-behavior');
     const base = '系统 方法 使用 代码';
     const replaced1 = replaceSynonyms(base);
     const replaced2 = replaceSynonyms(base);

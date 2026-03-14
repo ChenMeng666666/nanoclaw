@@ -78,7 +78,10 @@ export function generateQueryVariants(query: string): string[] {
   return [...variants].slice(0, MEMORY_CONFIG.retrieval.queryVariantLimit);
 }
 
-export function extractMatchedTerms(queryTerms: string[], content: string): string[] {
+export function extractMatchedTerms(
+  queryTerms: string[],
+  content: string,
+): string[] {
   const normalized = content.toLowerCase();
   return queryTerms.filter((term) => normalized.includes(term)).slice(0, 8);
 }

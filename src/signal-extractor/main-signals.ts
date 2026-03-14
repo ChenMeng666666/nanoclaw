@@ -2,11 +2,7 @@ import { MainComponent, EvolutionEntry } from '../types.js';
 import { logger } from '../logger.js';
 import { Signal, SignalType } from './types.js';
 import { extractSignals } from './extractor.js';
-import {
-  detectLanguage,
-  extractSnippet,
-  deduplicateSignals,
-} from './utils.js';
+import { detectLanguage, extractSnippet, deduplicateSignals } from './utils.js';
 
 /**
  * 主项目组件信号提取

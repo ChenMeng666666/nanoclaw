@@ -211,3 +211,14 @@ export class DefaultContextEngine implements ContextEngine {
     }
   }
 }
+
+/**
+ * 工厂函数：创建默认 ContextEngine 实例
+ */
+export async function createDefaultContextEngine(
+  agentFolder: string,
+): Promise<DefaultContextEngine> {
+  const engine = new DefaultContextEngine();
+  await engine.bootstrap(agentFolder);
+  return engine;
+}

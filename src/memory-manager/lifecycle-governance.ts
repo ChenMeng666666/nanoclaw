@@ -2,7 +2,11 @@ import { Memory } from '../types.js';
 import { MEMORY_CONFIG } from '../config.js';
 import { updateMemory, getMemories } from '../db-agents.js';
 import { logger } from '../logger.js';
-import { calculateQualityScore, clamp01, cosineSimilarity } from './ranking-utils.js';
+import {
+  calculateQualityScore,
+  clamp01,
+  cosineSimilarity,
+} from './ranking-utils.js';
 import { extractKeywords, extractMatchedTerms } from './query-variants.js';
 import { MemoryMetadataInput } from './types.js';
 
@@ -73,10 +77,7 @@ export function findLifecycleMergeTarget(
     ) {
       continue;
     }
-    const similarity = cosineSimilarity(
-      incomingEmbedding,
-      candidate.embedding,
-    );
+    const similarity = cosineSimilarity(incomingEmbedding, candidate.embedding);
     const isConflict = detectLifecycleConflict(
       candidate.content.toLowerCase(),
       incomingContent.toLowerCase(),
@@ -106,9 +107,7 @@ export function applyLifecycleGovernance(memory: Memory): void {
   );
   const decay = Math.exp(-daysSinceAccess / 90);
   const reinforce = Math.min(1, memory.accessCount / 12);
-  const nextImportance = clamp01(
-    memory.importance * decay + reinforce * 0.2,
-  );
+  const nextImportance = clamp01(memory.importance * decay + reinforce * 0.2);
   const baseQuality =
     memory.qualityScore ??
     calculateQualityScore(memory.content, {

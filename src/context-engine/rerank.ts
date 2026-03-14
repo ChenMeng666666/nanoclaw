@@ -59,16 +59,16 @@ export function reRankResults(
     .map((result) => result.id);
 }
 
-export function selectVectorCandidates(memories: Memory[], limit: number): Memory[] {
+export function selectVectorCandidates(
+  memories: Memory[],
+  limit: number,
+): Memory[] {
   if (memories.length <= limit) {
     return memories;
   }
   const candidateLimit = Math.min(
     memories.length,
-    Math.max(
-      limit * MEMORY_CONFIG.retrieval.vectorCandidateMultiplier,
-      limit,
-    ),
+    Math.max(limit * MEMORY_CONFIG.retrieval.vectorCandidateMultiplier, limit),
   );
   const hotTarget = Math.max(
     1,
@@ -113,11 +113,7 @@ export function rankMemoryHotness(memory: Memory): number {
         0,
         1 -
           (Date.now() - timestamp) /
-            (MEMORY_CONFIG.retrieval.hotMemoryWindowDays *
-              24 *
-              60 *
-              60 *
-              1000),
+            (MEMORY_CONFIG.retrieval.hotMemoryWindowDays * 24 * 60 * 60 * 1000),
       );
   return (
     (memory.accessCount || 0) * 0.4 +

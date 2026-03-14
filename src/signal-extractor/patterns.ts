@@ -1,6 +1,9 @@
 import { SignalType, SignalPattern } from './types.js';
 
-export const SIGNAL_PATTERNS: Record<SignalType, Record<string, SignalPattern>> = {
+export const SIGNAL_PATTERNS: Record<
+  SignalType,
+  Record<string, SignalPattern>
+> = {
   // 学习相关
   capability_gap: {
     en: {

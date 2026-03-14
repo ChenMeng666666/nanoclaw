@@ -42,7 +42,9 @@ export interface UpdateReleaseControlInput {
   migration?: Partial<MigrationRolloutConfig>;
 }
 
-export function safeParseReleaseControl(raw: string): MemoryReleaseControl | null {
+export function safeParseReleaseControl(
+  raw: string,
+): MemoryReleaseControl | null {
   try {
     const parsed = JSON.parse(raw) as MemoryReleaseControl;
     if (!parsed || typeof parsed !== 'object') {
