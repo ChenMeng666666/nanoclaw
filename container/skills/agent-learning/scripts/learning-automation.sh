@@ -15,7 +15,21 @@ CONFIG_FILE="$LEARNING_DIR/config/learning-automation.json"
 LEGACY_CONFIG_FILE="$LEARNING_DIR/config/automation.json"
 CRON_FILE="$LEARNING_DIR/cron/learning-crontab"
 RUNNING_MARKER="$LEARNING_DIR/status/automation-running"
-P3_GOVERNANCE_SCRIPT="$LEARNING_DIR/scripts/p3-governance-check.sh"
+GOVERNANCE_SCRIPT="$LEARNING_DIR/scripts/learning-governance-check.sh"
+LEGACY_GOVERNANCE_SCRIPT="$LEARNING_DIR/scripts/p3-governance-check.sh"
+
+resolve_governance_script() {
+    if [ -f "$GOVERNANCE_SCRIPT" ]; then
+        echo "$GOVERNANCE_SCRIPT"
+        return 0
+    fi
+    if [ -f "$LEGACY_GOVERNANCE_SCRIPT" ]; then
+        echo "$LEGACY_GOVERNANCE_SCRIPT"
+        return 0
+    fi
+    echo "$GOVERNANCE_SCRIPT"
+    return 0
+}
 
 # 颜色输出
 RED='\033[0;31m'
@@ -150,10 +164,12 @@ start_automation() {
     mkdir -p "$LEARNING_DIR/status"
     mkdir -p "$LEARNING_DIR/logs"
 
-    if [ -f "$P3_GOVERNANCE_SCRIPT" ]; then
-        log_info "执行 P3 门禁检查..."
-        if ! bash "$P3_GOVERNANCE_SCRIPT" check; then
-            log_error "P3 门禁检查失败，拒绝启动学习自动化"
+    local governance_script
+    governance_script=$(resolve_governance_script)
+    if [ -f "$governance_script" ]; then
+        log_info "执行治理门禁检查..."
+        if ! bash "$governance_script" check; then
+            log_error "治理门禁检查失败，拒绝启动学习自动化"
             return 1
         fi
     fi
@@ -211,11 +227,13 @@ check_status() {
 }
 
 run_governance_gate() {
-    if [ ! -f "$P3_GOVERNANCE_SCRIPT" ]; then
-        log_error "未找到 P3 门禁脚本：$P3_GOVERNANCE_SCRIPT"
+    local governance_script
+    governance_script=$(resolve_governance_script)
+    if [ ! -f "$governance_script" ]; then
+        log_error "未找到治理门禁脚本：$governance_script"
         return 1
     fi
-    bash "$P3_GOVERNANCE_SCRIPT" check
+    bash "$governance_script" check
     return $?
 }
 
@@ -228,7 +246,7 @@ show_help() {
   $0 start    - 启动学习自动化
   $0 stop     - 停止学习自动化
   $0 status   - 检查运行状态
-  $0 gate     - 执行 P3 治理门禁检查
+  $0 gate     - 执行治理门禁检查
   $0 help     - 显示此帮助信息
 
 功能:

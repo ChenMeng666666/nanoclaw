@@ -95,7 +95,7 @@ curl -G http://host.docker.internal:3456/api/learning/tasks \
   --data-urlencode "agentFolder=mimi"
 ```
 
-### 执行 P3 治理门禁
+### 执行治理门禁
 
 ```bash
 bash /workspace/group/.learning-system/scripts/learning-automation.sh gate
@@ -152,13 +152,13 @@ agent-learning/
 ├── config/
 │   ├── learning-automation.json
 │   ├── skill-learning-schedule.json
-│   └── p3-governance-gates.json
+│   └── learning-governance-gates.json
 ├── hooks/
 │   └── post-load.sh      # 加载钩子脚本
 ├── scripts/
 │   ├── init.sh
 │   ├── learning-automation.sh
-│   └── p3-governance-check.sh
+│   └── learning-governance-check.sh
 ```
 
 ## 与记忆系统集成

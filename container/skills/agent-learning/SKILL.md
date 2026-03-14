@@ -31,7 +31,7 @@ bash /workspace/group/.learning-system/scripts/learning-automation.sh start
 这会自动：
 - 设置 cron 定时任务
 - 立即生成并执行当日学习计划
-- 启动前执行 P3 治理门禁检查
+- 启动前执行治理门禁检查
 - 反思调度默认由主进程统一执行
 
 #### 停止学习自动化
@@ -46,7 +46,7 @@ bash /workspace/group/.learning-system/scripts/learning-automation.sh stop
 bash /workspace/group/.learning-system/scripts/learning-automation.sh status
 ```
 
-#### 执行 P3 门禁检查
+#### 执行治理门禁检查
 
 ```bash
 bash /workspace/group/.learning-system/scripts/learning-automation.sh gate
@@ -458,13 +458,13 @@ agent-learning/
 ├── config/
 │   ├── learning-automation.json
 │   ├── skill-learning-schedule.json
-│   └── p3-governance-gates.json
+│   └── learning-governance-gates.json
 ├── hooks/
 │   └── post-load.sh      # 加载钩子：同步初始化脚本并自动初始化
 ├── scripts/
 │   ├── init.sh           # 初始化脚本：检查版本、创建目录、迁移数据
 │   ├── learning-automation.sh
-│   └── p3-governance-check.sh
+│   └── learning-governance-check.sh
 └── README.md             # 使用说明（可选）
 ```
 
