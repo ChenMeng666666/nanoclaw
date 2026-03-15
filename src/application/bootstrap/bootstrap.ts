@@ -1,4 +1,3 @@
-
 import { validateAllConfig } from '../../config.js';
 import { logger } from '../../logger.js';
 import { checkSystemDependencies } from '../../infrastructure/system/dependency-check.js';

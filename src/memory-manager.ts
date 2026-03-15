@@ -18,8 +18,10 @@ import { Memory } from './types.js';
 import { logger } from './logger.js';
 
 // New imports from refactored modules
-import { MemoryMetricsTracker } from './memory-manager/metrics.js';
-import type { MemoryDashboardMetrics } from './memory-manager/metrics.js';
+import {
+  MemoryMetricsTracker,
+  type MemoryDashboardMetrics,
+} from './memory-manager/metrics.js';
 import type {
   MemoryReleaseControl,
   UpdateReleaseControlInput,

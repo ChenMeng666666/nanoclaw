@@ -1,4 +1,3 @@
-
 import { logger } from './logger.js';
 import { Bootstrap } from './application/bootstrap/bootstrap.js';
 
