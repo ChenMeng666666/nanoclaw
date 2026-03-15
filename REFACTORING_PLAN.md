@@ -81,12 +81,12 @@ Focus on simplifying the complex message processing flow.
 
 Final cleanup and entry point optimization.
 
-- [ ] **Entry Point Slimming**
+- [x] **Entry Point Slimming**
     - **Source**: `src/index.ts`
     - **Destination**: `src/application/bootstrap/bootstrap.ts`
     - **Goal**: Move Channel setup loop, Subsystem initialization (Scheduler, IPC), and detailed error handling into a `Bootstrap` class. `index.ts` should only call `Bootstrap.init()`.
 
-- [ ] **Externalize Signal Patterns**
+- [x] **Externalize Signal Patterns**
     - **Source**: `src/signal-extractor/patterns.ts`
     - **Destination**: `config/signal-patterns.json` (or similar) + `src/infrastructure/config/signal-config-loader.ts`
     - **Goal**: Move static data out of TypeScript code files to reduce file size and allow configuration updates without code changes.

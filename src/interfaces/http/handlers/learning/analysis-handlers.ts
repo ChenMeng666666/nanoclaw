@@ -317,7 +317,8 @@ export function createAnalysisHandlers(): {
           return true;
         }
 
-        const { extractSignals } = await import('../../../../signal-extractor.js');
+        const { extractSignals } =
+          await import('../../../../signal-extractor.js');
         const signals = extractSignals({
           content: content as string,
           memorySnippet: memorySnippet as string | undefined,

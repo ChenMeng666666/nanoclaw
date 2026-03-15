@@ -1,0 +1,1302 @@
+{
+  "capability_gap": {
+    "en": {
+      "patterns": [
+        {
+          "source": "I (don't|cannot|can't|am unable to) (understand|do|handle|figure out|solve)",
+          "flags": "i"
+        },
+        {
+          "source": "I (lack|need|should learn|have to learn)",
+          "flags": "i"
+        },
+        {
+          "source": "I'm (not good at|weak at|struggling with)",
+          "flags": "i"
+        },
+        {
+          "source": "I need (to learn|more (knowledge|skills|practice))",
+          "flags": "i"
+        },
+        {
+          "source": "my (ability|skill|knowledge) (is|are) (limited|insufficient|lacking)",
+          "flags": "i"
+        }
+      ],
+      "weight": 0.8,
+      "actionable": true
+    },
+    "zh-CN": {
+      "patterns": [
+        {
+          "source": "我(不|无法|不能)(懂|会|理解|处理|解决)",
+          "flags": ""
+        },
+        {
+          "source": "我(缺乏|需要学习|应该学习|得学习)",
+          "flags": ""
+        },
+        {
+          "source": "我(不擅长|不太会|在.*方面比较弱)",
+          "flags": ""
+        },
+        {
+          "source": "我需要(学习|更多.*知识|更多.*技能|练习)",
+          "flags": ""
+        },
+        {
+          "source": "我的(能力|技能|知识)(有限|不足|欠缺)",
+          "flags": ""
+        },
+        {
+          "source": "我发现自己.*不足",
+          "flags": ""
+        },
+        {
+          "source": "这方面我还需要",
+          "flags": ""
+        }
+      ],
+      "weight": 0.8,
+      "actionable": true
+    },
+    "zh-TW": {
+      "patterns": [
+        {
+          "source": "我(不|無法|不能)(懂|會|理解|處理|解決)",
+          "flags": ""
+        },
+        {
+          "source": "我(缺乏|需要學習|應該學習|得學習)",
+          "flags": ""
+        },
+        {
+          "source": "我(不擅長|不太會|在.*方面比較弱)",
+          "flags": ""
+        },
+        {
+          "source": "我需要(學習|更多.*知識|更多.*技能|練習)",
+          "flags": ""
+        },
+        {
+          "source": "我的(能力|技能|知識)(有限|不足|欠缺)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.8,
+      "actionable": true
+    },
+    "ja": {
+      "patterns": [
+        {
+          "source": "(わから|できな|理解できな|解決できな)",
+          "flags": ""
+        },
+        {
+          "source": "学ぶ必要がある",
+          "flags": ""
+        },
+        {
+          "source": "苦手",
+          "flags": ""
+        },
+        {
+          "source": "能力が(不足|足り)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.8,
+      "actionable": true
+    }
+  },
+  "learning_opportunity": {
+    "en": {
+      "patterns": [
+        {
+          "source": "I (could|should|want to) learn",
+          "flags": "i"
+        },
+        {
+          "source": "it would be (helpful|useful|good) to learn",
+          "flags": "i"
+        },
+        {
+          "source": "I (found|discovered|saw) (a|an) (new|interesting) (method|technique|approach)",
+          "flags": "i"
+        },
+        {
+          "source": "I can improve by",
+          "flags": "i"
+        },
+        {
+          "source": "this (gives me|provides) (a|an) (opportunity|chance) to learn",
+          "flags": "i"
+        }
+      ],
+      "weight": 0.7,
+      "actionable": true
+    },
+    "zh-CN": {
+      "patterns": [
+        {
+          "source": "我可以学习",
+          "flags": ""
+        },
+        {
+          "source": "学(一学|习)会很(有帮助|有用|好)",
+          "flags": ""
+        },
+        {
+          "source": "我发现(了|一个)(新|有趣的)(方法|技巧|思路)",
+          "flags": ""
+        },
+        {
+          "source": "这让我有机会学习",
+          "flags": ""
+        },
+        {
+          "source": "我可以.*提升",
+          "flags": ""
+        },
+        {
+          "source": "值得学习",
+          "flags": ""
+        }
+      ],
+      "weight": 0.7,
+      "actionable": true
+    },
+    "zh-TW": {
+      "patterns": [
+        {
+          "source": "我可以學習",
+          "flags": ""
+        },
+        {
+          "source": "學(一學|習)會很(有幫助|有用|好)",
+          "flags": ""
+        },
+        {
+          "source": "我發現(了|一個)(新|有趣的)(方法|技巧|思路)",
+          "flags": ""
+        },
+        {
+          "source": "這讓我有機會學習",
+          "flags": ""
+        }
+      ],
+      "weight": 0.7,
+      "actionable": true
+    },
+    "ja": {
+      "patterns": [
+        {
+          "source": "学ぶ(べき|できる|チャンス)",
+          "flags": ""
+        },
+        {
+          "source": "学習の機会",
+          "flags": ""
+        },
+        {
+          "source": "新しい(方法|技術|アプローチ)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.7,
+      "actionable": true
+    }
+  },
+  "knowledge_missing": {
+    "en": {
+      "patterns": [
+        {
+          "source": "I (don't|do not) know (how to|about|the|what)",
+          "flags": "i"
+        },
+        {
+          "source": "I'm (not sure|uncertain|confused) (about|how)",
+          "flags": "i"
+        },
+        {
+          "source": "I have no (idea|clue|knowledge)",
+          "flags": "i"
+        },
+        {
+          "source": "I need (more )?information (about|on)",
+          "flags": "i"
+        },
+        {
+          "source": "I'm missing (information|context|knowledge)",
+          "flags": "i"
+        }
+      ],
+      "weight": 0.75,
+      "actionable": true
+    },
+    "zh-CN": {
+      "patterns": [
+        {
+          "source": "我(不知道|不清楚|不了解)",
+          "flags": ""
+        },
+        {
+          "source": "我(不确定|不太确定|有点困惑)",
+          "flags": ""
+        },
+        {
+          "source": "我没有(头绪|概念|这方面的知识)",
+          "flags": ""
+        },
+        {
+          "source": "我需要更多(信息|资料|背景)",
+          "flags": ""
+        },
+        {
+          "source": "我缺少(信息|上下文|知识)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.75,
+      "actionable": true
+    },
+    "zh-TW": {
+      "patterns": [
+        {
+          "source": "我(不知道|不清楚|不了解)",
+          "flags": ""
+        },
+        {
+          "source": "我(不確定|不太確定|有點困惑)",
+          "flags": ""
+        },
+        {
+          "source": "我沒有(頭緒|概念|這方面的知識)",
+          "flags": ""
+        },
+        {
+          "source": "我需要更多(信息|資料|背景)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.75,
+      "actionable": true
+    },
+    "ja": {
+      "patterns": [
+        {
+          "source": "知らない",
+          "flags": ""
+        },
+        {
+          "source": "わからない",
+          "flags": ""
+        },
+        {
+          "source": "情報が(足りない|ない)",
+          "flags": ""
+        },
+        {
+          "source": "知識が不足",
+          "flags": ""
+        }
+      ],
+      "weight": 0.75,
+      "actionable": true
+    }
+  },
+  "recurring_error": {
+    "en": {
+      "patterns": [
+        {
+          "source": "I (keep|kept|always) (making|getting|encountering) (the same|this) (mistake|error)",
+          "flags": "i"
+        },
+        {
+          "source": "again( and again)? I (made|got|encountered)",
+          "flags": "i"
+        },
+        {
+          "source": "this is the (second|third|\\d+th) time",
+          "flags": "i"
+        },
+        {
+          "source": "repeatedly (failed|made mistake|got error)",
+          "flags": "i"
+        }
+      ],
+      "weight": 0.9,
+      "actionable": true
+    },
+    "zh-CN": {
+      "patterns": [
+        {
+          "source": "我(总是|一直|又)犯(同样的|这个)(错误|毛病)",
+          "flags": ""
+        },
+        {
+          "source": "又(一次|再)出现了",
+          "flags": ""
+        },
+        {
+          "source": "这是(第二|第三|第.*).{0,3}次了",
+          "flags": ""
+        },
+        {
+          "source": "反复(出错|失败)",
+          "flags": ""
+        },
+        {
+          "source": "同样的问题又出现了",
+          "flags": ""
+        }
+      ],
+      "weight": 0.9,
+      "actionable": true
+    },
+    "zh-TW": {
+      "patterns": [
+        {
+          "source": "我(總是|一直|又)犯(同樣的|這個)(錯誤|毛病)",
+          "flags": ""
+        },
+        {
+          "source": "又(一次|再)出現了",
+          "flags": ""
+        },
+        {
+          "source": "這是(第二|第三|第.*).{0,3}次了",
+          "flags": ""
+        },
+        {
+          "source": "反覆(出錯|失敗)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.9,
+      "actionable": true
+    },
+    "ja": {
+      "patterns": [
+        {
+          "source": "また(同じ|間違|エラー)",
+          "flags": ""
+        },
+        {
+          "source": "何度も",
+          "flags": ""
+        },
+        {
+          "source": "繰り返し",
+          "flags": ""
+        }
+      ],
+      "weight": 0.9,
+      "actionable": true
+    }
+  },
+  "performance_issue": {
+    "en": {
+      "patterns": [
+        {
+          "source": "too (slow|fast|long|short)",
+          "flags": "i"
+        },
+        {
+          "source": "not (fast|efficient|good) enough",
+          "flags": "i"
+        },
+        {
+          "source": "performance (issue|problem|degraded)",
+          "flags": "i"
+        },
+        {
+          "source": "taking too (much )?time",
+          "flags": "i"
+        },
+        {
+          "source": "response (time|quality) is",
+          "flags": "i"
+        },
+        {
+          "source": "efficiency (is|could be)",
+          "flags": "i"
+        }
+      ],
+      "weight": 0.7,
+      "actionable": true
+    },
+    "zh-CN": {
+      "patterns": [
+        {
+          "source": "太(慢|快|长|短)了",
+          "flags": ""
+        },
+        {
+          "source": "(不够|不太)(快|高效|好)",
+          "flags": ""
+        },
+        {
+          "source": "性能(问题|下降|瓶颈)",
+          "flags": ""
+        },
+        {
+          "source": "花费太(多.*时间|长时间)",
+          "flags": ""
+        },
+        {
+          "source": "响应(时间|质量)",
+          "flags": ""
+        },
+        {
+          "source": "效率(低|不够|可以提升)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.7,
+      "actionable": true
+    },
+    "zh-TW": {
+      "patterns": [
+        {
+          "source": "太(慢|快|長|短)了",
+          "flags": ""
+        },
+        {
+          "source": "(不夠|不太)(快|高效|好)",
+          "flags": ""
+        },
+        {
+          "source": "性能(問題|下降|瓶頸)",
+          "flags": ""
+        },
+        {
+          "source": "花費太(多.*時間|長時間)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.7,
+      "actionable": true
+    },
+    "ja": {
+      "patterns": [
+        {
+          "source": "(遅すぎ|速すぎ|長すぎ|短すぎ)",
+          "flags": ""
+        },
+        {
+          "source": "パフォーマンス(問題|低下)",
+          "flags": ""
+        },
+        {
+          "source": "効率が(悪い|低い)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.7,
+      "actionable": true
+    }
+  },
+  "user_feedback": {
+    "en": {
+      "patterns": [
+        {
+          "source": "user (said|told|asked|mentioned|complained|praised)",
+          "flags": "i"
+        },
+        {
+          "source": "the user (wants|needs|prefers|likes|dislikes)",
+          "flags": "i"
+        },
+        {
+          "source": "according to the user",
+          "flags": "i"
+        },
+        {
+          "source": "user feedback:",
+          "flags": "i"
+        }
+      ],
+      "weight": 0.85,
+      "actionable": true
+    },
+    "zh-CN": {
+      "patterns": [
+        {
+          "source": "用户(说|告诉|问|提到|抱怨|表扬|夸)",
+          "flags": ""
+        },
+        {
+          "source": "用户(想要|需要|喜欢|不喜欢|偏好)",
+          "flags": ""
+        },
+        {
+          "source": "根据用户",
+          "flags": ""
+        },
+        {
+          "source": "用户反馈",
+          "flags": ""
+        }
+      ],
+      "weight": 0.85,
+      "actionable": true
+    },
+    "zh-TW": {
+      "patterns": [
+        {
+          "source": "用戶(說|告訴|問|提到|抱怨|表揚|誇)",
+          "flags": ""
+        },
+        {
+          "source": "用戶(想要|需要|喜歡|不喜歡|偏好)",
+          "flags": ""
+        },
+        {
+          "source": "根據用戶",
+          "flags": ""
+        },
+        {
+          "source": "用戶反饋",
+          "flags": ""
+        }
+      ],
+      "weight": 0.85,
+      "actionable": true
+    },
+    "ja": {
+      "patterns": [
+        {
+          "source": "ユーザーが(言っ|言わ|聞い|文句|褒め)",
+          "flags": ""
+        },
+        {
+          "source": "ユーザーの(要望|好み|フィードバック)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.85,
+      "actionable": true
+    }
+  },
+  "negative_feedback": {
+    "en": {
+      "patterns": [
+        {
+          "source": "user (is|was|seems) (unhappy|dissatisfied|frustrated|angry|annoyed)",
+          "flags": "i"
+        },
+        {
+          "source": "user (complained|criticized|didn't like)",
+          "flags": "i"
+        },
+        {
+          "source": "user (said|told me) (it's|that's) (bad|wrong|incorrect|not good|terrible)",
+          "flags": "i"
+        },
+        {
+          "source": "user gave (negative|bad) feedback",
+          "flags": "i"
+        },
+        {
+          "source": "not what (the )?user (wanted|expected|needed)",
+          "flags": "i"
+        }
+      ],
+      "weight": 0.9,
+      "actionable": true
+    },
+    "zh-CN": {
+      "patterns": [
+        {
+          "source": "用户(不开心|不满意|沮丧|生气|烦躁|恼火)",
+          "flags": ""
+        },
+        {
+          "source": "用户(抱怨|批评|不喜欢)",
+          "flags": ""
+        },
+        {
+          "source": "用户说.*(不对|不好|错误|糟糕)",
+          "flags": ""
+        },
+        {
+          "source": "用户给了(负面|差)评",
+          "flags": ""
+        },
+        {
+          "source": "不是用户(想要|期望|需要)的",
+          "flags": ""
+        }
+      ],
+      "weight": 0.9,
+      "actionable": true
+    },
+    "zh-TW": {
+      "patterns": [
+        {
+          "source": "用戶(不開心|不滿意|沮喪|生氣|煩躁|惱火)",
+          "flags": ""
+        },
+        {
+          "source": "用戶(抱怨|批評|不喜歡)",
+          "flags": ""
+        },
+        {
+          "source": "用戶說.*(不對|不好|錯誤|糟糕)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.9,
+      "actionable": true
+    },
+    "ja": {
+      "patterns": [
+        {
+          "source": "ユーザーが(不満|怒っ|イライラ)",
+          "flags": ""
+        },
+        {
+          "source": "ユーザーから(文句|批判|苦情)",
+          "flags": ""
+        },
+        {
+          "source": "期待(していなかっ|と違っ)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.9,
+      "actionable": true
+    }
+  },
+  "positive_feedback": {
+    "en": {
+      "patterns": [
+        {
+          "source": "user (is|was|seems) (happy|satisfied|pleased|delighted)",
+          "flags": "i"
+        },
+        {
+          "source": "user (praised|complimented|liked|appreciated)",
+          "flags": "i"
+        },
+        {
+          "source": "user (said|told me) (it's|that's) (good|great|excellent|perfect|amazing)",
+          "flags": "i"
+        },
+        {
+          "source": "user gave (positive|good) feedback",
+          "flags": "i"
+        },
+        {
+          "source": "exactly what (the )?user (wanted|expected|needed)",
+          "flags": "i"
+        }
+      ],
+      "weight": 0.6,
+      "actionable": false
+    },
+    "zh-CN": {
+      "patterns": [
+        {
+          "source": "用户(开心|满意|高兴|惊喜)",
+          "flags": ""
+        },
+        {
+          "source": "用户(表扬|夸奖|喜欢|认可|赞赏)",
+          "flags": ""
+        },
+        {
+          "source": "用户说.*(好|棒|优秀|完美)",
+          "flags": ""
+        },
+        {
+          "source": "用户给了(正面|好)评",
+          "flags": ""
+        },
+        {
+          "source": "正是用户(想要|期望|需要)的",
+          "flags": ""
+        }
+      ],
+      "weight": 0.6,
+      "actionable": false
+    },
+    "zh-TW": {
+      "patterns": [
+        {
+          "source": "用戶(開心|滿意|高興|驚喜)",
+          "flags": ""
+        },
+        {
+          "source": "用戶(表揚|誇獎|喜歡|認可|讚賞)",
+          "flags": ""
+        },
+        {
+          "source": "用戶說.*(好|棒|優秀|完美)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.6,
+      "actionable": false
+    },
+    "ja": {
+      "patterns": [
+        {
+          "source": "ユーザーが(嬉し|満足|喜ん)",
+          "flags": ""
+        },
+        {
+          "source": "ユーザーから(褒め|好評|感謝)",
+          "flags": ""
+        },
+        {
+          "source": "期待通り",
+          "flags": ""
+        }
+      ],
+      "weight": 0.6,
+      "actionable": false
+    }
+  },
+  "stable_plateau": {
+    "en": {
+      "patterns": [
+        {
+          "source": "I've been (stable|consistent|steady) (for|over|the last)",
+          "flags": "i"
+        },
+        {
+          "source": "no (significant|major) (changes|improvements|issues) (recently|lately)",
+          "flags": "i"
+        },
+        {
+          "source": "everything (is|has been) (working|going|running) (well|smoothly|fine)",
+          "flags": "i"
+        },
+        {
+          "source": "I (feel|think) I've (reached|achieved) a (stable|good) (level|state)",
+          "flags": "i"
+        }
+      ],
+      "weight": 0.5,
+      "actionable": false
+    },
+    "zh-CN": {
+      "patterns": [
+        {
+          "source": "我已经(稳定|持续|平稳)(了|一段时间)",
+          "flags": ""
+        },
+        {
+          "source": "(最近|近期)没有(明显|重大)的(变化|改进|问题)",
+          "flags": ""
+        },
+        {
+          "source": "一切都(很|运行得)(好|顺利|正常)",
+          "flags": ""
+        },
+        {
+          "source": "我觉得我已经(达到|进入)(稳定|不错)的(水平|状态)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.5,
+      "actionable": false
+    },
+    "zh-TW": {
+      "patterns": [
+        {
+          "source": "我已經(穩定|持續|平穩)(了|一段時間)",
+          "flags": ""
+        },
+        {
+          "source": "(最近|近期)沒有(明顯|重大)的(變化|改進|問題)",
+          "flags": ""
+        },
+        {
+          "source": "一切都(很|運行得)(好|順利|正常)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.5,
+      "actionable": false
+    },
+    "ja": {
+      "patterns": [
+        {
+          "source": "安定し(ている|て)",
+          "flags": ""
+        },
+        {
+          "source": "(大きな|重大な)(変化|問題)が(ない|なし)",
+          "flags": ""
+        },
+        {
+          "source": "順調に(動い|い)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.5,
+      "actionable": false
+    }
+  },
+  "learning_stagnation": {
+    "en": {
+      "patterns": [
+        {
+          "source": "I (haven't|have not) (learned|improved|grown|progressed) (much|significantly)? (lately|recently|for a while)",
+          "flags": "i"
+        },
+        {
+          "source": "my (learning|progress|growth) has (slowed|stopped|stagnated)",
+          "flags": "i"
+        },
+        {
+          "source": "I feel (stuck|stagnant|in a rut)",
+          "flags": "i"
+        },
+        {
+          "source": "no (new|major) (insights|learnings|discoveries)",
+          "flags": "i"
+        }
+      ],
+      "weight": 0.65,
+      "actionable": true
+    },
+    "zh-CN": {
+      "patterns": [
+        {
+          "source": "我(最近|这段时间|好久)没有(学到|提升|进步|成长)",
+          "flags": ""
+        },
+        {
+          "source": "我的(学习|进步|成长)(停滞|慢下来|停了)",
+          "flags": ""
+        },
+        {
+          "source": "我觉得(卡住了|停滞不前|陷入瓶颈)",
+          "flags": ""
+        },
+        {
+          "source": "没有(新的|重大的)(洞见|学习|发现)",
+          "flags": ""
+        },
+        {
+          "source": "感觉学不动了",
+          "flags": ""
+        }
+      ],
+      "weight": 0.65,
+      "actionable": true
+    },
+    "zh-TW": {
+      "patterns": [
+        {
+          "source": "我(最近|這段時間|好久)沒有(學到|提升|進步|成長)",
+          "flags": ""
+        },
+        {
+          "source": "我的(學習|進步|成長)(停滯|慢下來|停了)",
+          "flags": ""
+        },
+        {
+          "source": "我覺得(卡住了|停滯不前|陷入瓶頸)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.65,
+      "actionable": true
+    },
+    "ja": {
+      "patterns": [
+        {
+          "source": "学びが(ない|止まっ|遅くなっ)",
+          "flags": ""
+        },
+        {
+          "source": "成長が(停滞|止ま)",
+          "flags": ""
+        },
+        {
+          "source": "行き詰ま(って|り)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.65,
+      "actionable": true
+    }
+  },
+  "saturation": {
+    "en": {
+      "patterns": [
+        {
+          "source": "I've (reached|hit|arrived at) my (limit|peak|maximum)",
+          "flags": "i"
+        },
+        {
+          "source": "I can't (improve|learn|do) (any )?more",
+          "flags": "i"
+        },
+        {
+          "source": "I've (done|tried) everything I (can|know)",
+          "flags": "i"
+        },
+        {
+          "source": "no more (room|space|potential) for (improvement|growth)",
+          "flags": "i"
+        }
+      ],
+      "weight": 0.8,
+      "actionable": false
+    },
+    "zh-CN": {
+      "patterns": [
+        {
+          "source": "我已经(达到|到了)(极限|顶峰|上限)",
+          "flags": ""
+        },
+        {
+          "source": "我无法再(提升|学习|做)了",
+          "flags": ""
+        },
+        {
+          "source": "我已经(尽力|尝试了所有)",
+          "flags": ""
+        },
+        {
+          "source": "没有(更多|更大)(提升|成长)空间了",
+          "flags": ""
+        }
+      ],
+      "weight": 0.8,
+      "actionable": false
+    },
+    "zh-TW": {
+      "patterns": [
+        {
+          "source": "我已經(達到|到了)(極限|頂峰|上限)",
+          "flags": ""
+        },
+        {
+          "source": "我無法再(提升|學習|做)了",
+          "flags": ""
+        },
+        {
+          "source": "我已經(盡力|嘗試了所有)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.8,
+      "actionable": false
+    },
+    "ja": {
+      "patterns": [
+        {
+          "source": "限界に(達し|到達)",
+          "flags": ""
+        },
+        {
+          "source": "これ以上(できな|無理)",
+          "flags": ""
+        },
+        {
+          "source": "成長の余地が(ない|なし)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.8,
+      "actionable": false
+    }
+  },
+  "feature_request": {
+    "en": {
+      "patterns": [
+        {
+          "source": "I (need|want|should have) (a|an|the ability to|the capability to)",
+          "flags": "i"
+        },
+        {
+          "source": "it would be (nice|great|helpful) if I could",
+          "flags": "i"
+        },
+        {
+          "source": "I wish I could",
+          "flags": "i"
+        },
+        {
+          "source": "feature (request|suggestion):",
+          "flags": "i"
+        },
+        {
+          "source": "new (feature|capability|ability):",
+          "flags": "i"
+        }
+      ],
+      "weight": 0.75,
+      "actionable": true
+    },
+    "zh-CN": {
+      "patterns": [
+        {
+          "source": "我(需要|想要|应该有)(能力|功能)",
+          "flags": ""
+        },
+        {
+          "source": "如果我能.*就(好了|太棒了|很有帮助)",
+          "flags": ""
+        },
+        {
+          "source": "我希望我能",
+          "flags": ""
+        },
+        {
+          "source": "功能请求:",
+          "flags": ""
+        },
+        {
+          "source": "新功能:",
+          "flags": ""
+        }
+      ],
+      "weight": 0.75,
+      "actionable": true
+    },
+    "zh-TW": {
+      "patterns": [
+        {
+          "source": "我(需要|想要|應該有)(能力|功能)",
+          "flags": ""
+        },
+        {
+          "source": "如果我能.*就(好了|太棒了|很有幫助)",
+          "flags": ""
+        },
+        {
+          "source": "我希望我能",
+          "flags": ""
+        },
+        {
+          "source": "功能請求:",
+          "flags": ""
+        }
+      ],
+      "weight": 0.75,
+      "actionable": true
+    },
+    "ja": {
+      "patterns": [
+        {
+          "source": "新機能",
+          "flags": ""
+        },
+        {
+          "source": "機能リクエスト",
+          "flags": ""
+        },
+        {
+          "source": "できればいいのに",
+          "flags": ""
+        },
+        {
+          "source": "機能が(欲し|必要)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.75,
+      "actionable": true
+    }
+  },
+  "improvement_suggestion": {
+    "en": {
+      "patterns": [
+        {
+          "source": "I could (improve|do better|optimize)",
+          "flags": "i"
+        },
+        {
+          "source": "it would be better if",
+          "flags": "i"
+        },
+        {
+          "source": "I should (try|attempt|consider)",
+          "flags": "i"
+        },
+        {
+          "source": "improvement:(\\s|$)",
+          "flags": "i"
+        },
+        {
+          "source": "suggestion:(\\s|$)",
+          "flags": "i"
+        }
+      ],
+      "weight": 0.7,
+      "actionable": true
+    },
+    "zh-CN": {
+      "patterns": [
+        {
+          "source": "我可以(改进|做得更好|优化)",
+          "flags": ""
+        },
+        {
+          "source": "如果.*会更好",
+          "flags": ""
+        },
+        {
+          "source": "我应该(尝试|考虑)",
+          "flags": ""
+        },
+        {
+          "source": "改进:",
+          "flags": ""
+        },
+        {
+          "source": "建议:",
+          "flags": ""
+        }
+      ],
+      "weight": 0.7,
+      "actionable": true
+    },
+    "zh-TW": {
+      "patterns": [
+        {
+          "source": "我可以(改進|做得更好|優化)",
+          "flags": ""
+        },
+        {
+          "source": "如果.*會更好",
+          "flags": ""
+        },
+        {
+          "source": "我應該(嘗試|考慮)",
+          "flags": ""
+        },
+        {
+          "source": "改進:",
+          "flags": ""
+        },
+        {
+          "source": "建議:",
+          "flags": ""
+        }
+      ],
+      "weight": 0.7,
+      "actionable": true
+    },
+    "ja": {
+      "patterns": [
+        {
+          "source": "改善(でき|できそう|提案)",
+          "flags": ""
+        },
+        {
+          "source": "もっといい方法",
+          "flags": ""
+        },
+        {
+          "source": "提案:",
+          "flags": ""
+        }
+      ],
+      "weight": 0.7,
+      "actionable": true
+    }
+  },
+  "innovation_idea": {
+    "en": {
+      "patterns": [
+        {
+          "source": "I (have|got|came up with) (a|an) (idea|insight|inspiration)",
+          "flags": "i"
+        },
+        {
+          "source": "what if I",
+          "flags": "i"
+        },
+        {
+          "source": "suddenly I (realized|thought|understood)",
+          "flags": "i"
+        },
+        {
+          "source": "innovative (approach|idea|solution):",
+          "flags": "i"
+        },
+        {
+          "source": "new idea:",
+          "flags": "i"
+        }
+      ],
+      "weight": 0.6,
+      "actionable": true
+    },
+    "zh-CN": {
+      "patterns": [
+        {
+          "source": "我(有|想到了)(一个|个)(想法|灵感|洞见)",
+          "flags": ""
+        },
+        {
+          "source": "如果我",
+          "flags": ""
+        },
+        {
+          "source": "突然我(意识到|想到|明白了)",
+          "flags": ""
+        },
+        {
+          "source": "创新(方法|想法|解决方案):",
+          "flags": ""
+        },
+        {
+          "source": "新想法:",
+          "flags": ""
+        }
+      ],
+      "weight": 0.6,
+      "actionable": true
+    },
+    "zh-TW": {
+      "patterns": [
+        {
+          "source": "我(有|想到了)(一個|個)(想法|靈感|洞見)",
+          "flags": ""
+        },
+        {
+          "source": "如果我",
+          "flags": ""
+        },
+        {
+          "source": "突然我(意識到|想到|明白了)",
+          "flags": ""
+        },
+        {
+          "source": "創新(方法|想法|解決方案):",
+          "flags": ""
+        }
+      ],
+      "weight": 0.6,
+      "actionable": true
+    },
+    "ja": {
+      "patterns": [
+        {
+          "source": "アイデアが(浮かん|思いつ)",
+          "flags": ""
+        },
+        {
+          "source": "ひらめき",
+          "flags": ""
+        },
+        {
+          "source": "新しい(アイデア|発想)",
+          "flags": ""
+        }
+      ],
+      "weight": 0.6,
+      "actionable": true
+    }
+  }
+}

@@ -6,9 +6,7 @@ import {
   TIMEZONE,
   TRIGGER_PATTERN,
 } from '../../config.js';
-import {
-  writeGroupsSnapshot,
-} from '../../container-runner.js';
+import { writeGroupsSnapshot } from '../../container-runner.js';
 import {
   getNewMessages,
   setRegisteredGroup,

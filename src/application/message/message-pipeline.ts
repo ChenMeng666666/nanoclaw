@@ -13,11 +13,7 @@ import {
   writeGroupsSnapshot,
   writeTasksSnapshot,
 } from '../../container-runner.js';
-import {
-  getAllTasks,
-  getMessagesSince,
-  setSession,
-} from '../../db.js';
+import { getAllTasks, getMessagesSince, setSession } from '../../db.js';
 import { routeMessageToAgent } from '../../agent-router.js';
 import { GroupQueue } from '../../group-queue.js';
 import { findChannel, formatMessages } from '../../router.js';
@@ -29,10 +25,7 @@ import { Channel, RegisteredGroup } from '../../types.js';
 import { logger } from '../../logger.js';
 import { contextEngineRegistry } from '../../context-engine/registry.js';
 import type { ContextEngine } from '../../context-engine/interface.js';
-import {
-  saveAppState,
-  AppState,
-} from './state-recovery-service.js';
+import { saveAppState, AppState } from './state-recovery-service.js';
 import { getAvailableGroups } from './group-utils.js';
 
 export class MessagePipeline {
