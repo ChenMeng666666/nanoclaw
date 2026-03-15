@@ -106,7 +106,6 @@ NanoClaw 提供以下高级功能：
 生成的认知文件会自动包含：
 - Agent 身份定义
 - 高级能力说明（ContextEngine/Learning/Evolution）
-- **标准作业流程 (SOP)**：指导 Agent 进行外部搜索和经验上传
 - 开发指南（API 地址、鉴权方式）
 
 ### 数据库记录
@@ -121,9 +120,20 @@ NanoClaw 提供以下高级功能：
    ```bash
    export NANOCLAW_ENCRYPTION_KEY=$(openssl rand -hex 32)
    ```
+   > 提示：这与 `setup` skill 中的全局配置不同，是专为多 Agent 场景提供的安全增强。
 
-2. **通道配置**：强烈建议跳过脚本内的通道配置，改用 `/add-telegram` 等专用 Skill。
+2. **通道配置**：脚本中虽保留手动配置选项，但**强烈建议跳过**，改用 `/add-telegram`、`/add-whatsapp` 等专用 Skill。这些 Skill 会自动处理认证、JID 格式校验和依赖安装。
 
-3. **鉴权**：生成的 Agent 容器会自动注入 `RUNTIME_API_KEY`。如果 Agent 需要编写脚本调用 Runtime API，必须在请求头中包含 `X-API-Key: $RUNTIME_API_KEY`。
+3. **容器与 API**：
+   - Agent 将运行在 `setup` 阶段选择的容器运行时中（Docker 或 Apple Container）。
+   - 生成的 `CLAUDE.md` 中包含 API 调用示例。请注意，API 地址（默认为 `http://host.docker.internal:3456`）可能需根据实际运行时环境微调（例如在某些 Linux 环境下可能需要使用网关 IP）。
+   - 容器会自动注入 `RUNTIME_API_KEY`。所有 API 调用必须在请求头中包含 `X-API-Key: $RUNTIME_API_KEY`。
 
-4. **生效方式**：修改后需运行 `npm run build` 并重启服务
+4. **生效方式**：修改配置后需运行 `npm run build` 并重启服务：
+   ```bash
+   npm run build
+   # macOS
+   launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+   # Linux
+   systemctl --user restart nanoclaw
+   ```

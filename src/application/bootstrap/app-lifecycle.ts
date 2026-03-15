@@ -159,7 +159,7 @@ export class AppLifecycleManager {
     // 关闭运行时 API
     if (this.runtimeAPIServer) {
       await new Promise<void>((resolve) => {
-        this.runtimeAPIServer.close(() => resolve());
+        this.runtimeAPIServer!.close(() => resolve());
       });
     }
 
@@ -180,7 +180,7 @@ export class AppLifecycleManager {
     logger.info('ContextEngine memories are persisted during runtime');
 
     if (this.queue) {
-      await this.queue.shutdown(10000);
+      await this.queue.shutdown();
     }
 
     for (const ch of this.channels) await ch.disconnect();

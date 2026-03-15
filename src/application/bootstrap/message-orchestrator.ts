@@ -34,6 +34,10 @@ import { getAvailableGroups } from '../message/group-utils.js';
 import type { AvailableGroup } from '../../container-runner.js';
 import { LearningSystemInitializer } from '../../infrastructure/system/learning-system-initializer.js';
 import { MessagePipeline } from '../message/message-pipeline.js';
+import {
+  startRemoteControl,
+  stopRemoteControl,
+} from '../remote-control.js';
 
 export class MessageOrchestrator {
   private messageLoopRunning = false;
@@ -155,6 +159,67 @@ export class MessageOrchestrator {
                 },
                 'Blocking potentially malicious message',
               );
+              continue;
+            }
+
+            // Remote Control Command
+            if (sanitizedContent.trim().startsWith('/remote-control')) {
+              // Security Check: Only allow Main Group
+              const group = this.state.registeredGroups[msg.chat_jid];
+              if (!group?.isMain) {
+                logger.warn(
+                  { chatJid: msg.chat_jid, sender: msg.sender },
+                  'Unauthorized /remote-control attempt (not main group)',
+                );
+                continue;
+              }
+
+              const channel = findChannel(this.channels, msg.chat_jid);
+              if (channel) {
+                const args = sanitizedContent.trim().split(/\s+/);
+                const subcommand = args[1];
+
+                if (subcommand === 'stop') {
+                  const result = stopRemoteControl();
+                  if (result.ok) {
+                    await channel.sendMessage(
+                      msg.chat_jid,
+                      'Remote Control session stopped.',
+                    );
+                  } else {
+                    await channel.sendMessage(
+                      msg.chat_jid,
+                      `Failed to stop: ${result.error}`,
+                    );
+                  }
+                } else {
+                  // Async execution to avoid blocking message loop
+                  (async () => {
+                    await channel.sendMessage(
+                      msg.chat_jid,
+                      'Starting Remote Control session...',
+                    );
+                    const result = await startRemoteControl(
+                      msg.sender,
+                      msg.chat_jid,
+                      process.cwd(),
+                    );
+                    if (result.ok) {
+                      await channel.sendMessage(
+                        msg.chat_jid,
+                        `Remote Control active: ${result.url}`,
+                      );
+                    } else {
+                      await channel.sendMessage(
+                        msg.chat_jid,
+                        `Failed to start: ${result.error}`,
+                      );
+                    }
+                  })().catch((err) =>
+                    logger.error({ err }, 'Remote control execution failed'),
+                  );
+                }
+              }
               continue;
             }
 

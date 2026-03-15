@@ -13,6 +13,7 @@ import {
 } from '../message/state-recovery-service.js';
 import { AppLifecycleManager } from './app-lifecycle.js';
 import { MessageOrchestrator } from './message-orchestrator.js';
+import { restoreRemoteControl } from '../remote-control.js';
 import { startRuntimeAPI } from '../../runtime-api.js';
 import {
   getChannelFactory,
@@ -49,6 +50,7 @@ export class Bootstrap {
 
     // 2. State & Core Services
     const appState = loadAppState();
+    restoreRemoteControl();
     const lifecycleManager = new AppLifecycleManager();
     const queue = new GroupQueue();
     const channels: Channel[] = []; // will be populated
