@@ -174,7 +174,7 @@ describe('GroupQueue', () => {
     const processMessages = vi.fn(async (groupJid: string) => groupJid !== '');
     queue.setProcessMessagesFn(processMessages);
 
-    await queue.shutdown(1000);
+    await queue.shutdown();
 
     queue.enqueueMessageCheck('group1@g.us');
     await vi.advanceTimersByTimeAsync(100);
@@ -304,7 +304,14 @@ describe('GroupQueue', () => {
     // Register a process so closeStdin has a groupFolder
     queue.registerProcess(
       'group1@g.us',
-      {} as any,
+      {
+        pid: 12345,
+        stdin: { write: vi.fn(), end: vi.fn() },
+        stdout: { on: vi.fn() },
+        stderr: { on: vi.fn() },
+        on: vi.fn(),
+        kill: vi.fn(),
+      } as any,
       'container-1',
       'test-group',
     );
@@ -344,7 +351,14 @@ describe('GroupQueue', () => {
     // Register process and mark idle
     queue.registerProcess(
       'group1@g.us',
-      {} as any,
+      {
+        pid: 12345,
+        stdin: { write: vi.fn(), end: vi.fn() },
+        stdout: { on: vi.fn() },
+        stderr: { on: vi.fn() },
+        on: vi.fn(),
+        kill: vi.fn(),
+      } as any,
       'container-1',
       'test-group',
     );
@@ -383,7 +397,14 @@ describe('GroupQueue', () => {
     await vi.advanceTimersByTimeAsync(10);
     queue.registerProcess(
       'group1@g.us',
-      {} as any,
+      {
+        pid: 12345,
+        stdin: { write: vi.fn(), end: vi.fn() },
+        stdout: { on: vi.fn() },
+        stderr: { on: vi.fn() },
+        on: vi.fn(),
+        kill: vi.fn(),
+      } as any,
       'container-1',
       'test-group',
     );
@@ -424,7 +445,14 @@ describe('GroupQueue', () => {
     await vi.advanceTimersByTimeAsync(10);
     queue.registerProcess(
       'group1@g.us',
-      {} as any,
+      {
+        pid: 12345,
+        stdin: { write: vi.fn(), end: vi.fn() },
+        stdout: { on: vi.fn() },
+        stderr: { on: vi.fn() },
+        on: vi.fn(),
+        kill: vi.fn(),
+      } as any,
       'container-1',
       'test-group',
     );
@@ -456,7 +484,14 @@ describe('GroupQueue', () => {
     await vi.advanceTimersByTimeAsync(10);
     queue.registerProcess(
       'group1@g.us',
-      {} as any,
+      {
+        pid: 12345,
+        stdin: { write: vi.fn(), end: vi.fn() },
+        stdout: { on: vi.fn() },
+        stderr: { on: vi.fn() },
+        on: vi.fn(),
+        kill: vi.fn(),
+      } as any,
       'container-1',
       'test-group',
     );
@@ -498,7 +533,14 @@ describe('GroupQueue', () => {
     // Register process and enqueue a task (no idle yet — no preemption)
     queue.registerProcess(
       'group1@g.us',
-      {} as any,
+      {
+        pid: 12345,
+        stdin: { write: vi.fn(), end: vi.fn() },
+        stdout: { on: vi.fn() },
+        stderr: { on: vi.fn() },
+        on: vi.fn(),
+        kill: vi.fn(),
+      } as any,
       'container-1',
       'test-group',
     );

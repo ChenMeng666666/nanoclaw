@@ -43,7 +43,7 @@ export async function handleLearningCollaborationEndpoints(
     const messageId = sendAgentMessage(
       fromAgentId as string,
       toAgentId as string,
-      type as string,
+      type as any,
       content as string,
       metadata as Record<string, unknown>,
     );
@@ -212,7 +212,7 @@ export async function handleLearningCollaborationEndpoints(
       return true;
     }
 
-    updateTeamState(teamId as string, updates);
+    updateTeamState(teamId as string, updates as any);
     writeJSON(res, 200, { success: true });
     return true;
   }
@@ -256,7 +256,7 @@ export async function handleLearningCollaborationEndpoints(
       return true;
     }
 
-    const health = checkTeamHealth(teamId);
+    const health = checkTeamHealth(teamId as string);
     writeJSON(res, 200, health);
     return true;
   }

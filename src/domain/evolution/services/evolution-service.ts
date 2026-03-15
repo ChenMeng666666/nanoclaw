@@ -307,7 +307,8 @@ export class EvolutionService {
       .get() as { count: number };
 
     // Calculate Shannon Diversity
-    const shannonDiversity = this.calculateShannonDiversity(allGenes);
+    // Type assertion to fix TS error
+    const shannonDiversity = this.calculateShannonDiversity(allGenes as unknown as EvolutionEntry[]);
 
     // Calculate Average GDI Score
     const gdiScores = allGenes
@@ -360,7 +361,7 @@ export class EvolutionService {
     const current = this.calculateEcosystemMetrics();
     const timeline = getEcosystemMetrics(safeLimit)
       .map((item) => ({
-        timestamp: item.timestamp,
+        timestamp: (item as any).timestamp,
         shannonDiversity: item.shannonDiversity,
         avgGDIScore: item.avgGDIScore,
         totalGenes: item.totalGenes,
@@ -407,17 +408,17 @@ export class EvolutionService {
     const currentEmbedding = await generateEmbedding(content);
 
     for (const existing of existingEntries) {
-      if (!existing.content_embedding) continue;
+      if (!existing.contentEmbedding) continue;
 
       try {
-        const existingEmbedding = JSON.parse(existing.content_embedding);
+        const existingEmbedding = JSON.parse(existing.contentEmbedding as unknown as string);
         if (!Array.isArray(existingEmbedding)) continue;
         const similarity = this.cosineSimilarity(
           currentEmbedding,
           existingEmbedding,
         );
 
-        const isSameAuthor = existing.source_agent_id === authorId;
+        const isSameAuthor = existing.sourceAgentId === authorId;
         const threshold = this.normalizeSimilarityThreshold(
           isSameAuthor
             ? EVOLUTION_CONFIG.duplicateThreshold.sameAuthor

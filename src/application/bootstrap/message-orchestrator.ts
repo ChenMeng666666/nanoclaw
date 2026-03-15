@@ -34,14 +34,13 @@ import { getAvailableGroups } from '../message/group-utils.js';
 import type { AvailableGroup } from '../../container-runner.js';
 import { LearningSystemInitializer } from '../../infrastructure/system/learning-system-initializer.js';
 import { MessagePipeline } from '../message/message-pipeline.js';
-import {
-  startRemoteControl,
-  stopRemoteControl,
-} from '../remote-control.js';
+import { RemoteControlSystemSkill } from '../skills/remote-control-skill.js';
+import type { SystemSkill } from '../system-skill.js';
 
 export class MessageOrchestrator {
   private messageLoopRunning = false;
   private pipeline: MessagePipeline;
+  private systemSkills: SystemSkill[] = [];
 
   constructor(
     private state: AppState,
@@ -49,6 +48,11 @@ export class MessageOrchestrator {
     private channels: Channel[],
   ) {
     this.pipeline = new MessagePipeline(state, queue, channels);
+    this.registerSystemSkills();
+  }
+
+  private registerSystemSkills() {
+    this.systemSkills.push(new RemoteControlSystemSkill());
   }
 
   public getRegisteredGroups(): Record<string, RegisteredGroup> {
@@ -162,64 +166,30 @@ export class MessageOrchestrator {
               continue;
             }
 
-            // Remote Control Command
-            if (sanitizedContent.trim().startsWith('/remote-control')) {
-              // Security Check: Only allow Main Group
-              const group = this.state.registeredGroups[msg.chat_jid];
-              if (!group?.isMain) {
-                logger.warn(
-                  { chatJid: msg.chat_jid, sender: msg.sender },
-                  'Unauthorized /remote-control attempt (not main group)',
-                );
-                continue;
-              }
+            // System Skills Execution
+            const channel = findChannel(this.channels, msg.chat_jid);
+            const group = this.state.registeredGroups[msg.chat_jid];
+            let handledBySkill = false;
 
-              const channel = findChannel(this.channels, msg.chat_jid);
-              if (channel) {
-                const args = sanitizedContent.trim().split(/\s+/);
-                const subcommand = args[1];
-
-                if (subcommand === 'stop') {
-                  const result = stopRemoteControl();
-                  if (result.ok) {
-                    await channel.sendMessage(
-                      msg.chat_jid,
-                      'Remote Control session stopped.',
-                    );
-                  } else {
-                    await channel.sendMessage(
-                      msg.chat_jid,
-                      `Failed to stop: ${result.error}`,
-                    );
-                  }
-                } else {
-                  // Async execution to avoid blocking message loop
-                  (async () => {
-                    await channel.sendMessage(
-                      msg.chat_jid,
-                      'Starting Remote Control session...',
-                    );
-                    const result = await startRemoteControl(
-                      msg.sender,
-                      msg.chat_jid,
-                      process.cwd(),
-                    );
-                    if (result.ok) {
-                      await channel.sendMessage(
-                        msg.chat_jid,
-                        `Remote Control active: ${result.url}`,
-                      );
-                    } else {
-                      await channel.sendMessage(
-                        msg.chat_jid,
-                        `Failed to start: ${result.error}`,
-                      );
-                    }
-                  })().catch((err) =>
-                    logger.error({ err }, 'Remote control execution failed'),
+            if (channel) {
+              for (const skill of this.systemSkills) {
+                if (skill.shouldHandle(msg, group)) {
+                  logger.debug(
+                    { skill: skill.name, chatJid: msg.chat_jid },
+                    'Executing system skill',
                   );
+                  await skill.execute(msg, channel, {
+                    state: this.state,
+                    registeredGroups: this.state.registeredGroups,
+                    channels: this.channels,
+                  });
+                  handledBySkill = true;
+                  break; // Only one skill handles a message
                 }
               }
+            }
+
+            if (handledBySkill) {
               continue;
             }
 

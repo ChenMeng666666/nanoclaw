@@ -87,7 +87,7 @@ export async function assemble(
     uniqueVectorResults,
   );
   const memoryIds = reRankResults(
-    fusedResults,
+    fusedResults as any,
     recentContent,
     scopedMemories,
     limit,

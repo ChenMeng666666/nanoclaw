@@ -8,7 +8,15 @@ import {
 } from './remote-control.js';
 import { spawn } from 'child_process';
 import fs from 'fs';
-import { vi, describe, it, expect, beforeEach, afterEach, type MockInstance } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type MockInstance,
+} from 'vitest';
 
 vi.mock('child_process', () => ({
   spawn: vi.fn(),
@@ -18,7 +26,7 @@ describe('Remote Control', () => {
   const spawnMock = vi.mocked(spawn);
   const STATE_FILE = _getStateFilePath();
   let stdoutFileContent = '';
-  
+
   let readFileSyncSpy: MockInstance;
   let writeFileSyncSpy: MockInstance;
   let unlinkSyncSpy: MockInstance;
@@ -33,16 +41,23 @@ describe('Remote Control', () => {
     stdoutFileContent = '';
 
     // Setup spies
-    readFileSyncSpy = vi.spyOn(fs, 'readFileSync').mockImplementation(((path: string) => {
-      if (typeof path === 'string' && path.endsWith('.stdout')) return stdoutFileContent;
+    readFileSyncSpy = vi.spyOn(fs, 'readFileSync').mockImplementation(((
+      path: string,
+    ) => {
+      if (typeof path === 'string' && path.endsWith('.stdout'))
+        return stdoutFileContent;
       throw new Error('ENOENT');
     }) as any);
-    
-    writeFileSyncSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+
+    writeFileSyncSpy = vi
+      .spyOn(fs, 'writeFileSync')
+      .mockImplementation(() => {});
     unlinkSyncSpy = vi.spyOn(fs, 'unlinkSync').mockImplementation(() => {});
     openSyncSpy = vi.spyOn(fs, 'openSync').mockReturnValue(123);
     closeSyncSpy = vi.spyOn(fs, 'closeSync').mockImplementation(() => {});
-    mkdirSyncSpy = vi.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+    mkdirSyncSpy = vi
+      .spyOn(fs, 'mkdirSync')
+      .mockImplementation(() => undefined as any);
     killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
   });
 
@@ -146,7 +161,9 @@ describe('Remote Control', () => {
     it('starts new session if existing process is dead', async () => {
       const proc1 = createMockProcess(11111);
       const proc2 = createMockProcess(22222);
-      spawnMock.mockReturnValueOnce(proc1 as any).mockReturnValueOnce(proc2 as any);
+      spawnMock
+        .mockReturnValueOnce(proc1 as any)
+        .mockReturnValueOnce(proc2 as any);
 
       stdoutFileContent = 'https://claude.ai/code?bridge=env_first\n';
       await startRemoteControl('user1', 'tg:123', '/project');
@@ -342,13 +359,15 @@ describe('Remote Control', () => {
 
       restoreRemoteControl();
 
-      return startRemoteControl('user2', 'tg:456', '/project').then((result) => {
-        expect(result).toEqual({
-          ok: true,
-          url: 'https://claude.ai/code?bridge=env_restored',
-        });
-        expect(spawnMock).not.toHaveBeenCalled();
-      });
+      return startRemoteControl('user2', 'tg:456', '/project').then(
+        (result) => {
+          expect(result).toEqual({
+            ok: true,
+            url: 'https://claude.ai/code?bridge=env_restored',
+          });
+          expect(spawnMock).not.toHaveBeenCalled();
+        },
+      );
     });
   });
 });

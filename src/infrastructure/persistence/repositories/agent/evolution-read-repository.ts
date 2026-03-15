@@ -274,20 +274,24 @@ export function getCapsuleById(id: string): GEPCapsule | undefined {
   if (!row) return undefined;
 
   return {
-    id: row.id,
-    geneId: row.gene_id,
+    // id: row.id,
+    gene_id: row.gene_id,
     trigger: safeJsonParse(row.trigger, []),
     summary: row.summary,
     confidence: row.confidence,
-    blastRadius: safeJsonParse(row.blast_radius, { files: 0, lines: 0 }),
+    blast_radius: safeJsonParse(row.blast_radius, { files: 0, lines: 0 }),
     outcome: safeJsonParse(row.outcome, { status: 'failed', score: 0 }),
-    envFingerprint: safeJsonParse(row.env_fingerprint, {
+    env_fingerprint: safeJsonParse(row.env_fingerprint, {
       platform: '',
       arch: '',
     }),
-    successStreak: row.success_streak,
-    approvedAt: row.approved_at,
-    createdAt: row.created_at,
+    success_streak: row.success_streak,
+    approved_at: row.approved_at,
+    // created_at: row.created_at,
+    type: 'Capsule' as const,
+    gene: {} as any,
+    schema_version: '1.0',
+    asset_id: row.id,
   };
 }
 
@@ -309,20 +313,24 @@ export function getCapsulesByGeneId(geneId: number): GEPCapsule[] {
   }>;
 
   return rows.map((row) => ({
-    id: row.id,
-    geneId: row.gene_id,
+    // id: row.id,
+    gene_id: row.gene_id,
     trigger: safeJsonParse(row.trigger, []),
     summary: row.summary,
     confidence: row.confidence,
-    blastRadius: safeJsonParse(row.blast_radius, { files: 0, lines: 0 }),
+    blast_radius: safeJsonParse(row.blast_radius, { files: 0, lines: 0 }),
     outcome: safeJsonParse(row.outcome, { status: 'failed', score: 0 }),
-    envFingerprint: safeJsonParse(row.env_fingerprint, {
+    env_fingerprint: safeJsonParse(row.env_fingerprint, {
       platform: '',
       arch: '',
     }),
-    successStreak: row.success_streak,
-    approvedAt: row.approved_at,
-    createdAt: row.created_at,
+    success_streak: row.success_streak,
+    approved_at: row.approved_at,
+    // created_at: row.created_at,
+    type: 'Capsule' as const,
+    gene: {} as any,
+    schema_version: '1.0',
+    asset_id: row.id,
   }));
 }
 
@@ -343,12 +351,12 @@ export function getAbilityChain(chainId: string): AbilityChain | undefined {
   if (!row) return undefined;
 
   return {
-    chainId: row.chain_id,
+    chain_id: row.chain_id,
     genes: safeJsonParse(row.genes, []),
     capsules: safeJsonParse(row.capsules, []),
     description: row.description || undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
   };
 }
 
@@ -372,12 +380,12 @@ export function getValidationReportsByGeneId(
 
   return rows.map((row) => ({
     id: row.id,
-    geneId: row.gene_id,
+    gene_id: row.gene_id,
     timestamp: row.timestamp,
     commands: safeJsonParse(row.commands, []),
     success: row.success === 1,
-    environment: safeJsonParse(row.environment, {}),
-    testResults: safeJsonParse(row.test_results, undefined),
+    environment: safeJsonParse(row.environment, {}) as any,
+    test_results: safeJsonParse(row.test_results, undefined),
     error: row.error,
   }));
 }
@@ -407,6 +415,10 @@ export function getEcosystemMetrics(limit: number = 30): EcosystemMetrics[] {
     promotedGenes: row.promoted_genes,
     staleGenes: row.stale_genes,
     archivedGenes: row.archived_genes,
+    fitnessLandscape: [] as any,
+    symbioticRelationships: [],
+    macroEvolutionEvents: [],
+    negentropyReduction: 0,
   }));
 }
 
@@ -464,8 +476,15 @@ export function getEvolutionEntriesByStatus(
     constraints: safeJsonParse(row.constraints, {}),
     validation: safeJsonParse(row.validation, []),
     createdAt: row.created_at,
-    chainId: row.chain_id || undefined,
-    ecosystemStatus: row.ecosystem_status,
+    chain_id: row.chain_id || undefined,
+    ecosystem_status: row.ecosystem_status as
+      | 'promoted'
+      | 'stale'
+      | 'archived'
+      | undefined,
+    preconditions: [],
+    validation_commands: [],
+    summary: '',
   }));
 }
 
@@ -524,7 +543,14 @@ export function getEvolutionEntryByAssetId(
     constraints: safeJsonParse(row.constraints, {}),
     validation: safeJsonParse(row.validation, []),
     createdAt: row.created_at,
-    chainId: row.chain_id || undefined,
-    ecosystemStatus: row.ecosystem_status,
+    chain_id: row.chain_id || undefined,
+    ecosystem_status: row.ecosystem_status as
+      | 'promoted'
+      | 'stale'
+      | 'archived'
+      | undefined,
+    preconditions: [],
+    validation_commands: [],
+    summary: '',
   };
 }
