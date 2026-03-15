@@ -1,16 +1,15 @@
 import type http from 'http';
 import type { URL } from 'url';
 
-import { MEMORY_CONFIG, PHASE_A_GUARDRAILS } from '../../../config.js';
+import { MEMORY_CONFIG } from '../../../config.js';
 import { getEvolutionEntriesByCategory } from '../../../db-agents.js';
 import { evolutionManager } from '../../../evolution-manager.js';
 import { memoryManager } from '../../../memory-manager.js';
-import type { Signal } from '../../../signal-extractor.js';
+import type { Signal, SignalType } from '../../../signal-extractor.js';
 import {
   parseEvolutionCategory,
   parseEvolutionLimit,
   parseOptionalIntegerInRange,
-  parseOptionalSignalTypes,
   parseOptionalString,
   parseOptionalStringArray,
   parseRequiredIntegerInRange,
@@ -78,17 +77,6 @@ export function createEvolutionHandlers(): {
           generatedAt: new Date().toISOString(),
           evolution: evolutionManager.getDashboardMetrics(timelineLimit ?? 30),
           memory: memoryManager.getDashboardMetrics(timelineLimit ?? 24),
-        });
-        return true;
-      }
-
-      if (
-        path === '/api/governance/phase-a/guardrails' &&
-        req.method === 'GET'
-      ) {
-        writeJSON(res, 200, {
-          generatedAt: new Date().toISOString(),
-          ...PHASE_A_GUARDRAILS,
         });
         return true;
       }
@@ -185,9 +173,9 @@ export function createEvolutionHandlers(): {
       if (path === '/api/evolution/select-gene' && req.method === 'POST') {
         const body = await readJSON(req);
         const signalTypes =
-          parseOptionalSignalTypes(body.signals, 'signals') || [];
+          parseOptionalStringArray(body.signals, 'signals') || [];
         const signals: Signal[] = signalTypes.map((type) => ({
-          type,
+          type: type as SignalType,
           confidence: 0.8,
         }));
         const category = parseEvolutionCategory(body.category);
