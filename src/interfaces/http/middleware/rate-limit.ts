@@ -19,6 +19,7 @@ function isEvolutionApiPath(path: string): boolean {
   return (
     path === '/api/evolution/metrics/dashboard' ||
     path === '/api/governance/metrics/dashboard' ||
+    path === '/api/governance/phase-a/guardrails' ||
     path === '/api/evolution/query' ||
     path === '/api/evolution/submit' ||
     path === '/api/evolution/feedback' ||

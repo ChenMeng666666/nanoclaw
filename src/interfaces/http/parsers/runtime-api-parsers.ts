@@ -1,4 +1,5 @@
 import type http from 'http';
+import type { SignalType } from '../../../signal-extractor.js';
 
 import { MEMORY_CONFIG } from '../../../config.js';
 import { safeJsonParse } from '../../../security.js';
@@ -13,6 +14,22 @@ const MEMORY_MESSAGE_TYPES = new Set([
   'bot',
   'code',
   'document',
+]);
+const EVOLUTION_SIGNAL_TYPES = new Set<SignalType>([
+  'capability_gap',
+  'learning_opportunity',
+  'knowledge_missing',
+  'recurring_error',
+  'performance_issue',
+  'user_feedback',
+  'negative_feedback',
+  'positive_feedback',
+  'stable_plateau',
+  'learning_stagnation',
+  'saturation',
+  'feature_request',
+  'improvement_suggestion',
+  'innovation_idea',
 ]);
 
 export function readJSON(
@@ -219,6 +236,27 @@ export function parseOptionalStringArray(
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
   return parsed.length > 0 ? parsed : undefined;
+}
+
+export function parseOptionalSignalTypes(
+  value: unknown,
+  field: string,
+): SignalType[] | undefined {
+  const parsed = parseOptionalStringArray(value, field);
+  if (!parsed) {
+    return undefined;
+  }
+  const invalidSignal = parsed.find(
+    (item) => !EVOLUTION_SIGNAL_TYPES.has(item as SignalType),
+  );
+  if (invalidSignal) {
+    throw createApiError(
+      400,
+      `INVALID_${field.toUpperCase()}`,
+      `${field} contains invalid signal type: ${invalidSignal}`,
+    );
+  }
+  return parsed as SignalType[];
 }
 
 export function normalizeMemoryScope(

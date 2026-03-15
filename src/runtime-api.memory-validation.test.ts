@@ -331,6 +331,39 @@ describe('runtime api memory validation', () => {
     expect(body.evolution?.summary?.totalGenes).toBeGreaterThan(0);
   });
 
+  it('returns phase a guardrails payload', async () => {
+    const response = await fetch(
+      `${baseUrl}/api/governance/phase-a/guardrails`,
+      {
+        method: 'GET',
+        headers: {
+          'x-api-key': 'test-key',
+        },
+      },
+    );
+    const body = (await response.json()) as {
+      generatedAt?: string;
+      metricsDictionary?: Array<{ key?: string }>;
+      releaseStages?: string[];
+      phaseGatePolicy?: { noPassNoNextPhase?: boolean };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.generatedAt).toBeTruthy();
+    expect(
+      body.metricsDictionary?.some(
+        (item) => item.key === 'runtime.startup_latency_ms',
+      ),
+    ).toBe(true);
+    expect(body.releaseStages).toEqual([
+      'canary',
+      'shadow',
+      'promote',
+      'fallback',
+    ]);
+    expect(body.phaseGatePolicy?.noPassNoNextPhase).toBe(true);
+  });
+
   it('supports release control update and rollback', async () => {
     const updateResponse = await fetch(
       `${baseUrl}/api/memory/release/control`,
@@ -545,6 +578,16 @@ describe('runtime api memory validation', () => {
     const invalidCategoryBody = (await invalidCategory.json()) as {
       code?: string;
     };
+    const invalidSignals = await fetch(`${baseUrl}/api/evolution/select-gene`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        signals: ['invalid-signal-type'],
+      }),
+    });
+    const invalidSignalsBody = (await invalidSignals.json()) as {
+      code?: string;
+    };
 
     expect(invalidLimit.status).toBe(400);
     expect(invalidLimitBody.code).toBe('INVALID_LIMIT');
@@ -558,6 +601,8 @@ describe('runtime api memory validation', () => {
     expect(invalidTimelineLimitBody.code).toBe('INVALID_TIMELINELIMIT');
     expect(invalidCategory.status).toBe(400);
     expect(invalidCategoryBody.code).toBe('INVALID_CATEGORY');
+    expect(invalidSignals.status).toBe(400);
+    expect(invalidSignalsBody.code).toBe('INVALID_SIGNALS');
   });
 
   it('enforces evolution api rate limiting', async () => {
