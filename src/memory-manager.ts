@@ -14,7 +14,7 @@ import {
   deleteMemory,
   getDuplicateMemory,
 } from './db-agents.js';
-import { Memory } from './types.js';
+import { Memory } from './types/agent-memory.js';
 import { logger } from './logger.js';
 
 // New imports from refactored modules
