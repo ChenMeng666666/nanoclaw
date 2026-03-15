@@ -1,10 +1,11 @@
 # NanoClaw 完整架构文档
 
-> 最后更新: 2026-03-14 10:30
+> 最后更新: 2026-03-15 12:00
 
 ## 目录
 
 - [项目概述](#项目概述)
+- [架构升维路线-v2](#架构升维路线-v2)
 - [核心架构](#核心架构)
 - [记忆系统](#记忆系统)
 - [进化系统 (GEP 1.5.0)](#进化系统-gep-150)
@@ -41,6 +42,46 @@ NanoClaw 是一个个人 Claude 助手，其设计哲学是：
 | 定时任务 | node-cron                                              |
 | 密钥存储 | keytar (系统 keychain) + AES-256-GCM 加密文件 fallback |
 | 协议标准 | GEP 1.5.0 (Genome Evolution Protocol)                  |
+
+---
+
+## 架构升维路线 V2
+
+为支撑“学习体系 + 进化体系 + 记忆体系”的下一阶段迭代，当前架构增加 V2 升维蓝图，强调从能力点增强升级为系统级闭环。
+
+### V2 架构目标
+
+1. **认知连续性**：跨通道、跨会话、跨模态统一身份与记忆语义  
+2. **进化闭环性**：从内部协作评审到主控反哺形成自动晋升回路  
+3. **运行实时性**：高频协作下通过热池与分级隔离保障低延迟  
+4. **系统韧性**：断网可降级、多端可同步、安全可熔断
+
+### 六大升维方向
+
+| 维度 | 核心升级 | 主锚点组件 |
+| --- | --- | --- |
+| 1. Memory, Context & Identity | 身份解析 + 动态上下文压缩 + GraphRAG + 多模态记忆 | `cognition-manager` `context-engine` `db` |
+| 2. Private Moltbook | 局域智能体社会、黑板模式、同行评审信号 | `db` `task-scheduler` `runtime-api` |
+| 3. Upward Knowledge Flow | Capsule 高分成果反哺主控技能资产 | `main-evolution-applier` `evolution-manager` |
+| 4. Runtime & Concurrency | Warm Container Pooling + 分级隔离执行面 | `group-queue` `container-runner` |
+| 5. Edge & Sync | CRDT 多端同步 + Local LLM Fallback | `agent-router` `store` |
+| 6. WebUI & Security | Observer 控制台 + 多模态注入防线 + 硬件级密钥隔离 | `index` `keystore` `security` |
+
+### V2 执行分期
+
+- **Phase 0 (P0)**: 护栏与观测基线（灰度、影子、熔断、回滚）  
+- **Phase 1 (P0/P1)**: 记忆引擎升维与上下文压缩  
+- **Phase 2 (P1)**: Private Moltbook 与闲时协作机制  
+- **Phase 3 (P1)**: 向上知识反哺与 Shadow Promote  
+- **Phase 4 (P0/P1)**: 热池化与并发执行模型重构  
+- **Phase 5 (P2)**: 离线降级与多端一致性同步  
+- **Phase 6 (P1/P2)**: Observer WebUI 与安全纵深
+
+### 版本化文档关联
+
+- V2 详细任务清单、优先级与复选跟踪见 `docs/ROADMAP_V2.md`  
+- 现有架构文档保留“当前态”，V2 章节承担“目标态与迁移路径”定义  
+- 后续每个 Phase 完成后，同步更新本节与对应 ADR/运行手册
 
 ---
 
@@ -1287,6 +1328,6 @@ systemctl --user status nanoclaw
 
 ---
 
-**文档版本**: 1.2.0
-**最后更新**: 2026-03-14 10:30
+**文档版本**: 1.3.0
+**最后更新**: 2026-03-15 12:00
 **维护者**: NanoClaw Team
