@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import crypto from 'crypto';
-import { Memory } from '../../../../types.js';
+import type { Memory } from '../../../../types.js';
 import { mapMemoryRow, type MemoryRow } from '../../mappers/memory-mapper.js';
 import { getDatabase as getPersistenceDatabase } from '../../sqlite/transaction-manager.js';
 

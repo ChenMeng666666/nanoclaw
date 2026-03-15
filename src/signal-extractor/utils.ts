@@ -1,4 +1,4 @@
-import { Signal } from './types.js';
+import type { Signal } from './types.js';
 
 /**
  * 检测文本语言

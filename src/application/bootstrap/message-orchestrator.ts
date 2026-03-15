@@ -19,12 +19,12 @@ import {
   isTriggerAllowed,
   loadSenderAllowlist,
 } from '../../sender-allowlist.js';
-import { Channel, NewMessage, RegisteredGroup } from '../../types.js';
+import type { Channel, NewMessage, RegisteredGroup } from '../../types.js';
 import { logger } from '../../logger.js';
 import {
   isDuplicateMessage,
   saveAppState,
-  AppState,
+  type AppState,
 } from '../message/state-recovery-service.js';
 import { validateUserInput, sanitizeWebContent } from '../../security.js';
 import { getAvailableGroups } from '../message/group-utils.js';

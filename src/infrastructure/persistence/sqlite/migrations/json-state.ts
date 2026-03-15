@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { DATA_DIR } from '../../../../config.js';
 import { logger } from '../../../../logger.js';
-import { RegisteredGroup } from '../../../../types.js';
+import type { RegisteredGroup } from '../../../../types.js';
 
 interface JsonStateMigrationHandlers {
   setRouterState: (key: string, value: string) => void;

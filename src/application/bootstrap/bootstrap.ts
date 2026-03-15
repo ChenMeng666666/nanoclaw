@@ -28,7 +28,7 @@ import {
   loadSenderAllowlist,
   shouldDropMessage,
 } from '../../sender-allowlist.js';
-import { NewMessage } from '../../types.js';
+import type { NewMessage } from '../../types.js';
 import '../../channels/index.js'; // Register channels
 
 export class Bootstrap {

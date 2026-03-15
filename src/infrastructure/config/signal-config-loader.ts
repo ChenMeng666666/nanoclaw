@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { SignalType, SignalPattern } from '../../signal-extractor/types.js';
+import type { SignalType, SignalPattern } from '../../signal-extractor/types.js';
 
 // Get __dirname in ESM
 const __filename = fileURLToPath(import.meta.url);

@@ -1,14 +1,14 @@
 import { evolutionManager } from './evolution-manager.js';
-import { extractSignals, SignalType, Signal } from './signal-extractor.js';
+import { extractSignals, type SignalType, type Signal } from './signal-extractor.js';
 import { logger } from './logger.js';
 import { isCommandAllowed } from './config.js';
 import {
   MainComponent,
-  MainExperienceInput,
-  EvolutionEntry,
-  GEPCapsule,
+  type MainExperienceInput,
+  type GEPCapsule,
   GEP_SCHEMA_VERSION,
 } from './types.js';
+import type { EvolutionEntry, GDIScore } from './types/evolution.js';
 
 export class MainEvolutionApplier {
   /**

@@ -1,4 +1,4 @@
-import { Memory } from '../types.js';
+import type { Memory } from '../types.js';
 import { MEMORY_CONFIG } from '../config.js';
 import { updateMemory, getMemories } from '../db-agents.js';
 import { logger } from '../logger.js';
@@ -8,7 +8,7 @@ import {
   cosineSimilarity,
 } from './ranking-utils.js';
 import { extractKeywords, extractMatchedTerms } from './query-variants.js';
-import { MemoryMetadataInput } from './types.js';
+import type { MemoryMetadataInput } from './types.js';
 
 export function mergeTags(
   existing?: string[],

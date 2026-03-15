@@ -14,8 +14,8 @@ import {
   CONTAINER_RUNTIME_BIN,
   stopContainer,
 } from '../../container-runtime.js';
-import { RegisteredGroup } from '../../types.js';
-import {
+import type { RegisteredGroup } from '../../types.js';
+import type {
   ContainerInput,
   ContainerOutput,
 } from '../../domain/container/types.js';

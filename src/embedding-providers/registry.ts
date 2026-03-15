@@ -3,8 +3,8 @@
  */
 
 import {
-  EmbeddingProvider,
-  EmbeddingConfig,
+  type EmbeddingProvider,
+  type EmbeddingConfig,
   DEFAULT_EMBEDDING_CONFIG,
 } from './interface.js';
 import { LocalEmbeddingProvider } from './local-provider.js';

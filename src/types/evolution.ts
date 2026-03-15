@@ -1,4 +1,5 @@
 import type { EvolutionCategory, GDIScore, EvolutionStrategy } from './gep.js';
+export type { GDIScore } from './gep.js';
 
 export interface DailyLearningSummary {
   id: string;

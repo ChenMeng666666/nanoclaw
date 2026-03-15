@@ -1,6 +1,6 @@
 import { getAllChats } from '../../db.js';
-import { RegisteredGroup } from '../../types.js';
-import { AvailableGroup } from '../../container-runner.js';
+import type { RegisteredGroup } from '../../types.js';
+import type { AvailableGroup } from '../../container-runner.js';
 
 /**
  * Get available groups list for the agent.

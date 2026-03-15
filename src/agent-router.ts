@@ -11,7 +11,7 @@ import { getAgentById } from './db-agents.js';
 import { getSecret } from './keystore.js';
 import { getRoutingBinding } from './db-routing.js';
 import { getBotIdentityByChatJid } from './db.js';
-import { RegisteredGroup } from './types.js';
+import type { RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
 
 /**

@@ -1,8 +1,8 @@
 import {
-  EvolutionEntry,
-  EvolutionStrategy,
-  StrategyConfig,
   STRATEGY_CONFIGS,
+  type EvolutionEntry,
+  type EvolutionStrategy,
+  type StrategyConfig,
 } from '../../../types.js';
 import {
   getEvolutionEntriesByStatus,
@@ -13,7 +13,7 @@ import {
 } from '../../../db-agents.js';
 import {
   getRecommendedGeneCategory,
-  Signal,
+  type Signal,
 } from '../../../signal-extractor.js';
 import { logger } from '../../../logger.js';
 

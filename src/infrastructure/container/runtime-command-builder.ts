@@ -5,8 +5,8 @@ import {
   TIMEZONE,
 } from '../../config.js';
 import { readonlyMountArgs } from '../../container-runtime.js';
-import { VolumeMount } from '../../domain/container/mount-policy.js';
-import { RegisteredGroup } from '../../types.js';
+import type { VolumeMount } from '../../domain/container/mount-policy.js';
+import type { RegisteredGroup } from '../../types.js';
 
 /**
  * Build the command line arguments for the container runtime.

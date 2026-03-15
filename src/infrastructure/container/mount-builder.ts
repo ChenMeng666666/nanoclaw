@@ -7,8 +7,8 @@ import {
 } from '../../group-folder.js';
 import { logger } from '../../logger.js';
 import { validateAdditionalMounts } from '../../mount-security.js';
-import { RegisteredGroup } from '../../types.js';
-import { VolumeMount } from '../../domain/container/mount-policy.js';
+import type { RegisteredGroup } from '../../types.js';
+import type { VolumeMount } from '../../domain/container/mount-policy.js';
 
 /**
  * Build volume mounts for a container agent.

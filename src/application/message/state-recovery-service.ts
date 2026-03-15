@@ -8,7 +8,7 @@ import {
 } from '../../db.js';
 import { safeJsonParse } from '../../security.js';
 import { logger } from '../../logger.js';
-import { RegisteredGroup } from '../../types.js';
+import type { RegisteredGroup } from '../../types.js';
 import { ASSISTANT_NAME } from '../../config.js';
 import { GroupQueue } from '../../group-queue.js';
 

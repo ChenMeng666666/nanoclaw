@@ -1,14 +1,14 @@
-import { Memory } from '../types.js';
+import type { Memory } from '../types.js';
 import {
   getMemories,
   incrementMemoryAccess,
-  MemoryQueryOptions,
+  type MemoryQueryOptions,
 } from '../db-agents.js';
 import { MEMORY_CONFIG } from '../config.js';
 import { BM25Index, reciprocalRankFusion } from '../hybrid-search.js';
 import { generateEmbedding } from './embedding.js';
-import { MemorySearchHit } from './types.js';
-import { RetrievalRolloutConfig } from './release-control-types.js';
+import type { MemorySearchHit } from './types.js';
+import type { RetrievalRolloutConfig } from './release-control-types.js';
 import { MemoryMetricsTracker } from './metrics.js';
 import {
   generateQueryVariants,

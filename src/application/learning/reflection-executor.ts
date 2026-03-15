@@ -14,7 +14,7 @@ import {
   updateMemory,
 } from '../../db-agents.js';
 import { getAllActiveAgents } from '../../db-agents.js';
-import { AgentConfig, LearningTask, DetailedReflection } from '../../types.js';
+import type { AgentConfig, LearningTask, DetailedReflection } from '../../types.js';
 import { logger } from '../../logger.js';
 import { memoryManager } from '../../memory-manager.js';
 import { evolutionManager } from '../../evolution-manager.js';

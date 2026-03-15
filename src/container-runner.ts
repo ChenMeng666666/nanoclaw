@@ -5,7 +5,7 @@
  * Refactored in Phase 7 to delegate to infrastructure modules.
  */
 
-export {
+export type {
   ContainerInput,
   ContainerOutput,
   AvailableGroup,

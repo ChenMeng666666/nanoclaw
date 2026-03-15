@@ -9,9 +9,9 @@ import {
   COLLABORATION_CONFIG,
 } from './config.js';
 import {
-  ContainerOutput,
   runContainerAgent,
   writeTasksSnapshot,
+  type ContainerOutput,
 } from './container-runner.js';
 import {
   getAllTasks,
@@ -24,7 +24,7 @@ import {
 import { GroupQueue } from './group-queue.js';
 import { resolveGroupFolderPath } from './group-folder.js';
 import { logger } from './logger.js';
-import { RegisteredGroup, ScheduledTask } from './types.js';
+import type { RegisteredGroup, ScheduledTask } from './types.js';
 
 /**
  * Compute the next run time for a recurring task, anchored to the

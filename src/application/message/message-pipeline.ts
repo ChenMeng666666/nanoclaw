@@ -8,10 +8,10 @@ import {
   TRIGGER_PATTERN,
 } from '../../config.js';
 import {
-  ContainerOutput,
   runContainerAgent,
   writeGroupsSnapshot,
   writeTasksSnapshot,
+  type ContainerOutput,
 } from '../../container-runner.js';
 import { getAllTasks, getMessagesSince, setSession } from '../../db.js';
 import { routeMessageToAgent } from '../../agent-router.js';
@@ -21,11 +21,11 @@ import {
   isTriggerAllowed,
   loadSenderAllowlist,
 } from '../../sender-allowlist.js';
-import { Channel, RegisteredGroup } from '../../types.js';
+import type { Channel, RegisteredGroup } from '../../types.js';
 import { logger } from '../../logger.js';
 import { contextEngineRegistry } from '../../context-engine/registry.js';
 import type { ContextEngine } from '../../context-engine/interface.js';
-import { saveAppState, AppState } from './state-recovery-service.js';
+import { saveAppState, type AppState } from './state-recovery-service.js';
 import { getAvailableGroups } from './group-utils.js';
 
 export class MessagePipeline {

@@ -1,11 +1,11 @@
 import {
-  EvolutionStrategy,
-  StrategyConfig,
+  type EvolutionStrategy,
+  type StrategyConfig,
   STRATEGY_CONFIGS,
-  EvolutionCategory,
+  type EvolutionCategory,
 } from '../../../types.js';
 import { logger } from '../../../logger.js';
-import { Signal } from '../../../signal-extractor.js';
+import type { Signal } from '../../../signal-extractor.js';
 import { getRecommendedGeneCategory } from '../../../signal-extractor.js';
 
 export interface ReviewConfig {

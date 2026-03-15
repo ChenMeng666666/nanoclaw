@@ -1,5 +1,5 @@
 import { EVOLUTION_CONFIG } from '../../../config.js';
-import { EvolutionEntry, GDIScore } from '../../../types.js';
+import type { EvolutionEntry, GDIScore } from '../../../types.js';
 
 export interface PromotionDecision {
   shouldPromote: boolean;

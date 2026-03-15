@@ -6,7 +6,7 @@ import { ContextEngineRegistry } from '../registry.js';
 import { createDefaultContextEngine } from '../providers.js';
 import type { ContextEngine } from '../interface.js';
 import type { Context, CompactResult, TurnResult } from '../types.js';
-import { NewMessage } from '../../types.js';
+import type { NewMessage } from '../../types.js';
 import { _initTestDatabase } from '../../db.js';
 
 // 测试用的 Mock ContextEngine

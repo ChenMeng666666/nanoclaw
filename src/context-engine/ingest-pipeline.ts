@@ -1,6 +1,6 @@
 import crypto from 'crypto';
-import { NewMessage, Memory } from '../types.js';
-import { Context } from './types.js';
+import type { NewMessage, Memory } from '../types.js';
+import type { Context } from './types.js';
 
 /**
  * 智能分块策略

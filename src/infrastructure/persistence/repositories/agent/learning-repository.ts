@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { LearningTask, Reflection } from '../../../../types.js';
+import type { LearningTask, Reflection } from '../../../../types.js';
 import { safeJsonParse } from '../../../../security.js';
 import { getDatabase as getPersistenceDatabase } from '../../sqlite/transaction-manager.js';
 

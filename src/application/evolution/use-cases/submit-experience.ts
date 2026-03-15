@@ -7,17 +7,17 @@ import {
   getDatabase,
   addGeneToChain,
   logAudit,
-  CreateGeneInput,
+  type CreateGeneInput,
 } from '../../../db-agents.js';
 import {
-  EvolutionEntry,
-  MainExperienceInput,
   GEP_SCHEMA_VERSION,
   generateAssetId,
-  DuplicateCheckResult,
+  type EvolutionEntry,
+  type MainExperienceInput,
+  type DuplicateCheckResult,
 } from '../../../types.js';
 import { logger } from '../../../logger.js';
-import { Signal } from '../../../signal-extractor.js';
+import type { Signal } from '../../../signal-extractor.js';
 
 export interface SubmitExperienceConfig {
   autoApproveThreshold: number;

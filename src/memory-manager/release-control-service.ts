@@ -7,11 +7,11 @@ import {
 import { MEMORY_CONFIG } from '../config.js';
 import { clamp01 } from './ranking-utils.js';
 import {
-  MemoryReleaseControl,
-  UpdateReleaseControlInput,
-  RetrievalRolloutConfig,
-  MigrationRuleConfig,
-  RolloutMode,
+  type MemoryReleaseControl,
+  type UpdateReleaseControlInput,
+  type RetrievalRolloutConfig,
+  type MigrationRuleConfig,
+  type RolloutMode,
   safeParseReleaseControl,
 } from './release-control-types.js';
 

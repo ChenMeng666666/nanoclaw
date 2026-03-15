@@ -1,5 +1,5 @@
 import { logger } from '../logger.js';
-import { Signal, SignalExtractionOptions, SignalType } from './types.js';
+import type { Signal, SignalExtractionOptions, SignalType } from './types.js';
 import { SIGNAL_PATTERNS } from './patterns.js';
 import {
   detectLanguage,

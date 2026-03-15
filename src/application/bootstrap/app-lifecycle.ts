@@ -6,7 +6,7 @@ import { EVOLUTION_CONFIG } from '../../config.js';
 import { LocalLLMQueryExpansionProvider } from '../../query-expansion/local-llm-provider.js';
 import { contextEngineRegistry } from '../../context-engine/registry.js';
 import { GroupQueue } from '../../group-queue.js';
-import { Channel } from '../../types.js';
+import type { Channel } from '../../types.js';
 import { MainEvolutionApplier } from '../../main-evolution-applier.js';
 
 export class AppLifecycleManager {

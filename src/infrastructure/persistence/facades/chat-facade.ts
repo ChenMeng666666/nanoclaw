@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { ASSISTANT_NAME } from '../../../config.js';
-import { NewMessage } from '../../../types.js';
+import type { NewMessage } from '../../../types.js';
 import { getDatabase as getPersistenceDatabase } from '../sqlite/transaction-manager.js';
 
 const db = new Proxy({} as Database.Database, {

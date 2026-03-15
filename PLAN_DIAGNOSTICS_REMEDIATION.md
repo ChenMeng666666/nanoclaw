@@ -14,6 +14,15 @@ This plan addresses the build errors and diagnostics identified in the codebase,
 - [x] **Fix `memory-manager.ts` Module Resolution**: Investigate and fix the `Cannot find module './types.js'` error in `src/memory-manager.ts`. This is likely due to a circular dependency or tsconfig inclusion issue.
 - [x] **Align Cache Manager Signatures**: Ensure `L1CacheManager.updateCacheEntry` accepts the `Memory` object shape being passed from `MemoryManager`, specifically handling the `Omit` and spread patterns correctly.
 
+## Phase 5: Verbatim Module Syntax Compliance [P0]
+**Goal**: Resolve widespread `TS1484` errors caused by `verbatimModuleSyntax: true` requiring explicit `import type` for type-only imports.
+
+- [x] **Fix Infrastructure Persistence Imports**: Update all repository and facade files in `src/infrastructure/persistence/` to use `import type`.
+- [x] **Fix Application Layer Imports**: Update files in `src/application/` (bootstrap, message, etc.) to use `import type`.
+- [x] **Fix Domain & Core Imports**: Update `src/types/evolution.ts`, `src/main-evolution-applier.ts`, `src/agent-router.ts`, etc.
+- [x] **Fix Test Files**: Update all `*.test.ts` files to use `import type`.
+- [x] **Create Missing Types**: Create `src/types/ipc-types.ts` to resolve missing module errors in `src/ipc.ts`.
+
 ## Phase 2: Runtime API & Legacy Code Cleanup [P1]
 **Goal**: Remove references to deleted files and ensure the Runtime API is clean.
 

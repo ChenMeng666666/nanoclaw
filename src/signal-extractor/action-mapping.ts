@@ -1,4 +1,4 @@
-import { SignalType, Signal } from './types.js';
+import type { SignalType, Signal } from './types.js';
 
 /**
  * 获取信号的可执行性

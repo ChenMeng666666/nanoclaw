@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { resolveGroupIpcPath } from '../../group-folder.js';
-import { AvailableGroup } from '../../domain/container/types.js';
+import type { AvailableGroup } from '../../domain/container/types.js';
 
 export function writeTasksSnapshot(
   groupFolder: string,

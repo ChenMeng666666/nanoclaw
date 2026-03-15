@@ -7,7 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { logger } from './logger.js';
-import { SecurityEventType, logSecurityEvent } from './security-alerts.js';
+import { type SecurityEventType, logSecurityEvent } from './security-alerts.js';
 
 /**
  * 技能验证结果

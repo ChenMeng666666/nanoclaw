@@ -13,13 +13,13 @@
  * - 生态系统指标
  */
 import {
-  CreateGeneInput,
+  type CreateGeneInput,
   getCapsuleById,
   getCapsulesByGeneId,
   getAbilityChain,
   getValidationReportsByGeneId,
 } from './db-agents.js';
-import {
+import type {
   EvolutionEntry,
   MainExperienceInput,
   GDIScore,
@@ -36,7 +36,7 @@ import { CommandSafetyService } from './domain/evolution/services/command-safety
 import { StrategyService } from './domain/evolution/services/strategy-service.js';
 import { CapsuleService } from './domain/evolution/services/capsule-service.js';
 import { EvolutionService } from './domain/evolution/services/evolution-service.js';
-import { Signal } from './signal-extractor.js';
+import type { Signal } from './signal-extractor.js';
 
 /**
  * 默认配置

@@ -1,4 +1,4 @@
-import { Memory } from '../types.js';
+import type { Memory } from '../types.js';
 import { MEMORY_CONFIG } from '../config.js';
 
 /**

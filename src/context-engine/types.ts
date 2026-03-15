@@ -1,4 +1,4 @@
-import { NewMessage, Memory } from '../types.js';
+import type { NewMessage, Memory } from '../types.js';
 
 /**
  * 上下文接口 - 传递给 agent 的完整上下文

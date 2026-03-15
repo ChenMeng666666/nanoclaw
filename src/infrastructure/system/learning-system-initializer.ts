@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { logger } from '../../logger.js';
-import { RegisteredGroup } from '../../types.js';
+import type { RegisteredGroup } from '../../types.js';
 
 export class LearningSystemInitializer {
   public static initialize(

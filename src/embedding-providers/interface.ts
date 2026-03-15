@@ -3,7 +3,7 @@
  * 支持 OpenAI、Anthropic、本地模型等多种实现
  */
 
-import { Memory } from '../types.js';
+import type { Memory } from '../types.js';
 
 /**
  * 嵌入模型配置

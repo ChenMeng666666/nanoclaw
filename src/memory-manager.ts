@@ -8,13 +8,13 @@ import crypto from 'crypto';
 import {
   createMemory,
   getMemories,
-  MemoryQueryOptions,
+  type MemoryQueryOptions,
   updateMemory,
   incrementMemoryAccess,
   deleteMemory,
   getDuplicateMemory,
 } from './db-agents.js';
-import { Memory } from './types/agent-memory.js';
+import type { Memory } from './types/agent-memory.js';
 import { logger } from './logger.js';
 
 // New imports from refactored modules
@@ -51,7 +51,7 @@ import { L1CacheManager } from './memory-manager/l1-cache-manager.js';
 import { ReleaseControlService } from './memory-manager/release-control-service.js';
 
 // Re-export types for compatibility
-export {
+export type {
   MemorySearchHit,
   MemorySearchExplanation,
   MemoryDashboardMetrics,

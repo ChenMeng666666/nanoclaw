@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { RegisteredGroup, ScheduledTask, TaskRunLog } from '../../../types.js';
+import type { RegisteredGroup, ScheduledTask, TaskRunLog } from '../../../types.js';
 import { getDatabase as getPersistenceDatabase } from '../sqlite/transaction-manager.js';
 import * as taskRepository from '../repositories/task-repository.js';
 import * as routingRepository from '../repositories/routing-repository.js';

@@ -6,7 +6,7 @@
  */
 import type { ContextEngine } from './interface.js';
 import type { Context, CompactResult, TurnResult } from './types.js';
-import { NewMessage, Memory } from '../types.js';
+import type { NewMessage, Memory } from '../types.js';
 import { logger } from '../logger.js';
 import { createMemory, getMemories } from '../db-agents.js';
 import { BM25Index } from '../hybrid-search.js';
@@ -21,7 +21,7 @@ import {
 } from './ingest-pipeline.js';
 import { assemble } from './assemble-retrieval.js';
 import {
-  QueryExpansionProvider,
+  type QueryExpansionProvider,
   generateKeywordVariants,
 } from './query-expansion.js';
 

@@ -3,7 +3,7 @@
  * 记录记忆之间的关联关系，支持查询相关记忆链
  */
 
-import { Memory } from './types.js';
+import type { Memory } from './types/agent-memory.js';
 
 /**
  * 记忆关联类型

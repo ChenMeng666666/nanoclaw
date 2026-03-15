@@ -10,7 +10,7 @@ import {
   updateGeneGDIScore,
   addEvolutionFeedback,
   logAudit,
-  CreateGeneInput,
+  type CreateGeneInput,
   getDatabase,
   createAbilityChain,
   getAbilityChain,
@@ -21,7 +21,7 @@ import {
   getEcosystemMetrics,
   getEvolutionEntriesByStatus,
 } from '../../../db-agents.js';
-import {
+import type {
   EvolutionEntry,
   GDIScore,
   DuplicateCheckResult,
@@ -31,7 +31,7 @@ import {
   EvolutionCategory,
 } from '../../../types.js';
 import { logger } from '../../../logger.js';
-import { extractSignals, Signal } from '../../../signal-extractor.js';
+import { extractSignals, type Signal } from '../../../signal-extractor.js';
 import { EVOLUTION_CONFIG } from '../../../config.js';
 import { EvolutionScoringService } from './scoring-service.js';
 import { CommandSafetyService } from './command-safety-service.js';

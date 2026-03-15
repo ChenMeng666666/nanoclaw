@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { ScheduledTask, TaskRunLog } from '../../../types.js';
+import type { ScheduledTask, TaskRunLog } from '../../../types.js';
 
 export function createTask(
   database: Database.Database,

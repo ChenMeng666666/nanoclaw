@@ -1,6 +1,6 @@
-import { MainComponent, EvolutionEntry } from '../types.js';
+import { MainComponent, type EvolutionEntry } from '../types.js';
 import { logger } from '../logger.js';
-import { Signal, SignalType } from './types.js';
+import type { Signal, SignalType } from './types.js';
 import { extractSignals } from './extractor.js';
 import { detectLanguage, extractSnippet, deduplicateSignals } from './utils.js';
 

@@ -1,4 +1,4 @@
-import { NewMessage, Memory } from '../types.js';
+import type { NewMessage, Memory } from '../types.js';
 import type { Context, CompactResult, TurnResult } from './types.js';
 
 /**

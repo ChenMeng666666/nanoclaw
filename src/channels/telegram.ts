@@ -2,8 +2,8 @@ import { Bot } from 'grammy';
 
 import { ASSISTANT_NAME, TRIGGER_PATTERN } from '../config.js';
 import { logger } from '../logger.js';
-import { registerChannel, ChannelOpts } from './registry.js';
-import {
+import { registerChannel, type ChannelOpts } from './registry.js';
+import type {
   Channel,
   OnChatMetadata,
   OnInboundMessage,
