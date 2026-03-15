@@ -1,6 +1,15 @@
 # Setup Agents Skill
 
-为 NanoClaw 创建和管理多智能体配置。支持创建新智能体、编辑现有智能体、配置通信通道。
+为 NanoClaw 创建和管理多智能体配置。支持创建新智能体、编辑现有智能体。
+
+## 核心能力
+
+本 Skill 会自动为新 Agent 配置以下高级能力：
+
+1. **记忆系统 (ContextEngine)**: 自动集成长期/短期记忆管理，无需手动配置。
+2. **学习系统 (Learning Automation)**: 启用定期反思与学习计划生成。
+3. **进化系统 (Evolution)**: 接入共享经验库，实现跨 Agent 知识复用。
+4. **安全鉴权**: 自动注入 `RUNTIME_API_KEY`，保障 API 调用安全。
 
 ## 触发条件
 
@@ -21,7 +30,7 @@ npx tsx scripts/setup-agent.ts
 1. **创建/选择智能体** - 启动时显示现有 agent 列表，可选择创建新 agent 或编辑现有 agent
 2. **身份定义** - 用户输入的完整"我是谁"描述直接写入 CLAUDE.md
 3. **配置认证** - 设置独立的 Anthropic API 凭证（或使用全局配置）
-4. **配置通道** - 绑定独立的 bot 实例（Telegram/WhatsApp/Slack/Discord）
+4. **配置通道** - (可选) 绑定独立的 bot 实例，推荐使用专用 Skill
 
 ---
 
@@ -66,51 +75,42 @@ npx tsx scripts/setup-agent.ts
 ```
 === 配置通信通道 ===
 
-这将把通道绑定到智能体 "xxx"
-每个智能体对应一个独立的 bot（如 @mimi_bot）
+【推荐】建议使用专用 Skill 添加通道，因为它们会自动处理认证和 JID 格式。
+  - Telegram: /add-telegram
+  - WhatsApp: /add-whatsapp
+  - Slack:    /add-slack
+  - Discord:  /add-discord
 
-现在跳过通道配置？(y/n，通道可稍后通过 /add-telegram 等 skill 添加):
+现在跳过通道配置？(y=跳过 (推荐), n=手动配置):
+```
+
+### 步骤 4：启用高级功能
+```
+=== 启用高级功能 ===
+
+NanoClaw 提供以下高级功能：
+  1. 记忆系统 (ContextEngine) - 自动管理短期/长期记忆，无需手动干预
+  2. 学习系统 (Learning Automation) - 定期反思，自动生成学习任务
+  3. 进化系统 (Evolution) - 共享经验库，与其他 agent 分享有效方法
+
+注意：启用后，系统会自动配置运行时 API 和鉴权信息。
+
+要启用这些功能吗？(1=全部启用 (推荐), 2=跳过，3=自定义):
 ```
 
 ---
 
-## 数据结构
+## 产物说明
 
-### agents 表
-| 字段 | 说明 |
-|------|------|
-| id | agent 唯一标识 |
-| name | 智能体名字 |
-| folder | 工作区 folder 名 |
-| personality | 性格（从 identity 解析） |
-| values | 价值观（从 identity 解析） |
-| anthropic_* | API 凭证（加密存储） |
+### CLAUDE.md
+生成的认知文件会自动包含：
+- Agent 身份定义
+- 高级能力说明（ContextEngine/Learning/Evolution）
+- 开发指南（API 地址、鉴权方式）
 
-### channel_instances 表
-| 字段 | 说明 |
-|------|------|
-| id | 通道实例 ID |
-| agent_id | 关联的 agent |
-| channel_type | telegram/whatsapp/slack/discord |
-| bot_id | Bot 标识（如 token） |
-| jid | 通道 JID |
-| mode | dm/group/both |
-
----
-
-## 文件结构
-
-```
-groups/{agent_folder}/
-  CLAUDE.md          # 认知文件（用户输入完整写入）
-  .claude/           # agent 工作区
-
-store/messages.db    # SQLite 数据库
-  - agents           # agent 配置
-  - channel_instances # 通道映射
-  - memories         # 分层记忆
-  - evolution_log    # 进化日志
-```
+### 数据库记录
+- `agents` 表：存储基础配置和凭证。
+- `channel_instances` 表：存储通道绑定关系。
 
 ---
 
@@ -121,40 +121,8 @@ store/messages.db    # SQLite 数据库
    export NANOCLAW_ENCRYPTION_KEY=$(openssl rand -hex 32)
    ```
 
-2. **CLAUDE.md**：用户输入的 identity 完整写入此文件，后续修改需手动编辑
+2. **通道配置**：强烈建议跳过脚本内的通道配置，改用 `/add-telegram` 等专用 Skill。
 
-3. **通道配置**：可跳过，稍后使用对应 skill 添加：
-   - `/add-telegram`
-   - `/add-whatsapp`
-   - `/add-slack`
-   - `/add-discord`
+3. **鉴权**：生成的 Agent 容器会自动注入 `RUNTIME_API_KEY`。如果 Agent 需要编写脚本调用 Runtime API，必须在请求头中包含 `X-API-Key: $RUNTIME_API_KEY`。
 
 4. **生效方式**：修改后需运行 `npm run build` 并重启服务
-
----
-
-## 示例
-
-### 创建新 agent
-
-```bash
-npx tsx scripts/setup-agent.ts
-
-# 输入：
-# 1. 名字：Andy
-# 2. 身份：我是 Andy，一个幽默风趣的助手...
-# 3. API 配置：y（使用全局）
-# 4. 通道配置：y（跳过）
-```
-
-### 编辑现有 agent
-
-```bash
-npx tsx scripts/setup-agent.ts
-
-# 输入：
-# 1. 要做什么：2（编辑）
-# 2. 选择编号：1
-# 3. 如何修改：1（覆盖重写）
-# 4. 输入新内容...
-```

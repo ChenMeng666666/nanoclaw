@@ -222,8 +222,14 @@ async function configureChannel(agentId: string, agentName: string): Promise<{
   log(`这将把通道绑定到智能体 "${agentName}"`);
   log('每个智能体对应一个独立的 bot（如 @mimi_bot）\n');
 
-  const skip = await question('现在跳过通道配置？(y/n，通道可稍后通过 /add-telegram 等 skill 添加): ');
-  if (skip.toLowerCase() === 'y') {
+  log('【推荐】建议使用专用 Skill 添加通道，因为它们会自动处理认证和 JID 格式。');
+  log('  - Telegram: /add-telegram');
+  log('  - WhatsApp: /add-whatsapp');
+  log('  - Slack:    /add-slack');
+  log('  - Discord:  /add-discord\n');
+
+  const skip = await question('现在跳过通道配置？(y=跳过 (推荐), n=手动配置): ');
+  if (skip.toLowerCase() !== 'n') {
     return null;
   }
 
@@ -272,15 +278,14 @@ async function configureAdvancedFeatures(): Promise<{
 }> {
   log('\n=== 启用高级功能 ===\n');
   log('NanoClaw 提供以下高级功能：');
-  log('  1. 记忆系统 - 存储和回忆用户信息、偏好、历史对话');
-  log('  2. 学习系统 - 定时反思和总结，自动生成学习任务');
-  log('  3. 进化系统 - 共享经验库，与其他 agent 分享有效方法');
-  log('\n这些功能通过运行时 API (http://host.docker.internal:3456) 调用');
-  log('agent 容器内可以使用 curl 或代码库访问这些 API\n');
+  log('  1. 记忆系统 (ContextEngine) - 自动管理短期/长期记忆，无需手动干预');
+  log('  2. 学习系统 (Learning Automation) - 定期反思，自动生成学习任务');
+  log('  3. 进化系统 (Evolution) - 共享经验库，与其他 agent 分享有效方法');
+  log('\n注意：启用后，系统会自动配置运行时 API 和鉴权信息。\n');
 
   const choice = await question('要启用这些功能吗？(1=全部启用 (推荐), 2=跳过，3=自定义): ');
 
-  if (choice === '1') {
+  if (choice === '1' || !choice) {
     log('已启用全部高级功能');
     return { enableMemory: true, enableLearning: true, enableEvolution: true };
   }
@@ -330,42 +335,65 @@ ${agentInfo.identity}
   // 如果启用了高级功能，添加 API 使用说明
   if (advancedFeatures && (advancedFeatures.enableMemory || advancedFeatures.enableLearning || advancedFeatures.enableEvolution)) {
     content += `
-## 可用 API（记忆、学习、进化系统）
+## 高级能力（已集成）
 
-NanoClaw 提供运行时 API 供你使用记忆、学习和进化功能。
+你已启用 NanoClaw 的高级能力，系统会自动为你管理记忆、学习和进化。
 
-### 快速示例
+1. **记忆系统 (ContextEngine)**
+   - 系统会自动记录对话中的关键信息（L1/L2 记忆）。
+   - 长期记忆（L3）会通过向量检索自动注入到你的上下文中。
+   - 你无需手动调用 API，只需关注对话内容。
 
-**记住用户偏好**：
+2. **学习系统 (Learning Automation)**
+   - 系统会定期触发反思（Reflection）和学习计划（Learning Plan）。
+   - 你可能会收到系统自动生成的任务，请认真执行。
+
+3. **进化系统 (Evolution)**
+   - 你的成功经验会自动提交到共享进化库。
+    - 遇到困难时，系统会自动为你检索相关的成功案例。
+
+## 标准作业流程 (SOP)
+
+为了确保任务的高效执行和知识的持续积累，请严格遵守以下流程：
+
+1. **信息检索**
+   - **记忆搜索**：系统会自动注入相关记忆（L1/L2/L3），请优先参考。
+   - **进化库搜索**：系统会自动检索相关经验。如果未找到，请尝试使用 \`curl\` 主动搜索：
+     \`curl -X POST http://host.docker.internal:3456/api/evolution/search ...\`
+   - **外部学习**：如果内部信息不足，请使用 \`WebSearch\` 工具搜索外部知识。
+
+2. **任务执行**
+   - 结合检索到的信息和外部知识执行任务。
+   - 如果遇到问题，尝试使用不同的方法或工具。
+
+3. **经验沉淀**
+   - 任务成功后，**必须**将经验总结并上传到进化库，以便自己和他人复用。
+   - 使用 \`curl\` 提交经验：
+     \`\`\`bash
+     curl -X POST http://host.docker.internal:3456/api/evolution/submit \\
+       -H "Content-Type: application/json" \\
+       -H "X-API-Key: $RUNTIME_API_KEY" \\
+       -d '{"abilityName": "任务名", "content": "...", "sourceAgentId": "${advancedFeatures.folder}", "tags": ["标签"]}'
+     \`\`\`
+   - 提交后，系统会自动触发审核流程。
+
+## 开发指南
+
+如果你需要编写脚本调用运行时 API（如主动触发学习或检索特定记忆），请注意：
+
+- **API 地址**：\`http://host.docker.internal:3456\`
+- **鉴权**：所有 API 调用必须包含 \`X-API-Key\` 头。
+- **环境变量**：容器内已预置 \`RUNTIME_API_KEY\` 环境变量。
+
+**示例代码（Bash）：**
+
 \`\`\`bash
-curl -X POST http://host.docker.internal:3456/api/memory/add \\
-  -H "Content-Type: application/json" \\
-  -d '{"agentFolder": "${advancedFeatures.folder}", "content": "用户喜欢简洁回答", "level": "L2"}'
-\`\`\`
-
-**查询记忆**：
-\`\`\`bash
+# 查询记忆示例
 curl -X POST http://host.docker.internal:3456/api/memory/search \\
   -H "Content-Type: application/json" \\
+  -H "X-API-Key: $RUNTIME_API_KEY" \\
   -d '{"query": "用户偏好", "agentFolder": "${advancedFeatures.folder}", "limit": 5}'
 \`\`\`
-
-**提交经验到进化库**：
-\`\`\`bash
-curl -X POST http://host.docker.internal:3456/api/evolution/submit \\
-  -H "Content-Type: application/json" \\
-  -d '{"abilityName": "技巧名", "content": "...", "sourceAgentId": "${advancedFeatures.folder}", "tags": ["技巧"]}'
-\`\`\`
-
-### 完整文档
-
-查看 \`container/skills/agent-memory/SKILL.md\` 获取完整 API 文档和代码示例。
-
-### 注意事项
-
-- **URL 配置**：容器内使用 \`http://host.docker.internal:3456\`
-- **agentFolder**：必须与你的 folder 名（\`${advancedFeatures.folder}\`）一致
-- **记忆层级**：L1(临时) / L2(短期) / L3(长期，带向量检索)
 `;
   }
 
