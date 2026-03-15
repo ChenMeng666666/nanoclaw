@@ -71,7 +71,7 @@ Focus on separating scheduling mechanics from business logic execution.
 
 Focus on simplifying the complex message processing flow.
 
-- [ ] **Refactor Message Processing Pipeline**
+- [x] **Refactor Message Processing Pipeline**
     - **Source**: `src/application/bootstrap/message-orchestrator.ts` (`processGroupMessagesWithTimeout` method)
     - **Destination**: `src/application/message/message-pipeline.ts`
     - **Goal**: Implement a middleware/pipeline pattern for message processing (Timeout -> Allowlist -> Context Engine -> Handler).

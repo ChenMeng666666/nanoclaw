@@ -228,7 +228,7 @@ export async function orchestrateLearningIntent(input: {
       reflectionSchedule.scheduleValue,
       reflectionSchedule.nextRun,
     );
-  const learningTaskId = await reflectionScheduler.createLearningTask(
+  const learningTaskId = await reflectionExecutor.createLearningTask(
     input.agentFolder,
     `${input.topic}: ${input.goal || '持续学习'}`,
     input.resources,
