@@ -118,7 +118,10 @@ export class CapsuleService {
     return getCapsulesByGeneId(geneId) as GEPCapsule[];
   }
 
-  private calculateSuccessStreak(capsules: GEPCapsule[], newOutcome: string): number {
+  private calculateSuccessStreak(
+    capsules: GEPCapsule[],
+    newOutcome: string,
+  ): number {
     let streak = 0;
 
     // Check from newest (reverse order)

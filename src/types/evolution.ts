@@ -1,6 +1,10 @@
 import type { EvolutionCategory, GDIScore, EvolutionStrategy } from './gep.js';
 export type { GDIScore, EvolutionCategory, EvolutionStrategy } from './gep.js';
-export type { StrategyConfig, DuplicateCheckResult, EcosystemMetrics } from './gep.js';
+export type {
+  StrategyConfig,
+  DuplicateCheckResult,
+  EcosystemMetrics,
+} from './gep.js';
 export { STRATEGY_CONFIGS } from './gep.js';
 
 export interface DailyLearningSummary {

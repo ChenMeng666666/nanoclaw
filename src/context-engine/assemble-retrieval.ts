@@ -4,7 +4,7 @@ import type { Memory } from '../types/agent-memory.js';
 import { ASSISTANT_NAME, MEMORY_CONFIG } from '../config.js';
 import { getRecentMessagesWithinWindow } from '../db.js';
 import { getMemories, incrementMemoryAccess } from '../db-agents.js';
-import type { BM25Index} from '../hybrid-search.js';
+import type { BM25Index } from '../hybrid-search.js';
 import { reciprocalRankFusion } from '../hybrid-search.js';
 import { generateEmbedding } from './embedding-cache.js';
 import { reRankResults, selectVectorCandidates } from './rerank.js';

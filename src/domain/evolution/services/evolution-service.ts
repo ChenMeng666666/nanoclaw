@@ -20,10 +20,7 @@ import {
   createEcosystemMetrics,
   getEcosystemMetrics,
 } from '../../../db-agents.js';
-import type {
-  AbilityChain,
-  ValidationReport,
-} from '../../../types/gep.js';
+import type { AbilityChain, ValidationReport } from '../../../types/gep.js';
 import type {
   EvolutionEntry,
   GDIScore,

@@ -1,8 +1,5 @@
 import { evolutionManager } from './evolution-manager.js';
-import {
-  type SignalType,
-  type Signal,
-} from './signal-extractor.js';
+import { type SignalType, type Signal } from './signal-extractor.js';
 import { logger } from './logger.js';
 import { isCommandAllowed } from './config.js';
 import {

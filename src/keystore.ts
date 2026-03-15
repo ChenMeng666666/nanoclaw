@@ -19,10 +19,10 @@ const USE_KEYTAR = process.env.USE_KEYTAR !== 'false';
 let keytar: typeof keytarType | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-    keytar = require('keytar');
-  } catch {
-    logger.warn('keytar not available, using encrypted file fallback');
-  }
+  keytar = require('keytar');
+} catch {
+  logger.warn('keytar not available, using encrypted file fallback');
+}
 
 /**
  * 存储敏感配置

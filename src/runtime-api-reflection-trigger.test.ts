@@ -17,8 +17,7 @@ vi.mock('./application/learning/reflection-executor.js', () => ({
 }));
 
 vi.mock('./db-agents.js', async () => {
-  const actual =
-    await vi.importActual<typeof dbAgentsType>('./db-agents.js');
+  const actual = await vi.importActual<typeof dbAgentsType>('./db-agents.js');
   return {
     ...actual,
     getAgentByFolder: mocks.getAgentByFolder,

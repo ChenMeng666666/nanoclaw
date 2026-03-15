@@ -12,7 +12,8 @@ import {
   getDatabase,
   getMemories,
   updateMemory,
- getAllActiveAgents } from '../../db-agents.js';
+  getAllActiveAgents,
+} from '../../db-agents.js';
 import type {
   AgentConfig,
   LearningTask,

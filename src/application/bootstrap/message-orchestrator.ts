@@ -18,7 +18,11 @@ import {
   isTriggerAllowed,
   loadSenderAllowlist,
 } from '../../sender-allowlist.js';
-import type { Channel, NewMessage, RegisteredGroup } from '../../types/core-runtime.js';
+import type {
+  Channel,
+  NewMessage,
+  RegisteredGroup,
+} from '../../types/core-runtime.js';
 import { logger } from '../../logger.js';
 import {
   isDuplicateMessage,

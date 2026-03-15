@@ -175,7 +175,8 @@ export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
   /**
    * 辅助方法：清理单个资源
    */
-  private async disposeResource(resource: any, name: string): Promise<void> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  private async disposeResource(resource: any, name: string): Promise<void> {
+    // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!resource) return;
     try {
       await resource.dispose();
