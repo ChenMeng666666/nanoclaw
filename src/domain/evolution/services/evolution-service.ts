@@ -308,7 +308,9 @@ export class EvolutionService {
 
     // Calculate Shannon Diversity
     // Type assertion to fix TS error
-    const shannonDiversity = this.calculateShannonDiversity(allGenes as unknown as EvolutionEntry[]);
+    const shannonDiversity = this.calculateShannonDiversity(
+      allGenes as unknown as EvolutionEntry[],
+    );
 
     // Calculate Average GDI Score
     const gdiScores = allGenes
@@ -411,7 +413,9 @@ export class EvolutionService {
       if (!existing.contentEmbedding) continue;
 
       try {
-        const existingEmbedding = JSON.parse(existing.contentEmbedding as unknown as string);
+        const existingEmbedding = JSON.parse(
+          existing.contentEmbedding as unknown as string,
+        );
         if (!Array.isArray(existingEmbedding)) continue;
         const similarity = this.cosineSimilarity(
           currentEmbedding,

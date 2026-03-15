@@ -1,4 +1,8 @@
-import type { Channel, NewMessage, RegisteredGroup } from '../types/core-runtime.js';
+import type {
+  Channel,
+  NewMessage,
+  RegisteredGroup,
+} from '../types/core-runtime.js';
 import type { AppState } from './message/state-recovery-service.js';
 
 /**
@@ -32,7 +36,7 @@ export interface SystemSkill {
   execute(
     message: NewMessage,
     channel: Channel,
-    context: SystemSkillContext
+    context: SystemSkillContext,
   ): Promise<void>;
 }
 

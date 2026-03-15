@@ -1,11 +1,16 @@
-import type { Channel, NewMessage, RegisteredGroup } from '../../types/core-runtime.js';
+import type {
+  Channel,
+  NewMessage,
+  RegisteredGroup,
+} from '../../types/core-runtime.js';
 import { logger } from '../../logger.js';
 import { startRemoteControl, stopRemoteControl } from '../remote-control.js';
 import type { SystemSkill, SystemSkillContext } from '../system-skill.js';
 
 export class RemoteControlSystemSkill implements SystemSkill {
   public name = 'remote-control';
-  public description = 'Control the host machine via chat commands (Main Group only)';
+  public description =
+    'Control the host machine via chat commands (Main Group only)';
 
   public shouldHandle(message: NewMessage, group?: RegisteredGroup): boolean {
     const content = message.content.trim();
@@ -15,7 +20,7 @@ export class RemoteControlSystemSkill implements SystemSkill {
   public async execute(
     message: NewMessage,
     channel: Channel,
-    context: SystemSkillContext
+    context: SystemSkillContext,
   ): Promise<void> {
     const { chat_jid: chatJid, sender, content } = message;
     const group = context.registeredGroups[chatJid];
@@ -51,12 +56,15 @@ export class RemoteControlSystemSkill implements SystemSkill {
   private async executeStart(
     chatJid: string,
     sender: string,
-    channel: Channel
+    channel: Channel,
   ): Promise<void> {
     await channel.sendMessage(chatJid, 'Starting Remote Control session...');
     const result = await startRemoteControl(sender, chatJid, process.cwd());
     if (result.ok) {
-      await channel.sendMessage(chatJid, `Remote Control active: ${result.url}`);
+      await channel.sendMessage(
+        chatJid,
+        `Remote Control active: ${result.url}`,
+      );
     } else {
       await channel.sendMessage(chatJid, `Failed to start: ${result.error}`);
     }
