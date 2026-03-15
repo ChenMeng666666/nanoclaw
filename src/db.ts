@@ -31,7 +31,9 @@ function createSchema(database: Database.Database): void {
     database.exec(
       `ALTER TABLE scheduled_tasks ADD COLUMN context_mode TEXT DEFAULT 'isolated'`,
     );
-  } catch {}
+  } catch {
+    // ignore
+  }
 
   try {
     database.exec(
@@ -40,7 +42,9 @@ function createSchema(database: Database.Database): void {
     database
       .prepare(`UPDATE messages SET is_bot_message = 1 WHERE content LIKE ?`)
       .run(`${ASSISTANT_NAME}:%`);
-  } catch {}
+  } catch {
+    // ignore
+  }
 
   try {
     database.exec(
@@ -49,7 +53,9 @@ function createSchema(database: Database.Database): void {
     database.exec(
       `UPDATE registered_groups SET is_main = 1 WHERE folder = 'main'`,
     );
-  } catch {}
+  } catch {
+    // ignore
+  }
 
   try {
     database.exec(`ALTER TABLE chats ADD COLUMN channel TEXT`);
@@ -66,7 +72,9 @@ function createSchema(database: Database.Database): void {
     database.exec(
       `UPDATE chats SET channel = 'telegram', is_group = 1 WHERE jid LIKE 'tg:%'`,
     );
-  } catch {}
+  } catch {
+    // ignore
+  }
 
   const geneColumns = [
     { name: 'category', default: "'learn'" },
@@ -90,7 +98,9 @@ function createSchema(database: Database.Database): void {
       database.exec(
         `ALTER TABLE evolution_log ADD COLUMN ${col.name} TEXT DEFAULT ${col.default}`,
       );
-    } catch {}
+    } catch {
+      // ignore
+    }
   }
 
   try {

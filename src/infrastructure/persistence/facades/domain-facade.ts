@@ -1,5 +1,9 @@
-import Database from 'better-sqlite3';
-import type { RegisteredGroup, ScheduledTask, TaskRunLog } from '../../../types.js';
+import type Database from 'better-sqlite3';
+import type {
+  RegisteredGroup,
+  ScheduledTask,
+  TaskRunLog,
+} from '../../../types/core-runtime.js';
 import { getDatabase as getPersistenceDatabase } from '../sqlite/transaction-manager.js';
 import * as taskRepository from '../repositories/task-repository.js';
 import * as routingRepository from '../repositories/routing-repository.js';
@@ -170,7 +174,7 @@ export function createBotIdentity(identity: {
   agentId: string;
   botName: string;
   botAvatar?: string;
-  config?: Record<string, any>;
+  config?: Record<string, unknown>;
 }): void {
   botIdentityRepository.createBotIdentity(db, identity);
 }
@@ -190,7 +194,7 @@ export function updateBotIdentity(
     agentId?: string;
     botName?: string;
     botAvatar?: string;
-    config?: Record<string, any>;
+    config?: Record<string, unknown>;
     isActive?: boolean;
   }>,
 ): void {

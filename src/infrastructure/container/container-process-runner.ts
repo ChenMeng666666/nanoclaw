@@ -1,4 +1,5 @@
-import { ChildProcess, exec, spawn } from 'child_process';
+import type { ChildProcess} from 'child_process';
+import { exec, spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -14,11 +15,11 @@ import {
   CONTAINER_RUNTIME_BIN,
   stopContainer,
 } from '../../container-runtime.js';
-import type { RegisteredGroup } from '../../types.js';
+import type { RegisteredGroup } from '../../types/core-runtime.js';
 import type {
   ContainerInput,
   ContainerOutput,
-} from '../../domain/container/types.js';
+} from '../../domain/container/container-types.js';
 import { buildVolumeMounts } from './mount-builder.js';
 import { buildContainerArgs } from './runtime-command-builder.js';
 

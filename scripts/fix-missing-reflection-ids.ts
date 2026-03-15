@@ -7,8 +7,6 @@
  */
 
 import {
-  getLearningTask,
-  getLearningTasksByAgent,
   updateLearningTask,
   createReflection,
   getDatabase,

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AddressInfo } from 'node:net';
+import type { Server } from 'node:http';
 
 vi.mock('./embedding-providers/registry.js', () => ({
   generateEmbedding: vi.fn(async () => [0.2, 0.2, 0.2]),
@@ -13,7 +14,7 @@ import { memoryManager } from './memory-manager.js';
 import { evolutionManager } from './evolution-manager.js';
 
 describe('runtime api memory validation', () => {
-  let server: import('http').Server | null = null;
+  let server: Server | null = null;
   let baseUrl = '';
 
   beforeEach(async () => {
@@ -139,7 +140,7 @@ describe('runtime api memory validation', () => {
       agentFolder: 'agent-runtime-api-memory',
       content: 'x'.repeat(MEMORY_CONFIG.api.maxRequestBodyBytes + 1024),
     });
-    let oversizedStatus: number | null = null;
+    let oversizedStatus: number | null;
     try {
       const oversizedResponse = await fetch(`${baseUrl}/api/memory/add`, {
         method: 'POST',

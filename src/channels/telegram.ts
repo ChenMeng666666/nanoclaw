@@ -8,14 +8,14 @@ import type {
   OnChatMetadata,
   OnInboundMessage,
   RegisteredGroup,
-  ChannelInstance,
-} from '../types.js';
+} from '../types/core-runtime.js';
+import type { ChannelInstance } from '../types/agent-memory.js';
 import {
   getAllActiveAgents,
   getChannelInstancesForAgent,
   getChannelInstanceByJid,
 } from '../db-agents.js';
-import { createRoutingBinding, getRoutingBinding } from '../db-routing.js';
+import { createRoutingBinding } from '../db-routing.js';
 
 export interface TelegramChannelOpts {
   onMessage: OnInboundMessage;
@@ -81,6 +81,7 @@ export class TelegramChannel implements Channel {
               },
               'Telegram bot connected',
             );
+            // eslint-disable-next-line no-console
             console.log(
               `\n  Telegram bot (@${botInfo.username}) -> Agent: ${inst.agentId}`,
             );
@@ -90,6 +91,7 @@ export class TelegramChannel implements Channel {
       });
     }
 
+    // eslint-disable-next-line no-console
     console.log(`  Send /chatid to any bot to get a chat's registration ID\n`);
   }
 
@@ -120,7 +122,7 @@ export class TelegramChannel implements Channel {
       const chatName =
         chatType === 'private'
           ? ctx.from?.first_name || 'Private'
-          : (ctx.chat as any).title || 'Unknown';
+          : (ctx.chat as { title?: string }).title || 'Unknown';
 
       ctx.reply(
         `Chat ID: \`tg:${chatId}\`\nName: ${chatName}\nType: ${chatType}`,
@@ -209,7 +211,7 @@ export class TelegramChannel implements Channel {
       const chatName =
         ctx.chat.type === 'private'
           ? senderName
-          : (ctx.chat as any).title || chatJid;
+          : (ctx.chat as { title?: string }).title || chatJid;
 
       // Translate Telegram @bot_username mentions into TRIGGER_PATTERN format.
       const botUsername = ctx.me?.username?.toLowerCase();
@@ -279,6 +281,7 @@ export class TelegramChannel implements Channel {
     });
 
     // Handle non-text messages with placeholders
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const storeNonText = (ctx: any, placeholder: string) => {
       const chatJid = `tg:${ctx.chat.id}`;
 
@@ -334,7 +337,8 @@ export class TelegramChannel implements Channel {
 
     // Handle errors gracefully
     bot.catch((err) => {
-      logger.error({ err: err.message }, 'Telegram bot error');
+      logger.error({ err }, 'Telegram bot error');
+      // console.error('Telegram error:', err);
     });
   }
 

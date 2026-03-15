@@ -6,12 +6,11 @@
  * 2. 从 keychain 解密 agent 特定配置
  * 3. 路由消息到对应的 agent 容器
  */
-import { getChannelInstanceByJid } from './db-agents.js';
-import { getAgentById } from './db-agents.js';
+import { getChannelInstanceByJid, getAgentById } from './db-agents.js';
 import { getSecret } from './keystore.js';
 import { getRoutingBinding } from './db-routing.js';
 import { getBotIdentityByChatJid } from './db.js';
-import type { RegisteredGroup } from './types.js';
+import type { RegisteredGroup } from './types/core-runtime.js';
 import { logger } from './logger.js';
 
 /**

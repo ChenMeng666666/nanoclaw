@@ -16,7 +16,7 @@ export interface BotIdentity {
   botName: string;
   botAvatar?: string;
   isActive: boolean;
-  config?: Record<string, any>;
+  config?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }

@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { resolveGroupIpcPath } from '../../group-folder.js';
-import type { AvailableGroup } from '../../domain/container/types.js';
+import type { AvailableGroup } from '../../domain/container/container-types.js';
 
 export function writeTasksSnapshot(
   groupFolder: string,
@@ -39,8 +39,9 @@ export function writeGroupsSnapshot(
   groupFolder: string,
   isMain: boolean,
   groups: AvailableGroup[],
-  registeredJids: Set<string>,
+  _registeredJids: Set<string>,
 ): void {
+  void _registeredJids;
   const groupIpcDir = resolveGroupIpcPath(groupFolder);
   fs.mkdirSync(groupIpcDir, { recursive: true });
 

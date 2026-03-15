@@ -5,7 +5,7 @@ import { parse } from 'yaml';
 
 import { SKILLS_SCHEMA_VERSION } from './constants.js';
 import { getAppliedSkills, readState, compareSemver } from './state.js';
-import { SkillManifest } from './types.js';
+import { SkillManifest } from './skill-types.js';
 
 export function readManifest(skillDir: string): SkillManifest {
   const manifestPath = path.join(skillDir, 'manifest.yaml');

@@ -28,7 +28,7 @@ import {
   loadSenderAllowlist,
   shouldDropMessage,
 } from '../../sender-allowlist.js';
-import type { NewMessage } from '../../types.js';
+import type { Channel, NewMessage } from '../../types/core-runtime.js';
 import '../../channels/index.js'; // Register channels
 
 export class Bootstrap {
@@ -51,7 +51,7 @@ export class Bootstrap {
     const appState = loadAppState();
     const lifecycleManager = new AppLifecycleManager();
     const queue = new GroupQueue();
-    const channels: any[] = []; // will be populated
+    const channels: Channel[] = []; // will be populated
 
     // 3. Message Orchestrator
     const orchestrator = new MessageOrchestrator(appState, queue, channels);

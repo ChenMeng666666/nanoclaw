@@ -1,5 +1,3 @@
-import fs from 'fs';
-import path from 'path';
 import {
   ASSISTANT_NAME,
   IDLE_TIMEOUT,
@@ -15,13 +13,13 @@ import {
 } from '../../container-runner.js';
 import { getAllTasks, getMessagesSince, setSession } from '../../db.js';
 import { routeMessageToAgent } from '../../agent-router.js';
-import { GroupQueue } from '../../group-queue.js';
+import type { GroupQueue } from '../../group-queue.js';
 import { findChannel, formatMessages } from '../../router.js';
 import {
   isTriggerAllowed,
   loadSenderAllowlist,
 } from '../../sender-allowlist.js';
-import type { Channel, RegisteredGroup } from '../../types.js';
+import type { Channel, RegisteredGroup } from '../../types/core-runtime.js';
 import { logger } from '../../logger.js';
 import { contextEngineRegistry } from '../../context-engine/registry.js';
 import type { ContextEngine } from '../../context-engine/interface.js';

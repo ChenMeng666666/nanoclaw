@@ -4,11 +4,24 @@
  */
 import { logger } from './logger.js';
 
+interface ClawhubResult {
+  title: string;
+  description: string;
+  url: string;
+}
+
+interface SkillsShResult {
+  name: string;
+  description: string;
+  url: string;
+  installs: number;
+}
+
 export class ExternalSkillsSearcher {
   /**
    * 搜索 clawhub.ai
    */
-  async searchClawhub(query: string): Promise<any[]> {
+  async searchClawhub(query: string): Promise<ClawhubResult[]> {
     try {
       const encodedQuery = encodeURIComponent(query);
       const response = await fetch(
@@ -19,11 +32,21 @@ export class ExternalSkillsSearcher {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = (await response.json()) as any;
+      const data = (await response.json()) as {
+        results?: Array<{
+          displayName?: string;
+          title?: string;
+          name?: string;
+          summary?: string;
+          description?: string;
+          url?: string;
+          slug?: string;
+        }>;
+      };
 
       return (
-        data.results?.map((item: any) => ({
-          title: item.displayName || item.title || item.name,
+        data.results?.map((item) => ({
+          title: item.displayName || item.title || item.name || 'Unknown',
           description: item.summary || item.description || '',
           url: item.url || `https://clawhub.ai/skills/${item.slug}`,
         })) || []
@@ -44,7 +67,7 @@ export class ExternalSkillsSearcher {
   /**
    * 搜索 skills.sh
    */
-  async searchSkillsSh(query: string): Promise<any[]> {
+  async searchSkillsSh(query: string): Promise<SkillsShResult[]> {
     try {
       const encodedQuery = encodeURIComponent(query);
       const response = await fetch(
@@ -55,10 +78,20 @@ export class ExternalSkillsSearcher {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = (await response.json()) as any;
+      const data = (await response.json()) as {
+        skills?: Array<{
+          skillId: string;
+          source?: string;
+          name?: string;
+          title?: string;
+          summary?: string;
+          description?: string;
+          installs?: number;
+        }>;
+      };
 
       return (
-        data.skills?.map((item: any) => {
+        data.skills?.map((item) => {
           // 从 source 字段构建 GitHub 链接
           let contentUrl = `https://skills.sh/skills/${item.skillId}`;
 
@@ -73,11 +106,11 @@ export class ExternalSkillsSearcher {
           }
 
           return {
-            name: item.name || item.title,
+            name: item.name || item.title || 'Unknown',
             description:
               item.summary || item.description || `Installs: ${item.installs}`,
             url: contentUrl,
-            installs: item.installs,
+            installs: item.installs || 0,
           };
         }) || []
       );

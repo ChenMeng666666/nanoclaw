@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import type { Memory } from '../types.js';
+import type { Memory } from '../types/agent-memory.js';
 import { logger } from '../logger.js';
 import {
   createMemory,
@@ -8,7 +8,7 @@ import {
   incrementMemoryAccess,
   getDuplicateMemory,
 } from '../db-agents.js';
-import { MemoryMetricsTracker } from './metrics.js';
+import type { MemoryMetricsTracker } from './metrics.js';
 import { generateEmbedding } from './embedding.js';
 import { calculateQualityScore } from './ranking-utils.js';
 

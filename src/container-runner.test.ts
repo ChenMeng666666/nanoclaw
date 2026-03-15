@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
 import { PassThrough } from 'stream';
+import type * as fsType from 'fs';
+import type * as childProcessType from 'child_process';
 
 // Sentinel markers must match container-runner.ts
 const OUTPUT_START_MARKER = '---NANOCLAW_OUTPUT_START---';
@@ -30,7 +32,7 @@ vi.mock('./logger.js', () => ({
 
 // Mock fs
 vi.mock('fs', async () => {
-  const actual = await vi.importActual<typeof import('fs')>('fs');
+  const actual = await vi.importActual<typeof fsType>('fs');
   return {
     ...actual,
     default: {
@@ -73,7 +75,7 @@ let fakeProc: ReturnType<typeof createFakeProcess>;
 // Mock child_process.spawn
 vi.mock('child_process', async () => {
   const actual =
-    await vi.importActual<typeof import('child_process')>('child_process');
+    await vi.importActual<typeof childProcessType>('child_process');
   return {
     ...actual,
     spawn: vi.fn(() => fakeProc),
@@ -87,7 +89,7 @@ vi.mock('child_process', async () => {
 });
 
 import { runContainerAgent, type ContainerOutput } from './container-runner.js';
-import type { RegisteredGroup } from './types.js';
+import type { RegisteredGroup } from './types/core-runtime.js';
 
 const testGroup: RegisteredGroup = {
   name: 'Test Group',

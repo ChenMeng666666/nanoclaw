@@ -1,14 +1,15 @@
 import { evolutionManager } from './evolution-manager.js';
-import { extractSignals, type SignalType, type Signal } from './signal-extractor.js';
+import {
+  type SignalType,
+  type Signal,
+} from './signal-extractor.js';
 import { logger } from './logger.js';
 import { isCommandAllowed } from './config.js';
 import {
-  MainComponent,
   type MainExperienceInput,
-  type GEPCapsule,
-  GEP_SCHEMA_VERSION,
-} from './types.js';
-import type { EvolutionEntry, GDIScore } from './types/evolution.js';
+  type EvolutionEntry,
+} from './types/evolution.js';
+import type { GEPCapsule } from './types/gep.js';
 
 export class MainEvolutionApplier {
   /**
@@ -333,7 +334,7 @@ export class MainEvolutionApplier {
   /**
    * 获取 Gene 的所有 Capsules
    */
-  static getCapsulesForGene(geneId: number): any[] {
+  static getCapsulesForGene(geneId: number): GEPCapsule[] {
     return evolutionManager.getCapsulesForGene(geneId);
   }
 

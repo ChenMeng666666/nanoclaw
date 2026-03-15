@@ -30,7 +30,7 @@ export async function checkSystemDependencies(): Promise<void> {
   try {
     execSync('docker --version');
     logger.info('Docker available');
-  } catch (err) {
+  } catch {
     logger.error('Docker not available');
     process.exit(1);
   }

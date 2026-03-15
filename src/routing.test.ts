@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 import { _initTestDatabase, storeChatMetadata } from './db.js';
 import { getAvailableGroups } from './application/message/group-utils.js';
-import type { RegisteredGroup } from './types.js';
+import type { RegisteredGroup } from './types/core-runtime.js';
 
 beforeEach(() => {
   _initTestDatabase();

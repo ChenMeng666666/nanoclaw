@@ -64,4 +64,4 @@ export type {
   SkillManifest,
   SkillState,
   UninstallResult,
-} from './types.js';
+} from './skill-types.js';

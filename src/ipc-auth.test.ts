@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import {
@@ -9,7 +10,7 @@ import {
   setRegisteredGroup,
 } from './db.js';
 import { processTaskIpc, type IpcDeps } from './ipc.js';
-import type { RegisteredGroup } from './types.js';
+import type { RegisteredGroup } from './types/core-runtime.js';
 
 // Set up registered groups used across tests
 const MAIN_GROUP: RegisteredGroup = {

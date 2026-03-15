@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 
 import { runContainerAgent, type ContainerInput } from './container-runner.js';
 import { readEnvFile } from './env.js';
-import type { RegisteredGroup } from './types.js';
+import type { RegisteredGroup } from './types/core-runtime.js';
 
 function hasDocker(): boolean {
   try {

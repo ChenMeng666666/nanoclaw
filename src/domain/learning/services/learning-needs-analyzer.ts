@@ -5,7 +5,7 @@ import {
 } from '../../../db-agents.js';
 import { logger } from '../../../logger.js';
 import { LocalLLMQueryExpansionProvider } from '../../../query-expansion/local-llm-provider.js';
-import type { LearningNeed, LearningModelDecision } from '../../../types.js';
+import type { LearningNeed, LearningModelDecision } from '../../../types/agent-memory.js';
 
 let learningNeedsLlmProvider: LocalLLMQueryExpansionProvider | null = null;
 let learningNeedsLlmInitPromise: Promise<void> | null = null;

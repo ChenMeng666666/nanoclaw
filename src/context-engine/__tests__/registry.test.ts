@@ -4,10 +4,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ContextEngineRegistry } from '../registry.js';
 import { createDefaultContextEngine } from '../providers.js';
-import type { ContextEngine } from '../interface.js';
-import type { Context, CompactResult, TurnResult } from '../types.js';
-import type { NewMessage } from '../../types.js';
+import type { ContextEngine, Session } from '../interface.js';
+import type { Context, CompactResult, TurnResult } from '../context-types.js';
+import type { NewMessage } from '../../types/core-runtime.js';
 import { _initTestDatabase } from '../../db.js';
+import type { Memory } from '../../types/agent-memory.js';
 
 // 测试用的 Mock ContextEngine
 class MockContextEngine implements ContextEngine {
@@ -15,16 +16,21 @@ class MockContextEngine implements ContextEngine {
   public ingestedCount = 0;
   public assembledCount = 0;
 
-  async bootstrap(agentFolder: string): Promise<void> {
+  async bootstrap(_agentFolder: string): Promise<void> {
+    void _agentFolder;
     this.bootstrapped = true;
   }
 
-  async ingest(message: NewMessage, context: Context): Promise<any[]> {
+  async ingest(_message: NewMessage, _context: Context): Promise<Memory[]> {
+    void _message;
+    void _context;
     this.ingestedCount++;
     return [];
   }
 
-  async assemble(chatJid: string, limit: number): Promise<Context> {
+  async assemble(_chatJid: string, _limit: number): Promise<Context> {
+    void _chatJid;
+    void _limit;
     this.assembledCount++;
     return {
       agentFolder: '',
@@ -34,7 +40,8 @@ class MockContextEngine implements ContextEngine {
     };
   }
 
-  async compact(session: any): Promise<CompactResult> {
+  async compact(_session: Session): Promise<CompactResult> {
+    void _session;
     return {
       summary: '',
       preservedMemories: [],
@@ -42,7 +49,9 @@ class MockContextEngine implements ContextEngine {
     };
   }
 
-  async afterTurn(result: TurnResult): Promise<void> {}
+  async afterTurn(_result: TurnResult): Promise<void> {
+    void _result;
+  }
 }
 
 describe('ContextEngineRegistry', () => {
@@ -54,7 +63,7 @@ describe('ContextEngineRegistry', () => {
   });
 
   it('should register a ContextEngine factory', () => {
-    const factory = async (agentFolder: string): Promise<ContextEngine> => {
+    const factory = async (): Promise<ContextEngine> => {
       return new MockContextEngine();
     };
 
@@ -78,7 +87,7 @@ describe('ContextEngineRegistry', () => {
 
   it('should cache engine instances', async () => {
     let createCount = 0;
-    const factory = async (agentFolder: string): Promise<ContextEngine> => {
+    const factory = async (): Promise<ContextEngine> => {
       createCount++;
       return new MockContextEngine();
     };
@@ -100,7 +109,7 @@ describe('ContextEngineRegistry', () => {
 
   it('should clear cached instances', async () => {
     let createCount = 0;
-    const factory = async (agentFolder: string): Promise<ContextEngine> => {
+    const factory = async (): Promise<ContextEngine> => {
       createCount++;
       return new MockContextEngine();
     };
@@ -116,7 +125,7 @@ describe('ContextEngineRegistry', () => {
   });
 
   it('should support multiple engines for different agents', async () => {
-    const factory = async (agentFolder: string): Promise<ContextEngine> => {
+    const factory = async (): Promise<ContextEngine> => {
       return new MockContextEngine();
     };
 

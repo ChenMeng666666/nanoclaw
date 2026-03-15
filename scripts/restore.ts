@@ -482,7 +482,7 @@ function listBackupsInteractive(): void {
       const typeStr = 'Full'; // 目前只支持全量备份
 
       console.log(`    ${backup.slice(0, 39).padEnd(40)}${sizeStr.padEnd(8)}${typeStr.padEnd(6)}${date} ${time}`);
-    } catch (err) {
+    } catch {
       console.log(`    ${backup}`);
     }
   });

@@ -11,17 +11,12 @@
  * 用法：npx tsx scripts/migrate-to-agents.ts
  */
 import crypto from 'crypto';
-import { initDatabase } from '../src/db.js';
-import {
-  getAllRegisteredGroups,
-  _initTestDatabase,
-} from '../src/db.js';
+import { initDatabase, getAllRegisteredGroups } from '../src/db.js';
 import {
   createAgent,
   createChannelInstance,
   getAgentByFolder,
 } from '../src/db-agents.js';
-import { logger } from '../src/logger.js';
 
 function log(...args: unknown[]) {
   console.log('\x1b[36m[Migration]\x1b[0m', ...args);
@@ -155,7 +150,6 @@ async function main() {
     log('\nStarting migration...\n');
     let successCount = 0;
     let skipCount = 0;
-    let failCount = 0;
 
     for (const [jid, group] of groupEntries) {
       const result = await migrateGroup(jid, group);

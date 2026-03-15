@@ -1,12 +1,18 @@
-import type { Memory } from '../types.js';
+import type { Memory } from '../types/agent-memory.js';
 import { MEMORY_CONFIG } from '../config.js';
+
+interface SearchResult {
+  id: string;
+  fusedScore: number;
+  [key: string]: unknown;
+}
 
 /**
  * 结果重排序
  * 基于内容相关性对 RRF 结果进行二次排序，同时考虑时间戳权重和重要性
  */
 export function reRankResults(
-  results: any[],
+  results: SearchResult[],
   query: string,
   memories: Memory[],
   limit: number,

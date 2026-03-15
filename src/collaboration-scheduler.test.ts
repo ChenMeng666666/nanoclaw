@@ -7,7 +7,7 @@ import {
   setRegisteredGroup,
 } from './db.js';
 import { scheduleAgentWakeup } from './collaboration-scheduler.js';
-import type { CollaborationTask } from './types.js';
+import type { CollaborationTask } from './types/collaboration.js';
 
 describe('collaboration scheduler wakeup', () => {
   beforeEach(() => {

@@ -22,14 +22,19 @@ import {
 import type {
   EvolutionEntry,
   MainExperienceInput,
+  ReviewConfig,
+  EvolutionDashboardMetrics,
+} from './types/evolution.js';
+import type {
   GDIScore,
   DuplicateCheckResult,
   EcosystemMetrics,
   EvolutionStrategy,
   StrategyConfig,
-  ReviewConfig,
-  EvolutionDashboardMetrics,
-} from './types.js';
+  ValidationReport,
+  AbilityChain,
+  GEPCapsule,
+} from './types/gep.js';
 import { EVOLUTION_CONFIG } from './config.js';
 import { EvolutionScoringService } from './domain/evolution/services/scoring-service.js';
 import { CommandSafetyService } from './domain/evolution/services/command-safety-service.js';
@@ -148,14 +153,14 @@ export class EvolutionManager {
   /**
    * 获取 Capsule
    */
-  getCapsule(capsuleId: string): any {
+  getCapsule(capsuleId: string): GEPCapsule | undefined {
     return getCapsuleById(capsuleId);
   }
 
   /**
    * 获取 Gene 的所有 Capsules
    */
-  getCapsulesForGene(geneId: number): any[] {
+  getCapsulesForGene(geneId: number): GEPCapsule[] {
     return getCapsulesByGeneId(geneId);
   }
 
@@ -231,7 +236,7 @@ export class EvolutionManager {
   /**
    * 获取 Gene 的验证报告
    */
-  getValidationReports(geneId: number): any[] {
+  getValidationReports(geneId: number): ValidationReport[] {
     return getValidationReportsByGeneId(geneId);
   }
 
@@ -247,7 +252,7 @@ export class EvolutionManager {
   /**
    * 获取能力链
    */
-  getAbilityChain(chainId: string): any {
+  getAbilityChain(chainId: string): AbilityChain | undefined {
     return getAbilityChain(chainId);
   }
 

@@ -9,7 +9,7 @@ import { copyDir } from './fs-utils.js';
 import { acquireLock } from './lock.js';
 import { mergeFile } from './merge.js';
 import { computeFileHash, readState, writeState } from './state.js';
-import type { RebaseResult } from './types.js';
+import type { RebaseResult } from './skill-types.js';
 
 function toUnifiedPath(relPath: string): string {
   return relPath.replace(/\\/g, '/');

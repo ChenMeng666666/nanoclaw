@@ -1,9 +1,9 @@
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
 import type {
   AgentConfig,
   ChannelInstance,
   UserProfile,
-} from '../../../../types.js';
+} from '../../../../types/agent-memory.js';
 import { readEnvFile } from '../../../../env.js';
 import { safeJsonParse } from '../../../../security.js';
 import { getDatabase as getPersistenceDatabase } from '../../sqlite/transaction-manager.js';

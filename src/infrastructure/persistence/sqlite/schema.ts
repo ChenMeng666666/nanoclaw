@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
 
 export function initializeSchemaTables(database: Database.Database): void {
   database.exec(`

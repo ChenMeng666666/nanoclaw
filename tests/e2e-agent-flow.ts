@@ -7,26 +7,24 @@ import {
   initDatabase,
   createTask,
   getDueTasks,
-  logTaskRun,
-  getAllRegisteredGroups,
   getTaskById,
   deleteTask,
 } from '../src/db.js';
+import type {
+  ContainerInput} from '../src/container-runner.js';
 import {
-  ContainerInput,
   runContainerAgent,
   writeTasksSnapshot,
 } from '../src/container-runner.js';
-import { startSchedulerLoop, computeNextRun } from '../src/task-scheduler.js';
+import { computeNextRun } from '../src/task-scheduler.js';
 import { MemoryManager } from '../src/memory-manager.js';
 import { EvolutionManager } from '../src/evolution-manager.js';
 import { logger } from '../src/logger.js';
 import { readEnvFile } from '../src/env.js';
-import { RegisteredGroup } from '../src/types.js';
+import type { RegisteredGroup } from '../src/types/core-runtime.js';
 import {
   TestDataFactory,
   TestDatabaseHelper,
-  TestAssertions,
 } from './test-utils.js';
 
 // 测试配置

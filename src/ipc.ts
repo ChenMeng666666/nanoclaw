@@ -8,8 +8,7 @@ import type { AvailableGroup } from './container-runner.js';
 import { createTask, deleteTask, getTaskById, updateTask } from './db.js';
 import { isValidGroupFolder } from './group-folder.js';
 import { logger } from './logger.js';
-import type { RegisteredGroup } from './types.js';
-import type { IPCMessage, IPCRequest, IPCResponse } from './types/ipc-types.js';
+import type { RegisteredGroup } from './types/core-runtime.js';
 import { safeJsonParse, validateUserInput } from './security.js';
 
 export interface IpcDeps {
@@ -159,7 +158,23 @@ export function startIpcWatcher(deps: IpcDeps): void {
             try {
               const data = safeJsonParse(
                 fs.readFileSync(filePath, 'utf-8'),
-              ) as any;
+              ) as {
+                type: string;
+                taskId?: string;
+                prompt?: string;
+                schedule_type?: string;
+                schedule_value?: string;
+                context_mode?: string;
+                groupFolder?: string;
+                chatJid?: string;
+                targetJid?: string;
+                jid?: string;
+                name?: string;
+                folder?: string;
+                trigger?: string;
+                requiresTrigger?: boolean;
+                containerConfig?: RegisteredGroup['containerConfig'];
+              };
               // Pass source group identity to processTaskIpc for authorization
               await processTaskIpc(data, sourceGroup, isMain, deps);
               fs.unlinkSync(filePath);

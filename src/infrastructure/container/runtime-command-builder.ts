@@ -6,7 +6,7 @@ import {
 } from '../../config.js';
 import { readonlyMountArgs } from '../../container-runtime.js';
 import type { VolumeMount } from '../../domain/container/mount-policy.js';
-import type { RegisteredGroup } from '../../types.js';
+import type { RegisteredGroup } from '../../types/core-runtime.js';
 
 /**
  * Build the command line arguments for the container runtime.

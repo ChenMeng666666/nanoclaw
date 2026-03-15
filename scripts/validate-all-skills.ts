@@ -25,7 +25,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { parse } from 'yaml';
-import type { SkillManifest } from '../skills-engine/types.js';
+import type { SkillManifest } from '../skills-engine/skill-types.js';
 
 interface SkillValidationResult {
   name: string;
@@ -155,15 +155,16 @@ async function main(): Promise<void> {
       } catch {
         // Non-JSON stdout with exit 0 is treated as success
       }
-    } catch (err: any) {
-      const stderr = err.stderr?.toString() || '';
-      const stdout = err.stdout?.toString() || '';
+    } catch (err: unknown) {
+      const errorObj = err as { stderr?: Buffer; stdout?: Buffer; message: string };
+      const stderr = errorObj.stderr?.toString() || '';
+      const stdout = errorObj.stdout?.toString() || '';
       let error = 'Apply failed';
       try {
         const parsed = JSON.parse(stdout);
         error = parsed.error || error;
       } catch {
-        error = stderr || stdout || err.message;
+        error = stderr || stdout || errorObj.message;
       }
       console.log(`  FAIL (apply): ${truncate(error)}`);
       results.push({
@@ -182,8 +183,9 @@ async function main(): Promise<void> {
         stdio: 'pipe',
         timeout: 120_000,
       });
-    } catch (err: any) {
-      const error = err.stdout?.toString() || err.message;
+    } catch (err: unknown) {
+      const errorObj = err as { stdout?: Buffer; message: string };
+      const error = errorObj.stdout?.toString() || errorObj.message;
       console.log(`  FAIL (typecheck): ${truncate(error)}`);
       results.push({
         name: skill.name,
@@ -202,9 +204,10 @@ async function main(): Promise<void> {
           stdio: 'pipe',
           timeout: 300_000,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const errorObj = err as { stdout?: Buffer; stderr?: Buffer; message: string };
         const error =
-          err.stdout?.toString() || err.stderr?.toString() || err.message;
+          errorObj.stdout?.toString() || errorObj.stderr?.toString() || errorObj.message;
         console.log(`  FAIL (test): ${truncate(error)}`);
         results.push({
           name: skill.name,

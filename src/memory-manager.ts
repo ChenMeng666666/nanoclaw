@@ -45,7 +45,7 @@ import type {
   MemoryMetadataInput,
   MemorySearchHit,
   MemorySearchExplanation,
-} from './memory-manager/types.js';
+} from './memory-manager/memory-types.js';
 
 import { L1CacheManager } from './memory-manager/l1-cache-manager.js';
 import { ReleaseControlService } from './memory-manager/release-control-service.js';

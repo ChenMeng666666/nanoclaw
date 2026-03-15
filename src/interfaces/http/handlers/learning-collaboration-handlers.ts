@@ -43,7 +43,7 @@ export async function handleLearningCollaborationEndpoints(
     const messageId = sendAgentMessage(
       fromAgentId as string,
       toAgentId as string,
-      type as any,
+      type as string,
       content as string,
       metadata as Record<string, unknown>,
     );
@@ -293,7 +293,7 @@ export async function handleLearningCollaborationEndpoints(
       agentId: String(agentId),
       botName: String(botName),
       botAvatar: botAvatar as string | undefined,
-      config: config as Record<string, any> | undefined,
+      config: config as Record<string, unknown> | undefined,
     });
 
     writeJSON(res, 200, { id: identityId, status: 'created' });

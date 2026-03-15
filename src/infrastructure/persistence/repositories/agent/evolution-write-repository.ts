@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
 import crypto from 'crypto';
 import { safeJsonParse } from '../../../../security.js';
 import { getDatabase as getPersistenceDatabase } from '../../sqlite/transaction-manager.js';
@@ -338,7 +338,7 @@ export function updateGeneStatus(
   );
 }
 
-export function updateGeneGDIScore(id: number, gdiScore: any): void {
+export function updateGeneGDIScore(id: number, gdiScore: unknown): void {
   db.prepare('UPDATE evolution_log SET gdi_score = ? WHERE id = ?').run(
     JSON.stringify(gdiScore),
     id,

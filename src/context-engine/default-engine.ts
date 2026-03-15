@@ -4,9 +4,10 @@
  * 实现分层记忆架构：L1 工作记忆 → L2 短期记忆 → L3 长期记忆
  * 支持向量嵌入、BM25 + 向量混合检索、记忆迁移
  */
-import type { ContextEngine } from './interface.js';
-import type { Context, CompactResult, TurnResult } from './types.js';
-import type { NewMessage, Memory } from '../types.js';
+import type { ContextEngine, Session } from './interface.js';
+import type { Context, CompactResult, TurnResult } from './context-types.js';
+import type { NewMessage } from '../types/core-runtime.js';
+import type { Memory } from '../types/agent-memory.js';
 import { logger } from '../logger.js';
 import { createMemory, getMemories } from '../db-agents.js';
 import { BM25Index } from '../hybrid-search.js';
@@ -143,7 +144,7 @@ export class DefaultContextEngine implements ContextEngine {
   /**
    * 4. compact - 压缩会话
    */
-  async compact(session: any): Promise<CompactResult> {
+  async compact(session: Session): Promise<CompactResult> {
     // 使用简单策略：保留高重要性记忆
     const preservedMemories = (session.memories || [])
       .filter((m: Memory) => m.importance > 0.7)

@@ -58,6 +58,7 @@ export function isCommandAllowed(command: string): boolean {
   const trimmedCommand = command.trim();
   if (!trimmedCommand) return false;
   if (trimmedCommand.length > 300) return false;
+  // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u001F]/.test(trimmedCommand)) return false;
 
   const hasForbiddenOperator = EVOLUTION_CONFIG.forbiddenOperators.some((op) =>

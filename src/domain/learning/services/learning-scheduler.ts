@@ -5,7 +5,7 @@ import { resolveLearningModelDecision } from './learning-needs-analyzer.js';
 import type {
   LearningIntentOrchestrationResult,
   LearningModelDecision,
-} from '../../../types.js';
+} from '../../../types/agent-memory.js';
 
 const LEARNING_AUTOMATION_DAILY_PLAN_PROMPT =
   '[learning-automation:daily-plan] 触发每日学习计划';

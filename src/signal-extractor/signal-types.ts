@@ -1,4 +1,4 @@
-import type { EvolutionEntry } from '../types.js';
+import type { EvolutionEntry } from '../types/evolution.js';
 
 // ===== 信号类型定义 =====
 

@@ -9,7 +9,7 @@ import {
   NANOCLAW_DIR,
   STATE_FILE,
 } from './constants.js';
-import { AppliedSkill, CustomModification, SkillState } from './types.js';
+import { AppliedSkill, CustomModification, SkillState } from './skill-types.js';
 
 function getStatePath(): string {
   return path.join(process.cwd(), NANOCLAW_DIR, STATE_FILE);

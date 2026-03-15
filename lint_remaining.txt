@@ -1,0 +1,192 @@
+
+> nanoclaw@1.2.10 lint
+> eslint .
+
+
+/Users/mengchen/Documents/nanoclaw/scripts/fix-missing-reflection-ids.ts
+  10:3  warning  'getLearningTask' is defined but never used          @typescript-eslint/no-unused-vars
+  11:3  warning  'getLearningTasksByAgent' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/scripts/fix-skill-drift.ts
+  143:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/mengchen/Documents/nanoclaw/scripts/migrate-to-agents.ts
+   16:3   warning  '_initTestDatabase' is defined but never used   @typescript-eslint/no-unused-vars
+   23:10  warning  'logger' is defined but never used              @typescript-eslint/no-unused-vars
+  157:11  warning  'failCount' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/scripts/restore.ts
+  485:14  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/scripts/setup-agent.ts
+   18:3   warning  'setDatabase' is defined but never used   @typescript-eslint/no-unused-vars
+   64:79  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  379:33  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/mengchen/Documents/nanoclaw/scripts/validate-all-skills.ts
+  158:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  185:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  205:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/mengchen/Documents/nanoclaw/setup/container.ts
+  27:9  warning  'logFile' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/setup/environment.ts
+  15:27  warning  '_args' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/setup/service.ts
+   17:3   warning  'hasSystemd' is defined but never used  @typescript-eslint/no-unused-vars
+   19:3   warning  'isWSL' is defined but never used       @typescript-eslint/no-unused-vars
+   23:27  warning  '_args' is defined but never used       @typescript-eslint/no-unused-vars
+  311:3   warning  'homeDir' is defined but never used     @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/setup/verify.ts
+  20:3   warning  'hasSystemd' is defined but never used         @typescript-eslint/no-unused-vars
+  25:27  warning  '_args' is defined but never used              @typescript-eslint/no-unused-vars
+  27:9   warning  'platform' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/src/__tests__/db-routing.test.ts
+  6:23  warning  'getDatabase' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/src/__tests__/hybrid-search.test.ts
+  70:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  71:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/mengchen/Documents/nanoclaw/src/context-engine/__tests__/registry.test.ts
+   19:19  warning  'agentFolder' is defined but never used   @typescript-eslint/no-unused-vars
+   23:16  warning  'message' is defined but never used       @typescript-eslint/no-unused-vars
+   23:37  warning  'context' is defined but never used       @typescript-eslint/no-unused-vars
+   28:18  warning  'chatJid' is defined but never used       @typescript-eslint/no-unused-vars
+   28:35  warning  'limit' is defined but never used         @typescript-eslint/no-unused-vars
+   38:17  warning  'session' is defined but never used       @typescript-eslint/no-unused-vars
+   46:19  warning  'result' is defined but never used        @typescript-eslint/no-unused-vars
+   58:28  warning  '_agentFolder' is defined but never used  @typescript-eslint/no-unused-vars
+   82:28  warning  '_agentFolder' is defined but never used  @typescript-eslint/no-unused-vars
+  104:28  warning  '_agentFolder' is defined but never used  @typescript-eslint/no-unused-vars
+  120:28  warning  '_agentFolder' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/src/context-engine/ingest-pipeline.ts
+  197:12  warning  '_err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/src/context-engine/rerank.ts
+  7:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/mengchen/Documents/nanoclaw/src/domain/evolution/services/capsule-service.ts
+   12:32  warning  'GEPCapsule' is defined but never used    @typescript-eslint/no-unused-vars
+  113:34  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  117:39  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  121:44  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/mengchen/Documents/nanoclaw/src/domain/evolution/services/evolution-service.ts
+   31:15  warning  'ValidationReport' is defined but never used  @typescript-eslint/no-unused-vars
+   31:33  warning  'AbilityChain' is defined but never used      @typescript-eslint/no-unused-vars
+  400:17  warning  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  468:41  warning  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  484:37  warning  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  522:44  warning  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+
+/Users/mengchen/Documents/nanoclaw/src/evolution-manager.ts
+  236:41  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/mengchen/Documents/nanoclaw/src/group-queue.ts
+  608:18  warning  '_gracePeriodMs' is defined but never used  @typescript-eslint/no-unused-vars
+  615:17  warning  '_' is assigned a value but never used      @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/src/infrastructure/ipc/snapshot-writer.ts
+  42:3  warning  'registeredJids' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/src/infrastructure/system/dependency-check.ts
+  33:12  warning  '_err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/src/ipc.ts
+  159:15  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  162:20  warning  Unexpected any. Specify a different type                                                               @typescript-eslint/no-explicit-any
+
+/Users/mengchen/Documents/nanoclaw/src/keystore.ts
+  23:10  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/src/main-evolution-applier.ts
+  3:3  warning  'extractSignals' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/src/query-expansion/local-llm-provider.ts
+   11:8   warning  'fs' is defined but never used            @typescript-eslint/no-unused-vars
+   47:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   48:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   49:20  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   50:24  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  175:43  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/mengchen/Documents/nanoclaw/src/query-expansion/testing/mock-llm-provider.ts
+  16:20  warning  '_query' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/src/search-learning-execution.ts
+   51:14  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   59:57  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   73:25  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   73:42  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   86:20  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   87:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   88:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  112:57  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  117:58  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/mengchen/Documents/nanoclaw/src/sender-allowlist.test.ts
+  4:55  warning  'vi' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/src/skill-verifier.ts
+   10:15  warning  'SecurityEventType' is defined but never used  @typescript-eslint/no-unused-vars
+   72:16  warning  'err' is defined but never used                @typescript-eslint/no-unused-vars
+  165:14  warning  'err' is defined but never used                @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/src/task-scheduler.integration.test.ts
+  52:35  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/mengchen/Documents/nanoclaw/src/task-scheduler.test.ts
+  44:33  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/mengchen/Documents/nanoclaw/src/team-manager.ts
+  19:10  warning  'COLLABORATION_CONFIG' is defined but never used              @typescript-eslint/no-unused-vars
+  20:26  warning  'TeamCollaborationState' is defined but never used            @typescript-eslint/no-unused-vars
+  32:10  warning  'generateTeamCollaborationStateId' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/src/types/agent-memory.ts
+  24:27  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  34:32  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/mengchen/Documents/nanoclaw/src/types/collaboration.ts
+  19:27  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/mengchen/Documents/nanoclaw/src/types/ipc-types.ts
+  30:12  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/mengchen/Documents/nanoclaw/tests/e2e-agent-flow.ts
+  10:3   warning  'logTaskRun' is defined but never used              @typescript-eslint/no-unused-vars
+  11:3   warning  'getAllRegisteredGroups' is defined but never used  @typescript-eslint/no-unused-vars
+  21:10  warning  'startSchedulerLoop' is defined but never used      @typescript-eslint/no-unused-vars
+  30:3   warning  'TestAssertions' is defined but never used          @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/tests/full-agent-flow.ts
+   63:7   warning  'TEST_AGENT3' is assigned a value but never used        @typescript-eslint/no-unused-vars
+   67:7   warning  'TEST_AGENT4' is assigned a value but never used        @typescript-eslint/no-unused-vars
+  280:12  warning  Unexpected any. Specify a different type                @typescript-eslint/no-explicit-any
+  323:12  warning  Unexpected any. Specify a different type                @typescript-eslint/no-explicit-any
+  341:27  warning  Unexpected any. Specify a different type                @typescript-eslint/no-explicit-any
+  360:16  warning  'error' is defined but never used                       @typescript-eslint/no-unused-vars
+  410:27  warning  Unexpected any. Specify a different type                @typescript-eslint/no-explicit-any
+  463:11  warning  'externalKnowledge' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  541:29  warning  Unexpected any. Specify a different type                @typescript-eslint/no-explicit-any
+  679:34  warning  Unexpected any. Specify a different type                @typescript-eslint/no-explicit-any
+
+/Users/mengchen/Documents/nanoclaw/tests/minimal-test.ts
+  13:47  warning  'TestAssertions' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/mengchen/Documents/nanoclaw/tests/test-utils.ts
+    2:10  warning  'logger' is defined but never used            @typescript-eslint/no-unused-vars
+  141:11  warning  'assetId' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  208:42  warning  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  267:48  warning  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  286:61  warning  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+
+✖ 106 problems (0 errors, 106 warnings)
+  0 errors and 1 warning potentially fixable with the `--fix` option.
+

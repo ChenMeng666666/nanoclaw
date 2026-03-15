@@ -6,6 +6,7 @@
  * 支持多 agent，每个 agent 对应一个独立的 bot token
  */
 import crypto from 'crypto';
+import readline from 'readline';
 import { initDatabase } from '../src/db.js';
 import { createChannelInstance, getAllActiveAgents } from '../src/db-agents.js';
 import { storeSecret } from '../src/keystore.js';
@@ -106,7 +107,7 @@ async function main() {
 
 function question(prompt: string): Promise<string> {
   return new Promise((resolve) => {
-    const rl = require('readline').createInterface({
+    const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
     });

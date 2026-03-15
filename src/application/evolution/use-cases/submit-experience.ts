@@ -12,10 +12,12 @@ import {
 import {
   GEP_SCHEMA_VERSION,
   generateAssetId,
-  type EvolutionEntry,
-  type MainExperienceInput,
   type DuplicateCheckResult,
-} from '../../../types.js';
+} from '../../../types/gep.js';
+import type {
+  EvolutionEntry,
+  MainExperienceInput,
+} from '../../../types/evolution.js';
 import { logger } from '../../../logger.js';
 import type { Signal } from '../../../signal-extractor.js';
 

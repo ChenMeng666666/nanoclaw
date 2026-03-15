@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { setDatabase, getDatabase } from '../db-agents.js';
+import { setDatabase } from '../db-agents.js';
 import {
   createRoutingBinding,
   getRoutingBinding,

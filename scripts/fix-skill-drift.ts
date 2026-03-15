@@ -26,7 +26,7 @@ import os from 'os';
 import path from 'path';
 
 import { parse } from 'yaml';
-import type { SkillManifest } from '../skills-engine/types.js';
+import type { SkillManifest } from '../skills-engine/skill-types.js';
 
 interface FixResult {
   skill: string;
@@ -140,8 +140,9 @@ function fixSkill(skillName: string, projectRoot: string): FixResult[] {
         stdio: 'pipe',
       });
       results.push({ skill: skillName, file: relPath, status: 'auto-fixed' });
-    } catch (err: any) {
-      const exitCode = err.status ?? -1;
+    } catch (err: unknown) {
+      const error = err as { status?: number; message: string };
+      const exitCode = error.status ?? -1;
       if (exitCode > 0) {
         // Positive exit code = number of conflicts, file has markers
         results.push({
@@ -155,7 +156,7 @@ function fixSkill(skillName: string, projectRoot: string): FixResult[] {
           skill: skillName,
           file: relPath,
           status: 'error',
-          reason: err.message,
+          reason: error.message,
         });
       }
     } finally {

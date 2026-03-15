@@ -8,7 +8,7 @@ import { acquireLock } from './lock.js';
 import { loadPathRemap, resolvePathRemap } from './path-remap.js';
 import { computeFileHash, readState, writeState } from './state.js';
 import { findSkillDir, replaySkills } from './replay.js';
-import type { UninstallResult } from './types.js';
+import type { UninstallResult } from './skill-types.js';
 
 export async function uninstallSkill(
   skillName: string,

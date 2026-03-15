@@ -27,6 +27,6 @@ export interface IPCRequest {
 
 export interface IPCResponse {
   status: 'success' | 'error';
-  result?: any;
+  result?: unknown;
   error?: string;
 }

@@ -6,6 +6,7 @@ import {
   computeNextRun,
   startSchedulerLoop,
 } from './task-scheduler.js';
+import type { GroupQueue } from './group-queue.js';
 
 describe('task scheduler', () => {
   beforeEach(() => {
@@ -41,7 +42,7 @@ describe('task scheduler', () => {
     startSchedulerLoop({
       registeredGroups: () => ({}),
       getSessions: () => ({}),
-      queue: { enqueueTask } as any,
+      queue: { enqueueTask } as unknown as GroupQueue,
       onProcess: () => {},
       sendMessage: async () => {},
     });

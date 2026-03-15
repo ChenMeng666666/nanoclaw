@@ -1,4 +1,4 @@
-import type { Memory } from '../../../types.js';
+import type { Memory } from '../../../types/agent-memory.js';
 import { parseObject } from './json-mapper.js';
 
 export interface MemoryRow {

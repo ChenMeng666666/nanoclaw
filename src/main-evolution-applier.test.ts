@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { evolutionManager } from './evolution-manager.js';
 import { MainEvolutionApplier } from './main-evolution-applier.js';
-import type { EvolutionEntry } from './types.js';
+import type { EvolutionEntry } from './types/evolution.js';
 
 function createGene(overrides: Partial<EvolutionEntry> = {}): EvolutionEntry {
   return {

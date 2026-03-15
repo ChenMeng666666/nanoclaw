@@ -1,4 +1,5 @@
 import type { AddressInfo } from 'node:net';
+import type { Server } from 'node:http';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createAgent } from './db-agents.js';
@@ -6,7 +7,7 @@ import { _initTestDatabase, getTasksForGroup } from './db.js';
 import { startRuntimeAPI } from './runtime-api.js';
 
 describe('learning p2 contracts', () => {
-  let server: import('http').Server | null = null;
+  let server: Server | null = null;
   let baseUrl = '';
 
   beforeEach(async () => {

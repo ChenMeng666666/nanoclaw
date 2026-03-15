@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 import { DATA_DIR, GROUPS_DIR } from '../../config.js';
 import {
   resolveGroupFolderPath,
@@ -7,7 +8,7 @@ import {
 } from '../../group-folder.js';
 import { logger } from '../../logger.js';
 import { validateAdditionalMounts } from '../../mount-security.js';
-import type { RegisteredGroup } from '../../types.js';
+import type { RegisteredGroup } from '../../types/core-runtime.js';
 import type { VolumeMount } from '../../domain/container/mount-policy.js';
 
 /**
@@ -123,7 +124,6 @@ export function buildVolumeMounts(
         );
         try {
           const env = { ...process.env, SKILL_DIR: srcDir };
-          const execSync = require('child_process').execSync;
           execSync(`bash "${hookScript}"`, {
             env,
             stdio: ['ignore', 'pipe', 'pipe'],

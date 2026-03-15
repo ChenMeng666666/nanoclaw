@@ -1,4 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import type * as fsType from 'fs';
 
 import { GroupQueue } from './group-queue.js';
 
@@ -10,7 +12,7 @@ vi.mock('./config.js', () => ({
 
 // Mock fs operations used by sendMessage/closeStdin
 vi.mock('fs', async () => {
-  const actual = await vi.importActual<typeof import('fs')>('fs');
+  const actual = await vi.importActual<typeof fsType>('fs');
   return {
     ...actual,
     default: {

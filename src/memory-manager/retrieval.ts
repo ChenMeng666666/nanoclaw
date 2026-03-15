@@ -1,4 +1,4 @@
-import type { Memory } from '../types.js';
+import type { Memory, MemorySearchHit } from './memory-types.js';
 import {
   getMemories,
   incrementMemoryAccess,
@@ -7,9 +7,8 @@ import {
 import { MEMORY_CONFIG } from '../config.js';
 import { BM25Index, reciprocalRankFusion } from '../hybrid-search.js';
 import { generateEmbedding } from './embedding.js';
-import type { MemorySearchHit } from './types.js';
 import type { RetrievalRolloutConfig } from './release-control-types.js';
-import { MemoryMetricsTracker } from './metrics.js';
+import type { MemoryMetricsTracker } from './metrics.js';
 import {
   generateQueryVariants,
   extractKeywords,

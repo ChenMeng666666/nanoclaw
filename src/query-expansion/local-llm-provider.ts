@@ -8,7 +8,6 @@
 
 import type { QueryExpansionProvider } from '../context-engine/query-expansion.js';
 import { logger } from '../logger.js';
-import fs from 'fs';
 
 /**
  * 本地 LLM 提供者配置
@@ -44,9 +43,13 @@ export interface LocalLLMConfig {
  */
 export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
   private config: LocalLLMConfig;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private llama: any = null; // node-llama-cpp 的实例（延迟加载）
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private model: any = null; // 加载的模型
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private context: any = null; // 上下文
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private chatSession: any = null; // 聊天会话
   private isInitialized = false;
 
@@ -67,7 +70,6 @@ export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
   async initialize(): Promise<void> {
     try {
       // 动态导入 node-llama-cpp，避免非必需依赖
-      // @ts-ignore - node-llama-cpp 是可选依赖
       const {
         getLlama,
         LlamaChatSession,
@@ -111,6 +113,7 @@ export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
         throw new Error(
           'node-llama-cpp not installed. ' +
             'Please install it with: npm install node-llama-cpp',
+          { cause: err },
         );
       }
       logger.warn(
@@ -172,7 +175,7 @@ export class LocalLLMQueryExpansionProvider implements QueryExpansionProvider {
   /**
    * 辅助方法：清理单个资源
    */
-  private async disposeResource(resource: any, name: string): Promise<void> {
+  private async disposeResource(resource: any, name: string): Promise<void> { // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!resource) return;
     try {
       await resource.dispose();

@@ -6,7 +6,7 @@
  */
 
 import type { CreateEngineOptions } from './providers.js';
-import { BM25Index } from '../hybrid-search.js';
+import type { BM25Index } from '../hybrid-search.js';
 import { logger } from '../logger.js';
 
 /**

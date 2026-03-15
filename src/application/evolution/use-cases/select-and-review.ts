@@ -1,9 +1,9 @@
 import {
   STRATEGY_CONFIGS,
-  type EvolutionEntry,
   type EvolutionStrategy,
   type StrategyConfig,
-} from '../../../types.js';
+} from '../../../types/gep.js';
+import type { EvolutionEntry } from '../../../types/evolution.js';
 import {
   getEvolutionEntriesByStatus,
   getEvolutionEntriesByCategory,
@@ -268,7 +268,7 @@ export class SelectAndReviewUseCase {
     let comment = '';
 
     switch (agent.expertise) {
-      case 'safety':
+      case 'safety': {
         const safetyIssues = this.checkSafety(entry.content);
         if (safetyIssues.length === 0) {
           score = 0.9;
@@ -278,6 +278,7 @@ export class SelectAndReviewUseCase {
           comment = `发现安全问题：${safetyIssues.join(', ')}`;
         }
         break;
+      }
       case 'effectiveness':
         if (
           entry.content.length > 200 &&

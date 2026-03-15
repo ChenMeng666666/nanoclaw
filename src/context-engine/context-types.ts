@@ -1,4 +1,5 @@
-import type { NewMessage, Memory } from '../types.js';
+import type { NewMessage } from '../types/core-runtime.js';
+import type { Memory } from '../types/agent-memory.js';
 
 /**
  * 上下文接口 - 传递给 agent 的完整上下文

@@ -1,7 +1,10 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { SignalType, SignalPattern } from '../../signal-extractor/types.js';
+import type {
+  SignalType,
+  SignalPattern,
+} from '../../signal-extractor/signal-types.js';
 
 // Get __dirname in ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -84,6 +87,7 @@ export class SignalConfigLoader {
     } catch (error) {
       throw new Error(
         `Failed to load signal patterns config: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
       );
     }
   }

@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import type { FileOperation, FileOpsResult } from './types.js';
+import type { FileOperation, FileOpsResult } from './skill-types.js';
 
 function isWithinRoot(rootPath: string, targetPath: string): boolean {
   return targetPath === rootPath || targetPath.startsWith(rootPath + path.sep);

@@ -1,5 +1,5 @@
 import { getAllChats } from '../../db.js';
-import type { RegisteredGroup } from '../../types.js';
+import type { RegisteredGroup } from '../../types/core-runtime.js';
 import type { AvailableGroup } from '../../container-runner.js';
 
 /**

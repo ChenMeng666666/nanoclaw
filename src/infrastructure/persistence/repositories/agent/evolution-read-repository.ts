@@ -1,5 +1,11 @@
-import Database from 'better-sqlite3';
-import type { EvolutionEntry } from '../../../../types.js';
+import type Database from 'better-sqlite3';
+import type { EvolutionEntry } from '../../../../types/evolution.js';
+import type {
+  GEPCapsule,
+  AbilityChain,
+  ValidationReport,
+  EcosystemMetrics,
+} from '../../../../types/gep.js';
 import { safeJsonParse } from '../../../../security.js';
 import { getDatabase as getPersistenceDatabase } from '../../sqlite/transaction-manager.js';
 
@@ -82,7 +88,29 @@ export function getDuplicateEvolutionEntry(
        ORDER BY created_at DESC
        LIMIT 1`,
     )
-    .get(abilityName, contentHash, timeThreshold) as any;
+    .get(abilityName, contentHash, timeThreshold) as
+    | {
+        id: number;
+        ability_name: string;
+        description: string | null;
+        source_agent_id: string | null;
+        content: string;
+        content_embedding: string | null;
+        tags: string | null;
+        status: string;
+        reviewed_by: string | null;
+        reviewed_at: string | null;
+        feedback: string | null;
+        gdi_score: string | null;
+        category: string | null;
+        signals_match: string | null;
+        strategy: string | null;
+        constraints: string | null;
+        validation: string | null;
+        created_at: string;
+        chain_id: string | null;
+      }
+    | undefined;
   if (!row) return undefined;
   return {
     id: row.id,
@@ -96,8 +124,8 @@ export function getDuplicateEvolutionEntry(
     reviewedBy: row.reviewed_by || undefined,
     reviewedAt: row.reviewed_at || undefined,
     feedback: safeJsonParse(row.feedback, []),
-    gdi_score: safeJsonParse((row as any).gdi_score, undefined),
-    gdiScore: safeJsonParse((row as any).gdi_score, undefined),
+    gdi_score: safeJsonParse(row.gdi_score, undefined),
+    gdiScore: safeJsonParse(row.gdi_score, undefined),
     category:
       (row.category as 'repair' | 'optimize' | 'innovate' | 'learn') || 'learn',
     signalsMatch: safeJsonParse(row.signals_match, []),
@@ -226,7 +254,7 @@ export function getEvolutionEntriesByCategory(
   }));
 }
 
-export function getCapsuleById(id: string): any | undefined {
+export function getCapsuleById(id: string): GEPCapsule | undefined {
   const row = db.prepare('SELECT * FROM capsules WHERE id = ?').get(id) as
     | {
         id: string;
@@ -263,7 +291,7 @@ export function getCapsuleById(id: string): any | undefined {
   };
 }
 
-export function getCapsulesByGeneId(geneId: number): any[] {
+export function getCapsulesByGeneId(geneId: number): GEPCapsule[] {
   const rows = db
     .prepare('SELECT * FROM capsules WHERE gene_id = ? ORDER BY created_at ASC')
     .all(geneId) as Array<{
@@ -298,7 +326,7 @@ export function getCapsulesByGeneId(geneId: number): any[] {
   }));
 }
 
-export function getAbilityChain(chainId: string): any | undefined {
+export function getAbilityChain(chainId: string): AbilityChain | undefined {
   const row = db
     .prepare('SELECT * FROM ability_chains WHERE chain_id = ?')
     .get(chainId) as
@@ -324,7 +352,9 @@ export function getAbilityChain(chainId: string): any | undefined {
   };
 }
 
-export function getValidationReportsByGeneId(geneId: number): any[] {
+export function getValidationReportsByGeneId(
+  geneId: number,
+): ValidationReport[] {
   const rows = db
     .prepare(
       'SELECT * FROM validation_reports WHERE gene_id = ? ORDER BY timestamp DESC',
@@ -352,7 +382,7 @@ export function getValidationReportsByGeneId(geneId: number): any[] {
   }));
 }
 
-export function getEcosystemMetrics(limit: number = 30): any[] {
+export function getEcosystemMetrics(limit: number = 30): EcosystemMetrics[] {
   const rows = db
     .prepare('SELECT * FROM ecosystem_metrics ORDER BY timestamp DESC LIMIT ?')
     .all(limit) as Array<{
@@ -383,70 +413,118 @@ export function getEcosystemMetrics(limit: number = 30): any[] {
 export function getEvolutionEntriesByStatus(
   status: 'promoted' | 'stale' | 'archived',
   limit: number = 20,
-): any[] {
+): EvolutionEntry[] {
   const rows = db
     .prepare(
       'SELECT * FROM evolution_log WHERE ecosystem_status = ? ORDER BY created_at DESC LIMIT ?',
     )
-    .all(status, limit) as any[];
+    .all(status, limit) as Array<{
+    id: number;
+    ability_name: string;
+    description: string | null;
+    source_agent_id: string | null;
+    content: string;
+    content_embedding: string | null;
+    tags: string | null;
+    status: string;
+    reviewed_by: string | null;
+    reviewed_at: string | null;
+    feedback: string | null;
+    gdi_score: string | null;
+    category: string | null;
+    signals_match: string | null;
+    strategy: string | null;
+    constraints: string | null;
+    validation: string | null;
+    created_at: string;
+    chain_id: string | null;
+    ecosystem_status: string;
+    preconditions: string | null;
+    validation_commands: string | null;
+    summary: string | null;
+  }>;
   return rows.map((row) => ({
     id: row.id,
     abilityName: row.ability_name,
-    description: row.description,
-    sourceAgentId: row.source_agent_id,
+    description: row.description || '',
+    sourceAgentId: row.source_agent_id || '',
     content: row.content,
     contentEmbedding: safeJsonParse(row.content_embedding, undefined),
     tags: safeJsonParse(row.tags, []),
-    status: row.status,
-    reviewedBy: row.reviewed_by,
-    reviewedAt: row.reviewed_at,
+    status: row.status as 'pending' | 'reviewing' | 'approved' | 'rejected',
+    reviewedBy: row.reviewed_by || undefined,
+    reviewedAt: row.reviewed_at || undefined,
     feedback: safeJsonParse(row.feedback, []),
-    category: row.category,
-    signalsMatch: safeJsonParse(row.signals_match, []),
-    summary: row.summary,
-    preconditions: safeJsonParse(row.preconditions, []),
-    validationCommands: safeJsonParse(row.validation_commands, []),
-    chainId: row.chain_id,
     gdi_score: safeJsonParse(row.gdi_score, undefined),
     gdiScore: safeJsonParse(row.gdi_score, undefined),
-    ecosystemStatus: row.ecosystem_status,
+    category:
+      (row.category as 'repair' | 'optimize' | 'innovate' | 'learn') || 'learn',
+    signalsMatch: safeJsonParse(row.signals_match, []),
     strategy: safeJsonParse(row.strategy, []),
     constraints: safeJsonParse(row.constraints, {}),
     validation: safeJsonParse(row.validation, []),
     createdAt: row.created_at,
+    chainId: row.chain_id || undefined,
+    ecosystemStatus: row.ecosystem_status,
   }));
 }
 
-export function getEvolutionEntryByAssetId(assetId: string): any | undefined {
+export function getEvolutionEntryByAssetId(
+  assetId: string,
+): EvolutionEntry | undefined {
   const row = db
     .prepare('SELECT * FROM evolution_log WHERE asset_id = ?')
-    .get(assetId) as any;
+    .get(assetId) as
+    | {
+        id: number;
+        ability_name: string;
+        description: string | null;
+        source_agent_id: string | null;
+        content: string;
+        content_embedding: string | null;
+        tags: string | null;
+        status: string;
+        reviewed_by: string | null;
+        reviewed_at: string | null;
+        feedback: string | null;
+        gdi_score: string | null;
+        category: string | null;
+        signals_match: string | null;
+        strategy: string | null;
+        constraints: string | null;
+        validation: string | null;
+        created_at: string;
+        chain_id: string | null;
+        ecosystem_status: string;
+        preconditions: string | null;
+        validation_commands: string | null;
+        summary: string | null;
+      }
+    | undefined;
   if (!row) return undefined;
 
   return {
     id: row.id,
     abilityName: row.ability_name,
-    description: row.description,
-    sourceAgentId: row.source_agent_id,
+    description: row.description || '',
+    sourceAgentId: row.source_agent_id || '',
     content: row.content,
     contentEmbedding: safeJsonParse(row.content_embedding, undefined),
     tags: safeJsonParse(row.tags, []),
-    status: row.status,
-    reviewedBy: row.reviewed_by,
-    reviewedAt: row.reviewed_at,
+    status: row.status as 'pending' | 'reviewing' | 'approved' | 'rejected',
+    reviewedBy: row.reviewed_by || undefined,
+    reviewedAt: row.reviewed_at || undefined,
     feedback: safeJsonParse(row.feedback, []),
-    category: row.category,
-    signalsMatch: safeJsonParse(row.signals_match, []),
-    summary: row.summary,
-    preconditions: safeJsonParse(row.preconditions, []),
-    validationCommands: safeJsonParse(row.validation_commands, []),
-    chainId: row.chain_id,
     gdi_score: safeJsonParse(row.gdi_score, undefined),
     gdiScore: safeJsonParse(row.gdi_score, undefined),
-    ecosystemStatus: row.ecosystem_status,
+    category:
+      (row.category as 'repair' | 'optimize' | 'innovate' | 'learn') || 'learn',
+    signalsMatch: safeJsonParse(row.signals_match, []),
     strategy: safeJsonParse(row.strategy, []),
     constraints: safeJsonParse(row.constraints, {}),
     validation: safeJsonParse(row.validation, []),
     createdAt: row.created_at,
+    chainId: row.chain_id || undefined,
+    ecosystemStatus: row.ecosystem_status,
   };
 }

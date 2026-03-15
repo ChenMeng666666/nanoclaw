@@ -7,21 +7,22 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import type * as keytarType from 'keytar';
 
 import { logger } from './logger.js';
-import { logCredentialAccess, keystoreAudit } from './keystore-audit.js';
+import { logCredentialAccess } from './keystore-audit.js';
 
 const SERVICE_NAME = 'nanoclaw';
 const USE_KEYTAR = process.env.USE_KEYTAR !== 'false';
 
 // 尝试动态导入 keytar（可选依赖）
-let keytar: typeof import('keytar') | null = null;
+let keytar: typeof keytarType | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  keytar = require('keytar');
-} catch (err) {
-  logger.warn('keytar not available, using encrypted file fallback');
-}
+    keytar = require('keytar');
+  } catch {
+    logger.warn('keytar not available, using encrypted file fallback');
+  }
 
 /**
  * 存储敏感配置

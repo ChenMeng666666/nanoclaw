@@ -12,7 +12,7 @@ import { logger } from '../src/logger.js';
 import { commandExists, getPlatform, isHeadless, isWSL } from './platform.js';
 import { emitStatus } from './status.js';
 
-export async function run(_args: string[]): Promise<void> {
+export async function run(): Promise<void> {
   const projectRoot = process.cwd();
 
   logger.info('Starting environment check');

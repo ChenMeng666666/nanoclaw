@@ -19,8 +19,11 @@ import {
   getValidationReportsByGeneId,
   createEcosystemMetrics,
   getEcosystemMetrics,
-  getEvolutionEntriesByStatus,
 } from '../../../db-agents.js';
+import type {
+  AbilityChain,
+  ValidationReport,
+} from '../../../types/gep.js';
 import type {
   EvolutionEntry,
   GDIScore,
@@ -28,14 +31,13 @@ import type {
   EcosystemMetrics,
   EvolutionDashboardMetrics,
   MainExperienceInput,
-  EvolutionCategory,
-} from '../../../types.js';
+} from '../../../types/evolution.js';
 import { logger } from '../../../logger.js';
 import { extractSignals, type Signal } from '../../../signal-extractor.js';
 import { EVOLUTION_CONFIG } from '../../../config.js';
-import { EvolutionScoringService } from './scoring-service.js';
-import { CommandSafetyService } from './command-safety-service.js';
-import { StrategyService } from './strategy-service.js';
+import type { EvolutionScoringService } from './scoring-service.js';
+import type { CommandSafetyService } from './command-safety-service.js';
+import type { StrategyService } from './strategy-service.js';
 import { SubmitExperienceUseCase } from '../../../application/evolution/use-cases/submit-experience.js';
 import { SelectAndReviewUseCase } from '../../../application/evolution/use-cases/select-and-review.js';
 
@@ -285,7 +287,11 @@ export class EvolutionService {
     const db = getDatabase();
 
     // Get all Genes
-    const allGenes = db.prepare('SELECT * FROM evolution_log').all() as any[];
+    const allGenes = db.prepare('SELECT * FROM evolution_log').all() as Array<{
+      ecosystem_status: string;
+      gdi_score: string;
+      category: string;
+    }>;
 
     // Count by status
     const promotedGenes = allGenes.filter(
@@ -394,7 +400,7 @@ export class EvolutionService {
       .prepare(
         "SELECT * FROM evolution_log WHERE created_at >= datetime('now', '-7 days')",
       )
-      .all() as any[];
+      .all() as EvolutionEntry[];
 
     if (existingEntries.length === 0) {
       return { isDuplicate: false, similarity: 0 };
@@ -408,6 +414,7 @@ export class EvolutionService {
 
       try {
         const existingEmbedding = JSON.parse(existing.content_embedding);
+        if (!Array.isArray(existingEmbedding)) continue;
         const similarity = this.cosineSimilarity(
           currentEmbedding,
           existingEmbedding,
@@ -461,7 +468,7 @@ export class EvolutionService {
     });
   }
 
-  getValidationReports(geneId: number): any[] {
+  getValidationReports(geneId: number): ValidationReport[] {
     return getValidationReportsByGeneId(geneId);
   }
 
@@ -477,7 +484,7 @@ export class EvolutionService {
     return chainId;
   }
 
-  getAbilityChain(chainId: string): any {
+  getAbilityChain(chainId: string): AbilityChain | undefined {
     return getAbilityChain(chainId);
   }
 
@@ -515,7 +522,7 @@ export class EvolutionService {
     updateGeneStatus(geneId, status);
   }
 
-  private calculateShannonDiversity(genes: any[]): number {
+  private calculateShannonDiversity(genes: EvolutionEntry[]): number {
     const categoryCounts: Record<string, number> = {};
     const total = genes.length;
 

@@ -1,4 +1,4 @@
-import type { Memory } from '../types.js';
+import type { Memory } from '../types/agent-memory.js';
 import { MEMORY_CONFIG } from '../config.js';
 
 export function calculateImportance(content: string, level: string): number {

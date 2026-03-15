@@ -22,6 +22,8 @@ describe('task scheduler integration', () => {
     process.env.SCHEDULER_POLL_INTERVAL = '5000';
     const db = await import('./db.js');
     const scheduler = await import('./task-scheduler.js');
+    // eslint-disable-next-line @typescript-eslint/consistent-type-imports
+    type GroupQueue = import('./group-queue.js').GroupQueue;
 
     try {
       db._initTestDatabase();
@@ -49,7 +51,7 @@ describe('task scheduler integration', () => {
       scheduler.startSchedulerLoop({
         registeredGroups: () => ({}),
         getSessions: () => ({}),
-        queue: { enqueueTask } as any,
+        queue: { enqueueTask } as unknown as GroupQueue,
         onProcess: vi.fn(async () => {}),
         sendMessage: vi.fn(async () => {}),
       });

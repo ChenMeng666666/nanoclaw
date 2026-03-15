@@ -1,5 +1,6 @@
-import type { NewMessage, Memory } from '../types.js';
-import type { Context, CompactResult, TurnResult } from './types.js';
+import type { NewMessage } from '../types/core-runtime.js';
+import type { Memory } from '../types/agent-memory.js';
+import type { Context, CompactResult, TurnResult } from './context-types.js';
 
 /**
  * ContextEngine 接口 - 可插拔的上下文/记忆管理引擎
@@ -44,7 +45,7 @@ export interface ContextEngine {
    * @param session - 完整会话历史
    * @returns 压缩结果
    */
-  compact(session: any): Promise<CompactResult>;
+  compact(session: Session): Promise<CompactResult>;
 
   /**
    * 每轮对话结束后调用
@@ -54,7 +55,7 @@ export interface ContextEngine {
 }
 
 // Session 类型临时定义（避免循环依赖）
-interface Session {
+export interface Session {
   messages: NewMessage[];
   memories: Memory[];
 }

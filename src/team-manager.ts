@@ -16,21 +16,13 @@ import {
 } from './db.js';
 import { sendAgentMessage } from './agent-communication.js';
 import { logger } from './logger.js';
-import { COLLABORATION_CONFIG } from './config.js';
-import type { TeamState, TeamCollaborationState } from './types.js';
+import type { TeamState } from './types/collaboration.js';
 
 /**
  * 生成团队 ID
  */
 function generateTeamId(): string {
   return `team-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-/**
- * 生成团队协作状态 ID
- */
-function generateTeamCollaborationStateId(): string {
-  return `team-collab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 /**

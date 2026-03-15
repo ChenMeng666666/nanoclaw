@@ -14,6 +14,7 @@ export class MockLLMQueryExpansionProvider implements QueryExpansionProvider {
   }
 
   generateVariants(_query: string): string[] {
+    void _query;
     if (this.variants.length > 0) {
       return this.variants.slice(0, 3);
     }

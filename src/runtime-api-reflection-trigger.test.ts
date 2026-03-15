@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AddressInfo } from 'node:net';
+import type { Server } from 'node:http';
+import type * as dbAgentsType from './db-agents.js';
 
 const mocks = vi.hoisted(() => ({
   triggerReflection: vi.fn(),
@@ -16,7 +18,7 @@ vi.mock('./application/learning/reflection-executor.js', () => ({
 
 vi.mock('./db-agents.js', async () => {
   const actual =
-    await vi.importActual<typeof import('./db-agents.js')>('./db-agents.js');
+    await vi.importActual<typeof dbAgentsType>('./db-agents.js');
   return {
     ...actual,
     getAgentByFolder: mocks.getAgentByFolder,
@@ -26,7 +28,7 @@ vi.mock('./db-agents.js', async () => {
 import { startRuntimeAPI } from './runtime-api.js';
 
 describe('runtime-api reflection trigger endpoint', () => {
-  let server: import('http').Server | null = null;
+  let server: Server | null = null;
   let baseUrl = '';
 
   beforeEach(async () => {

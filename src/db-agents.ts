@@ -3,7 +3,7 @@
  * 包含 agents, channel_instances, user_profiles, memories, reflections,
  * learning_tasks, evolution_log 等表的 CRUD 操作
  */
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
 import {
   setDatabase as setPersistenceDatabase,
   getDatabase as getPersistenceDatabase,

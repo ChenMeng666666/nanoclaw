@@ -4,10 +4,8 @@ import {
   getReflectionsByAgent,
   createReflection,
 } from '../../../db-agents.js';
-import type {
-  DetailedReflection,
-  DailyLearningSummary,
-} from '../../../types.js';
+import type { DetailedReflection } from '../../../types/agent-memory.js';
+import type { DailyLearningSummary } from '../../../types/evolution.js';
 import {
   extractKnowledgePoints,
   splitToPoints,

@@ -35,7 +35,7 @@ import {
   printDatabaseStats,
   getDatabaseStats,
 } from './test-helper.js';
-import { RegisteredGroup } from '../src/types.js';
+import type { RegisteredGroup } from '../src/types/core-runtime.js';
 
 // 辅助函数：计算斐波那契数列
 function calculateFibonacci(n: number): number {
@@ -59,14 +59,6 @@ const TEST_AGENT1 = TestDataFactory.createTestAgent(
 const TEST_AGENT2 = TestDataFactory.createTestAgent(
   TEST_GROUP.folder,
   'test-agent-2',
-);
-const TEST_AGENT3 = TestDataFactory.createTestAgent(
-  TEST_GROUP.folder,
-  'test-agent-3',
-);
-const TEST_AGENT4 = TestDataFactory.createTestAgent(
-  TEST_GROUP.folder,
-  'test-agent-4',
 );
 const TEST_TASK = TestDataFactory.createTestTask(
   TEST_GROUP.folder,
@@ -277,7 +269,7 @@ async function testFullAgentFlow() {
       .all(
         TEST_EXPERIENCE.source_agent_id,
         TEST_EXPERIENCE.ability_name,
-      ) as any[];
+      ) as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     if (allExperiences.length === 0) {
       throw new Error('进化经验未存储');
@@ -320,7 +312,7 @@ async function testFullAgentFlow() {
       .all(
         TEST_EXPERIENCE.source_agent_id,
         TEST_EXPERIENCE.ability_name,
-      ) as any[];
+      ) as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     if (gepTestExperiences.length > 0) {
       const gene = gepTestExperiences[0];
@@ -338,7 +330,7 @@ async function testFullAgentFlow() {
     logger.debug('  测试 Capsule 创建');
     const approvedExperiences = TestDatabaseHelper.getDatabase()
       .prepare('SELECT * FROM evolution_log WHERE status = ?')
-      .all('approved') as any[];
+      .all('approved') as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     if (approvedExperiences.length > 0) {
       const approvedGene = approvedExperiences[0];
@@ -357,7 +349,7 @@ async function testFullAgentFlow() {
         logger.debug(
           `  Gene ${approvedGene.id} 有 ${capsules.length} 个 Capsules`,
         );
-      } catch (error) {
+      } catch {
         logger.debug(`  Capsule 创建条件不满足，跳过测试 (这是正常的)`);
       }
     }
@@ -407,7 +399,7 @@ async function testFullAgentFlow() {
     const db = TestDatabaseHelper.getDatabase();
     const dbExperiences = db
       .prepare('SELECT * FROM evolution_log WHERE status = ?')
-      .all('approved') as any[];
+      .all('approved') as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
     logger.debug(`  数据库中已批准的经验数量: ${dbExperiences.length}`);
 
     // 查询相同内容的经验
@@ -460,7 +452,8 @@ async function testFullAgentFlow() {
 
     // 4. 外部学习（模拟）
     logger.debug('  [4/7] 外部学习（模拟）');
-    const externalKnowledge = `
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _externalKnowledge = `
 斐波那契数列定义：
 - F(0) = 0
 - F(1) = 1
@@ -538,7 +531,7 @@ function calculateFibonacci(n: number): number {
     const dbAfterSubmit = TestDatabaseHelper.getDatabase();
     const submittedExperience = dbAfterSubmit
       .prepare('SELECT * FROM evolution_log WHERE id = ?')
-      .get(experienceId) as any;
+      .get(experienceId) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     if (!submittedExperience) {
       throw new Error('经验提交后未找到');
@@ -676,7 +669,7 @@ function calculateFibonacciOptimized(n: number): number {
     logger.debug('  验证Agent记忆隔离性');
     const agent1Memories = TestDatabaseHelper.getDatabase()
       .prepare('SELECT * FROM memories WHERE agent_folder = ?')
-      .all(TEST_GROUP.folder) as any[];
+      .all(TEST_GROUP.folder) as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     logger.debug(`  总共存储 ${agent1Memories.length} 条记忆`);
 

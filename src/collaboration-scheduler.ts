@@ -24,7 +24,7 @@ import {
 import { logger } from './logger.js';
 import { sendAgentMessage } from './agent-communication.js';
 import { COLLABORATION_CONFIG } from './config.js';
-import type { CollaborationTask, TeamState } from './types.js';
+import type { CollaborationTask, TeamState } from './types/collaboration.js';
 
 // 调度器状态
 let schedulerRunning = false;

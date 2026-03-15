@@ -1,5 +1,4 @@
 import { getDatabase } from '../src/db-agents.js';
-import { logger } from '../src/logger.js';
 import crypto from 'crypto';
 
 /**
@@ -138,8 +137,6 @@ node benchmarks/connection-pool.js
 \`\`\`
     `.trim();
 
-    const assetId = this.generateGEPAssetId(content);
-
     return {
       abilityName: '数据库连接池优化',
       category: 'optimize' as const,
@@ -205,7 +202,7 @@ export class TestDatabaseHelper {
     return getDatabase();
   }
 
-  static async setupTestAgent(agentData: any) {
+  static async setupTestAgent(agentData: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
     const db = getDatabase();
     const now = new Date().toISOString();
     db.prepare(
@@ -264,7 +261,7 @@ export class TestDatabaseHelper {
     cleanup();
   }
 
-  static async setupTestLearningTask(taskData: any) {
+  static async setupTestLearningTask(taskData: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
     const db = getDatabase();
     db.prepare(
       `
@@ -283,7 +280,7 @@ export class TestDatabaseHelper {
     );
   }
 
-  static async setupTestEvolutionExperience(experienceData: any) {
+  static async setupTestEvolutionExperience(experienceData: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
     const db = getDatabase();
     db.prepare(
       `
@@ -374,7 +371,7 @@ export class TestAssertions {
 
   static assertMemoryLevel(groupFolder: string, expectedLevel: 'L1' | 'L2' | 'L3') {
     const db = getDatabase();
-    const memories = db.prepare('SELECT * FROM memories WHERE agent_folder = ?').all(groupFolder);
+    const memories = db.prepare('SELECT * FROM memories WHERE agent_folder = ?').all(groupFolder) as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
     if (memories.length === 0) {
       throw new Error(`未找到 ${groupFolder} 的记忆`);
     }

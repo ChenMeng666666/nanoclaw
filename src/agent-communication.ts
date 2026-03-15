@@ -13,7 +13,7 @@ import path from 'path';
 import { DATA_DIR } from './config.js';
 import { logger } from './logger.js';
 import { safeJsonParse } from './security.js';
-import type { AgentMessage } from './types.js';
+import type { AgentMessage } from './types/collaboration.js';
 
 // IPC 通信目录
 const IPC_BASE_DIR = path.join(DATA_DIR, 'ipc');

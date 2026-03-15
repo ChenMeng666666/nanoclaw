@@ -32,7 +32,7 @@ import {
   mergeNpmDependencies,
   runNpmInstall,
 } from './structured.js';
-import { ApplyResult } from './types.js';
+import { ApplyResult } from './skill-types.js';
 
 export async function applySkill(skillDir: string): Promise<ApplyResult> {
   const projectRoot = process.cwd();

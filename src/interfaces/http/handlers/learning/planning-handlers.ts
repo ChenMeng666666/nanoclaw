@@ -9,7 +9,7 @@ import {
   getLearningTasksByAgent,
   updateLearningTask,
 } from '../../../../db-agents.js';
-import type { DailyLearningPlan, LearningNeed } from '../../../../types.js';
+import type { DailyLearningPlan, LearningNeed } from '../../../../types/agent-memory.js';
 import {
   analyzeLearningNeeds,
   inferPlanPriority,

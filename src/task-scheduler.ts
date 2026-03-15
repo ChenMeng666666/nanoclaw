@@ -1,4 +1,4 @@
-import { ChildProcess } from 'child_process';
+import type { ChildProcess } from 'child_process';
 import { CronExpressionParser } from 'cron-parser';
 import fs from 'fs';
 
@@ -21,10 +21,10 @@ import {
   updateTask,
   updateTaskAfterRun,
 } from './db.js';
-import { GroupQueue } from './group-queue.js';
+import type { GroupQueue } from './group-queue.js';
 import { resolveGroupFolderPath } from './group-folder.js';
 import { logger } from './logger.js';
-import type { RegisteredGroup, ScheduledTask } from './types.js';
+import type { RegisteredGroup, ScheduledTask } from './types/core-runtime.js';
 
 /**
  * Compute the next run time for a recurring task, anchored to the

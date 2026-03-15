@@ -15,7 +15,6 @@ import { initDatabase } from '../src/db.js';
 import {
   createAgent,
   createChannelInstance,
-  setDatabase,
   getAllActiveAgents,
   updateAgent,
 } from '../src/db-agents.js';
@@ -61,7 +60,7 @@ function generateFolderName(name: string): string {
 /**
  * 步骤 0：选择创建新 agent 还是编辑现有 agent
  */
-async function selectOrCreateAgent(): Promise<{ mode: 'new' | 'edit'; agent?: any }> {
+async function selectOrCreateAgent(): Promise<{ mode: 'new' | 'edit'; agent?: unknown }> {
   log('=== NanoClaw 智能体管理 ===\n');
 
   const agents = getAllActiveAgents();
@@ -376,7 +375,7 @@ curl -X POST http://host.docker.internal:3456/api/evolution/submit \\
 /**
  * 编辑现有 agent
  */
-async function editAgent(agent: any): Promise<void> {
+async function editAgent(agent: { id: string; name: string; folder: string }): Promise<void> {
   log(`\n=== 编辑智能体 "${agent.name}" ===\n`);
 
   const claudeMdPath = path.resolve(process.cwd(), 'groups', agent.folder, 'CLAUDE.md');
@@ -442,7 +441,7 @@ async function main() {
     const selection = await selectOrCreateAgent();
 
     if (selection.mode === 'edit' && selection.agent) {
-      await editAgent(selection.agent);
+      await editAgent(selection.agent as { id: string; name: string; folder: string });
       log('\n运行 `npm run build` 后重启服务生效');
       return;
     }

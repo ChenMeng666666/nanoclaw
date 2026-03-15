@@ -10,7 +10,7 @@ import {
 } from '../src/db.js';
 import { MemoryManager } from '../src/memory-manager.js';
 import { logger } from '../src/logger.js';
-import { TestDataFactory, TestDatabaseHelper, TestAssertions } from './test-utils.js';
+import { TestDataFactory, TestDatabaseHelper } from './test-utils.js';
 
 // 最小化测试配置
 const MINIMAL_GROUP_FOLDER = 'minimal-test';

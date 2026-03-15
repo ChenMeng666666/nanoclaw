@@ -1,7 +1,6 @@
 import type http from 'http';
 import type { URL } from 'url';
 
-import { memoryManager } from '../../../../memory-manager.js';
 import { reflectionExecutor } from '../../../../application/learning/reflection-executor.js';
 import {
   createLearningResult,

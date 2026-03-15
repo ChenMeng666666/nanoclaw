@@ -10,7 +10,7 @@ import {
 } from './constants.js';
 import { isGitRepo } from './merge.js';
 import { writeState } from './state.js';
-import { SkillState } from './types.js';
+import { SkillState } from './skill-types.js';
 
 // Directories/files to always exclude from base snapshot
 const BASE_EXCLUDES = [

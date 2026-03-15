@@ -7,7 +7,7 @@ import {
   formatOutbound,
   stripInternalTags,
 } from './router.js';
-import type { NewMessage } from './types.js';
+import type { NewMessage } from './types/core-runtime.js';
 
 function makeMsg(overrides: Partial<NewMessage> = {}): NewMessage {
   return {

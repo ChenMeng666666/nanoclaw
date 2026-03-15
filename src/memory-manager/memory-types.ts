@@ -1,4 +1,5 @@
-import type { Memory } from '../types.js';
+export type { Memory } from '../types/agent-memory.js';
+import type { Memory } from '../types/agent-memory.js';
 
 export interface MemoryMetadataInput {
   scope?: Memory['scope'];

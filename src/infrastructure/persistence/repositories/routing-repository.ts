@@ -1,5 +1,5 @@
-import Database from 'better-sqlite3';
-import type { RegisteredGroup } from '../../../types.js';
+import type Database from 'better-sqlite3';
+import type { RegisteredGroup } from '../../../types/core-runtime.js';
 import { isValidGroupFolder } from '../../../group-folder.js';
 import { logger } from '../../../logger.js';
 import { safeJsonParse } from '../../../security.js';

@@ -67,7 +67,9 @@ describe('BM25Index', () => {
     index.addDocument('doc2', 'beta');
     index.removeDocument('doc1');
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((index as any).docCount).toBe(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((index as any).avgDocLength).toBe(1);
   });
 

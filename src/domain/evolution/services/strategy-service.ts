@@ -3,7 +3,7 @@ import {
   type StrategyConfig,
   STRATEGY_CONFIGS,
   type EvolutionCategory,
-} from '../../../types.js';
+} from '../../../types/evolution.js';
 import { logger } from '../../../logger.js';
 import type { Signal } from '../../../signal-extractor.js';
 import { getRecommendedGeneCategory } from '../../../signal-extractor.js';

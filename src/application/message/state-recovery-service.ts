@@ -8,9 +8,9 @@ import {
 } from '../../db.js';
 import { safeJsonParse } from '../../security.js';
 import { logger } from '../../logger.js';
-import type { RegisteredGroup } from '../../types.js';
+import type { RegisteredGroup } from '../../types/core-runtime.js';
 import { ASSISTANT_NAME } from '../../config.js';
-import { GroupQueue } from '../../group-queue.js';
+import type { GroupQueue } from '../../group-queue.js';
 
 export interface AppState {
   lastTimestamp: string;
@@ -117,7 +117,7 @@ export function isDuplicateMessage(
 export function loadAppState(): AppState {
   const lastTimestamp = getRouterState('last_timestamp') || '';
   const agentTs = getRouterState('last_agent_timestamp');
-  let lastAgentTimestamp: Record<string, string> = {};
+  let lastAgentTimestamp: Record<string, string>;
 
   try {
     const parsed = agentTs ? safeJsonParse(agentTs) : null;

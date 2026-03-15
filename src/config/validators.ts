@@ -37,7 +37,7 @@ export function validateString(
   );
 }
 
-export function validateBoolean(value: any): boolean {
+export function validateBoolean(value: unknown): boolean {
   return (
     value === true || value === false || value === 'true' || value === 'false'
   );

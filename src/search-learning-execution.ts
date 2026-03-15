@@ -5,6 +5,8 @@
 import { memoryManager } from './memory-manager.js';
 import { evolutionManager } from './evolution-manager.js';
 import { ExternalSkillsSearcher } from './external-skills-search.js';
+import type { Memory } from './types/agent-memory.js';
+import type { EvolutionEntry } from './types/evolution.js';
 
 export class SearchLearningExecutor {
   private searcher = new ExternalSkillsSearcher();
@@ -48,7 +50,7 @@ export class SearchLearningExecutor {
   private async searchMemory(
     groupFolder: string,
     query: string,
-  ): Promise<any[]> {
+  ): Promise<Memory[]> {
     const memories = await memoryManager.searchMemories(groupFolder, query, 3);
     return memories;
   }
@@ -56,7 +58,7 @@ export class SearchLearningExecutor {
   /**
    * 搜索进化库
    */
-  private async searchEvolution(query: string): Promise<any[]> {
+  private async searchEvolution(query: string): Promise<EvolutionEntry[]> {
     const entries = await evolutionManager.queryExperience(
       query,
       ['practical'],
@@ -70,6 +72,7 @@ export class SearchLearningExecutor {
    */
   private async searchExternalResources(
     query: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ clawhub: any[]; skillsSh: any[] }> {
     const [clawhubResults, skillsShResults] = await Promise.all([
       this.searcher.searchClawhub(query),
@@ -83,8 +86,9 @@ export class SearchLearningExecutor {
    * 归纳总结搜索结果
    */
   private summarizeFindings(
-    memoryResults: any[],
-    evolutionResults: any[],
+    memoryResults: Memory[],
+    evolutionResults: EvolutionEntry[],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     externalResults: any,
   ): string {
     let summary = '';
@@ -109,11 +113,13 @@ export class SearchLearningExecutor {
     ) {
       summary += '\n### 外部资源中的方法：\n';
       if (externalResults.clawhub.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         externalResults.clawhub.slice(0, 2).forEach((r: any, i: number) => {
           summary += `${i + 1}. ${r.title}: ${r.description.slice(0, 80)}\n`;
         });
       }
       if (externalResults.skillsSh.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         externalResults.skillsSh.slice(0, 2).forEach((r: any, i: number) => {
           summary += `${i + 1 + externalResults.clawhub.length}. ${r.name}: ${r.description.slice(0, 80)}\n`;
         });

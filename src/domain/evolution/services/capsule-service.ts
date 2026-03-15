@@ -1,16 +1,16 @@
 import crypto from 'crypto';
 import { logger } from '../../../logger.js';
 import {
-  createCapsule,
   getCapsuleById,
   getCapsulesByGeneId,
   getEvolutionEntry,
   updateGeneStatus,
   addCapsuleToChain,
   getValidationReportsByGeneId,
+  createCapsule,
 } from '../../../db-agents.js';
-import { generateAssetId } from '../../../types.js';
-import { EvolutionScoringService } from './scoring-service.js';
+import { generateAssetId, type GEPCapsule } from '../../../types/gep.js';
+import type { EvolutionScoringService } from './scoring-service.js';
 
 export class CapsuleService {
   private scoringService: EvolutionScoringService;
@@ -110,15 +110,15 @@ export class CapsuleService {
     return capsuleId;
   }
 
-  getCapsule(capsuleId: string): any {
-    return getCapsuleById(capsuleId);
+  getCapsule(capsuleId: string): GEPCapsule | undefined {
+    return getCapsuleById(capsuleId) as GEPCapsule | undefined;
   }
 
-  getCapsulesForGene(geneId: number): any[] {
-    return getCapsulesByGeneId(geneId);
+  getCapsulesForGene(geneId: number): GEPCapsule[] {
+    return getCapsulesByGeneId(geneId) as GEPCapsule[];
   }
 
-  private calculateSuccessStreak(capsules: any[], newOutcome: string): number {
+  private calculateSuccessStreak(capsules: GEPCapsule[], newOutcome: string): number {
     let streak = 0;
 
     // Check from newest (reverse order)

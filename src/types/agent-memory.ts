@@ -21,7 +21,7 @@ export interface ChannelInstance {
   botId: string;
   jid: string;
   name?: string;
-  config?: Record<string, any>;
+  config?: Record<string, unknown>;
   mode: 'dm' | 'group' | 'both';
   isActive: boolean;
 }
@@ -31,7 +31,7 @@ export interface UserProfile {
   channelInstanceId: string;
   userJid: string;
   name?: string;
-  preferences?: Record<string, any>;
+  preferences?: Record<string, unknown>;
   memorySummary?: string;
   lastInteraction: string;
   createdAt: string;

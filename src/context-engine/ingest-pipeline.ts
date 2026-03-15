@@ -1,6 +1,4 @@
 import crypto from 'crypto';
-import type { NewMessage, Memory } from '../types.js';
-import type { Context } from './types.js';
 
 /**
  * 智能分块策略
@@ -196,7 +194,7 @@ export function calculateTimestampWeight(
       // 如果没有提供消息时间戳，使用当前时间
       messageTime = now;
     }
-  } catch (err) {
+  } catch {
     // logger not available here, assume current time
     messageTime = now;
   }

@@ -28,7 +28,7 @@ import {
 } from '../src/db-agents.js';
 import { createDefaultContextEngine } from '../src/context-engine/default-engine.js';
 import { MemoryManager } from '../src/memory-manager.js';
-import type { Context } from '../src/context-engine/types.js';
+import type { Context } from '../src/context-engine/context-types.js';
 
 describe('e2e memory isolation', () => {
   beforeEach(() => {

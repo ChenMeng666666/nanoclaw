@@ -1,6 +1,6 @@
 import { execFileSync, execSync } from 'child_process';
 
-import { MergeResult } from './types.js';
+import { MergeResult } from './skill-types.js';
 
 export function isGitRepo(): boolean {
   try {

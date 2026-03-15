@@ -9,7 +9,7 @@ export type {
   ContainerInput,
   ContainerOutput,
   AvailableGroup,
-} from './domain/container/types.js';
+} from './domain/container/container-types.js';
 
 export { runContainerAgent } from './infrastructure/container/container-process-runner.js';
 export {

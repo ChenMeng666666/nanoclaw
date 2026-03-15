@@ -14,19 +14,17 @@ import {
   getPlatform,
   getNodePath,
   getServiceManager,
-  hasSystemd,
   isRoot,
-  isWSL,
 } from './platform.js';
 import { emitStatus } from './status.js';
 
-export async function run(_args: string[]): Promise<void> {
+export async function run(): Promise<void> {
   const projectRoot = process.cwd();
   const platform = getPlatform();
   const nodePath = getNodePath();
   const homeDir = os.homedir();
 
-  logger.info({ platform, nodePath, projectRoot }, 'Setting up service');
+  logger.info({ platform, nodePath, projectRoot, homeDir }, 'Setting up service');
 
   // Build first
   logger.info('Building TypeScript');
@@ -155,7 +153,7 @@ function setupLinux(
     setupSystemd(projectRoot, nodePath, homeDir);
   } else {
     // WSL without systemd or other Linux without systemd
-    setupNohupFallback(projectRoot, nodePath, homeDir);
+    setupNohupFallback(projectRoot, nodePath);
   }
 }
 
@@ -224,7 +222,7 @@ function setupSystemd(
       logger.warn(
         'systemd user session not available — falling back to nohup wrapper',
       );
-      setupNohupFallback(projectRoot, nodePath, homeDir);
+      setupNohupFallback(projectRoot, nodePath);
       return;
     }
     const unitDir = path.join(homeDir, '.config', 'systemd', 'user');
@@ -308,7 +306,6 @@ WantedBy=${runningAsRoot ? 'multi-user.target' : 'default.target'}`;
 function setupNohupFallback(
   projectRoot: string,
   nodePath: string,
-  homeDir: string,
 ): void {
   logger.warn('No systemd detected — generating nohup wrapper script');
 

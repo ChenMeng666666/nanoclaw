@@ -7,7 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { logger } from './logger.js';
-import { type SecurityEventType, logSecurityEvent } from './security-alerts.js';
+import { logSecurityEvent } from './security-alerts.js';
 
 /**
  * 技能验证结果
@@ -69,7 +69,7 @@ class SkillVerifier {
         if (!pkg.name || !pkg.version) {
           result.warnings!.push('Missing name or version in package.json');
         }
-      } catch (err) {
+      } catch {
         result.warnings!.push('Invalid package.json');
       }
     }
@@ -162,7 +162,7 @@ class SkillVerifier {
       result.signature = signature.signature;
       result.signer = signature.signer;
       result.timestamp = signature.timestamp;
-    } catch (err) {
+    } catch {
       result.issues!.push('Invalid signature file');
     }
 

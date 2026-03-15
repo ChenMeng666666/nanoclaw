@@ -1,10 +1,10 @@
-import type { Memory } from '../types.js';
+import type { Memory } from '../types/agent-memory.js';
 import { MEMORY_CONFIG } from '../config.js';
 import { getAllMemories, updateMemory } from '../db-agents.js';
 import { logger } from '../logger.js';
 import type { MigrationRuleConfig } from './release-control-types.js';
 import { clamp01 } from './ranking-utils.js';
-import { MemoryMetricsTracker } from './metrics.js';
+import type { MemoryMetricsTracker } from './metrics.js';
 import { applyLifecycleGovernance } from './lifecycle-governance.js';
 
 export function shouldMigrateMemory(

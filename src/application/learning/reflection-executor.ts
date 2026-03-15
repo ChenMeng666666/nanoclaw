@@ -12,9 +12,13 @@ import {
   getDatabase,
   getMemories,
   updateMemory,
-} from '../../db-agents.js';
-import { getAllActiveAgents } from '../../db-agents.js';
-import type { AgentConfig, LearningTask, DetailedReflection } from '../../types.js';
+ getAllActiveAgents } from '../../db-agents.js';
+import type {
+  AgentConfig,
+  LearningTask,
+  DetailedReflection,
+  Memory,
+} from '../../types/agent-memory.js';
 import { logger } from '../../logger.js';
 import { memoryManager } from '../../memory-manager.js';
 import { evolutionManager } from '../../evolution-manager.js';
@@ -232,7 +236,7 @@ ${this.generateReflectionInsights(agent, type, memories)}
   }
 
   private analyzeMemoriesForReflection(
-    memories: any[],
+    memories: Memory[],
   ): Omit<
     DetailedReflection,
     'id' | 'agentFolder' | 'type' | 'content' | 'createdAt'
@@ -318,7 +322,7 @@ ${this.generateReflectionInsights(agent, type, memories)}
   private generateReflectionInsights(
     agent: AgentConfig,
     type: string,
-    memories: any[],
+    memories: Memory[],
   ): string {
     if (memories.length === 0) {
       return '暂无足够的记忆数据进行深度反思。';
@@ -455,7 +459,7 @@ ${analysis.rating} / 5
     }
   }
 
-  private evaluateMemoryForL3(memory: any): boolean {
+  private evaluateMemoryForL3(memory: Memory): boolean {
     if (
       memory.importance > 0.7 &&
       memory.accessCount > 2 &&

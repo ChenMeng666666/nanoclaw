@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
 import { parseObject } from '../mappers/json-mapper.js';
 
 export function createBotIdentity(
@@ -9,7 +9,7 @@ export function createBotIdentity(
     agentId: string;
     botName: string;
     botAvatar?: string;
-    config?: Record<string, any>;
+    config?: Record<string, unknown>;
   },
 ): void {
   database
@@ -61,7 +61,10 @@ export function getBotIdentityByChatJid(
     botName: row.bot_name,
     botAvatar: row.bot_avatar,
     isActive: Boolean(row.is_active),
-    config: parseObject<Record<string, any> | undefined>(row.config, undefined),
+    config: parseObject<Record<string, unknown> | undefined>(
+      row.config,
+      undefined,
+    ),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -87,7 +90,10 @@ export function getAllBotIdentities(database: Database.Database) {
     botName: row.bot_name,
     botAvatar: row.bot_avatar,
     isActive: Boolean(row.is_active),
-    config: parseObject<Record<string, any> | undefined>(row.config, undefined),
+    config: parseObject<Record<string, unknown> | undefined>(
+      row.config,
+      undefined,
+    ),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));
@@ -101,7 +107,7 @@ export function updateBotIdentity(
     agentId?: string;
     botName?: string;
     botAvatar?: string;
-    config?: Record<string, any>;
+    config?: Record<string, unknown>;
     isActive?: boolean;
   }>,
 ): void {

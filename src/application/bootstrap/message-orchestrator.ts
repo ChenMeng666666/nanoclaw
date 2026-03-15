@@ -6,20 +6,19 @@ import {
   TIMEZONE,
   TRIGGER_PATTERN,
 } from '../../config.js';
-import { writeGroupsSnapshot } from '../../container-runner.js';
 import {
   getNewMessages,
   setRegisteredGroup,
   getMessagesSince,
 } from '../../db.js';
-import { GroupQueue } from '../../group-queue.js';
+import type { GroupQueue } from '../../group-queue.js';
 import { resolveGroupFolderPath } from '../../group-folder.js';
 import { findChannel, formatMessages } from '../../router.js';
 import {
   isTriggerAllowed,
   loadSenderAllowlist,
 } from '../../sender-allowlist.js';
-import type { Channel, NewMessage, RegisteredGroup } from '../../types.js';
+import type { Channel, NewMessage, RegisteredGroup } from '../../types/core-runtime.js';
 import { logger } from '../../logger.js';
 import {
   isDuplicateMessage,
@@ -28,6 +27,7 @@ import {
 } from '../message/state-recovery-service.js';
 import { validateUserInput, sanitizeWebContent } from '../../security.js';
 import { getAvailableGroups } from '../message/group-utils.js';
+import type { AvailableGroup } from '../../container-runner.js';
 import { LearningSystemInitializer } from '../../infrastructure/system/learning-system-initializer.js';
 import { MessagePipeline } from '../message/message-pipeline.js';
 
@@ -84,7 +84,7 @@ export class MessageOrchestrator {
   /**
    * Get available groups list for the agent.
    */
-  public getAvailableGroups(): import('../../container-runner.js').AvailableGroup[] {
+  public getAvailableGroups(): AvailableGroup[] {
     return getAvailableGroups(this.state.registeredGroups);
   }
 
@@ -324,9 +324,9 @@ export class MessageOrchestrator {
                 },
                 'Enqueuing message check for new container',
               );
-              console.log(
-                `DEBUG: Enqueuing check for chat ${chatJid} with ${messagesToSend.length} messages`,
-              );
+              // console.log(
+              //   `DEBUG: Enqueuing check for chat ${chatJid} with ${messagesToSend.length} messages`,
+              // );
               this.queue.enqueueMessageCheck(chatJid);
             }
           }
@@ -335,7 +335,9 @@ export class MessageOrchestrator {
           saveAppState(this.state);
         }
       } catch (err) {
+        // Log the error but don't crash
         logger.error({ err }, 'Error in message loop');
+        // console.error(err);
       }
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
     }
