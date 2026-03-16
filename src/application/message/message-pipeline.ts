@@ -24,7 +24,7 @@ import { logger } from '../../logger.js';
 import { contextEngineRegistry } from '../../context-engine/registry.js';
 import type { ContextEngine } from '../../context-engine/interface.js';
 import { saveAppState, type AppState } from './state-recovery-service.js';
-import { getAvailableGroups } from './group-utils.js';
+import { getAvailableGroups } from '../../contexts/messaging/application/group-utils.js';
 
 export class MessagePipeline {
   constructor(

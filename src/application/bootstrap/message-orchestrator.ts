@@ -30,7 +30,7 @@ import {
   type AppState,
 } from '../message/state-recovery-service.js';
 import { validateUserInput, sanitizeWebContent } from '../../security.js';
-import { getAvailableGroups } from '../message/group-utils.js';
+import { getAvailableGroups } from '../../contexts/messaging/application/group-utils.js';
 import type { AvailableGroup } from '../../container-runner.js';
 import { LearningSystemInitializer } from '../../infrastructure/system/learning-system-initializer.js';
 import { MessagePipeline } from '../message/message-pipeline.js';

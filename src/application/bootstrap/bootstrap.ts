@@ -10,19 +10,22 @@ import { preloadRoutingCache } from '../../db-routing.js';
 import {
   loadAppState,
   recoverPendingMessages,
-} from '../message/state-recovery-service.js';
+} from '../../contexts/messaging/application/state-recovery-service.js';
 import { AppLifecycleManager } from './app-lifecycle.js';
-import { MessageOrchestrator } from './message-orchestrator.js';
+import { MessageOrchestrator } from '../../contexts/messaging/application/message-orchestrator.js';
 import { restoreRemoteControl } from '../remote-control.js';
 import { startRuntimeAPI } from '../../runtime-api.js';
 import {
   getChannelFactory,
   getRegisteredChannelNames,
 } from '../../platform/integration/channels.js';
-import { GroupQueue } from '../../group-queue.js';
+import { GroupQueue } from '../../contexts/messaging/infrastructure/group-queue.js';
 import { startSchedulerLoop } from '../../task-scheduler.js';
 import { startIpcWatcher } from '../../ipc.js';
-import { findChannel, formatOutbound } from '../../router.js';
+import {
+  findChannel,
+  formatOutbound,
+} from '../../contexts/messaging/interfaces/router.js';
 import { writeGroupsSnapshot } from '../../container-runner.js';
 import {
   isSenderAllowed,

@@ -105,11 +105,19 @@ src/
 
 ## Phase 2（P1）Messaging Context 迁移
 
-- [ ] [P1] 定义 messaging 领域模型：消息、会话、路由、队列等聚合边界
-- [ ] [P1] 迁移应用编排：消息编排与恢复流程归入 application
-- [ ] [P1] 迁移通道接口：channels 与路由适配归入 interfaces
-- [ ] [P1] 迁移基础设施实现：队列、持久化适配、外部调用归入 infrastructure
-- [ ] [P1] 建立反腐层：旧入口保留转发到 contexts/messaging
+- [x] [P1] 定义 messaging 领域模型：消息、会话、路由、队列等聚合边界
+- [x] [P1] 迁移应用编排：消息编排与恢复流程归入 application
+- [x] [P1] 迁移通道接口：channels 与路由适配归入 interfaces
+- [x] [P1] 迁移基础设施实现：队列、持久化适配、外部调用归入 infrastructure
+- [x] [P1] 建立反腐层：旧入口保留转发到 contexts/messaging
+
+### Phase 2 迭代执行增量（2026-03-16）
+
+- messaging 分层落位：新增 `src/contexts/messaging/{domain,application,interfaces,infrastructure}`，并新增 `src/contexts/messaging/index.ts` 统一导出。
+- 领域模型归位：在 `contexts/messaging/domain/models.ts` 收敛消息、会话、通道相关核心类型边界。
+- 应用编排归位：在 `contexts/messaging/application` 提供 `group-utils` 实现与编排入口（message-pipeline/state-recovery/message-orchestrator）导出面。
+- 通道与路由接口归位：在 `contexts/messaging/interfaces` 落地 channel registry 与 router 实现；旧入口 `src/channels/registry.ts`、`src/router.ts` 保留为转发门面。
+- 基础设施归位：在 `contexts/messaging/infrastructure` 收敛 `group-queue`、`db-routing` 与 message 持久化相关导出；启动编排改为从 messaging context 接入 queue/router。
 
 ## Phase 3（P1）Runtime Context 迁移
 

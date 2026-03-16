@@ -1,5 +1,67 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`barrel export contract > contexts/messaging export surface is stable 1`] = `
+[
+  "application",
+  "domain",
+  "infrastructure",
+  "interfaces",
+]
+`;
+
+exports[`barrel export contract > contexts/messaging export surface is stable 2`] = `[]`;
+
+exports[`barrel export contract > contexts/messaging export surface is stable 3`] = `
+[
+  "MessageOrchestrator",
+  "MessagePipeline",
+  "getAvailableGroups",
+  "isDuplicateMessage",
+  "loadAppState",
+  "recoverPendingMessages",
+  "saveAppState",
+]
+`;
+
+exports[`barrel export contract > contexts/messaging export surface is stable 4`] = `
+[
+  "escapeXml",
+  "findChannel",
+  "formatMessages",
+  "formatOutbound",
+  "getChannelFactory",
+  "getRegisteredChannelNames",
+  "registerChannel",
+  "routeOutbound",
+  "stripInternalTags",
+]
+`;
+
+exports[`barrel export contract > contexts/messaging export surface is stable 5`] = `
+[
+  "GroupQueue",
+  "addCacheListener",
+  "clearRoutingCache",
+  "createRoutingBinding",
+  "deleteRoutingBinding",
+  "getAllChats",
+  "getAllRoutingBindings",
+  "getLastGroupSync",
+  "getMessagesSince",
+  "getNewMessages",
+  "getRecentMessagesWithinWindow",
+  "getRoutingBinding",
+  "getRoutingBindingsByAgent",
+  "preloadRoutingCache",
+  "setLastGroupSync",
+  "storeChatMetadata",
+  "storeMessage",
+  "storeMessageDirect",
+  "updateChatName",
+  "updateRoutingBindingSession",
+]
+`;
+
 exports[`barrel export contract > platform/integration export surface is stable 1`] = `
 [
   "DEFAULT_PROVIDER_CONFIG",
