@@ -1,0 +1,140 @@
+# src 目录 DDD 迁移方案（仅规划与目录落位）
+
+## 目标与范围
+
+- 本轮仅执行两件事：创建目标目录；输出迁移方案。
+- 本轮不迁移任何业务代码、不改 import、不改运行逻辑。
+- 采用“限界上下文（Bounded Context）+ 分层（Domain/Application/Infrastructure/Interfaces）”组织方式。
+
+## 已落位目标目录（本轮完成）
+
+```text
+src/
+  app/
+    bootstrap/
+  shared/
+    kernel/
+    config/
+  platform/
+    persistence/
+    integration/
+  contexts/
+    messaging/
+      domain/
+      application/
+      infrastructure/
+      interfaces/
+    runtime/
+      domain/
+      application/
+      infrastructure/
+      interfaces/
+    memory/
+      domain/
+      application/
+      infrastructure/
+      interfaces/
+    evolution/
+      domain/
+      application/
+      infrastructure/
+      interfaces/
+    security/
+      domain/
+      application/
+      infrastructure/
+      interfaces/
+```
+
+## 优先级定义
+
+- P0：先决约束与安全网，不完成不得迁移。
+- P1：主干迁移（高价值、低破坏顺序）。
+- P2：深度解耦与巨型文件拆分。
+- P3：治理、收敛与长期演进能力。
+
+## Phase 0（P0）基线治理与防护网
+
+- [x] [P0] 冻结迁移边界：确认“仅迁移结构，不改变外部行为”验收标准
+- [x] [P0] 建立依赖规则：定义 contexts 间引用白名单与禁止方向
+- [x] [P0] 建立兼容策略：约定旧入口文件保留 facade 转发期
+- [x] [P0] 补齐回归基线：锁定关键测试集（runtime-api/container/channels/db）
+- [x] [P0] 建立迁移看板：为每个 context 定义 owner、完成标准、回滚条件
+
+Phase 0 交付物：
+
+- docs/ddd/PHASE0_BASELINE.md
+- docs/ddd/PHASE0_KANBAN.md
+- scripts/check-ddd-dependencies.js
+- npm scripts: ddd:deps-check, test:phase0
+
+## Phase 1（P1）共享层与平台层归位
+
+- [ ] [P1] 识别 shared/kernel 候选：logger、errors、utils、核心类型
+- [ ] [P1] 识别 shared/config 候选：配置模型、校验器、装配入口
+- [ ] [P1] 识别 platform/persistence 候选：sqlite、transaction、schema、通用仓储
+- [ ] [P1] 识别 platform/integration 候选：外部依赖适配器与 provider 注册
+- [ ] [P1] 设计别名与导出策略：统一 barrel/export 边界，避免跨层直连
+
+## Phase 2（P1）Messaging Context 迁移
+
+- [ ] [P1] 定义 messaging 领域模型：消息、会话、路由、队列等聚合边界
+- [ ] [P1] 迁移应用编排：消息编排与恢复流程归入 application
+- [ ] [P1] 迁移通道接口：channels 与路由适配归入 interfaces
+- [ ] [P1] 迁移基础设施实现：队列、持久化适配、外部调用归入 infrastructure
+- [ ] [P1] 建立反腐层：旧入口保留转发到 contexts/messaging
+
+## Phase 3（P1）Runtime Context 迁移
+
+- [ ] [P1] 定义 runtime 子域：容器生命周期、执行器、IPC、运行时安全
+- [ ] [P1] 迁移运行时应用服务：启动编排、恢复、调度触发归入 application
+- [ ] [P1] 迁移 runtime API 接口层：HTTP handlers/parsers/router 边界收敛
+- [ ] [P1] 迁移运行基础设施：container/ipc 命令构建与执行归入 infrastructure
+- [ ] [P1] 保留兼容 facade：旧 runtime 入口文件仅做转发
+
+## Phase 4（P2）Memory Context 迁移
+
+- [ ] [P2] 定义 memory 领域模型：记忆条目、检索策略、生命周期规则
+- [ ] [P2] 迁移 memory 用例：写入、检索、评分、治理流程归入 application
+- [ ] [P2] 迁移 persistence 映射：mappers/repositories 按 memory 边界收敛
+- [ ] [P2] 迁移 context-engine 适配：作为 memory 基础设施能力接入
+- [ ] [P2] 清理跨域耦合：移除 memory 对无关 context 的直接依赖
+
+## Phase 5（P2）Evolution Context 迁移
+
+- [ ] [P2] 定义 evolution 领域边界：策略、评分、晋升、审核
+- [ ] [P2] 迁移 evolution 领域服务：按能力拆到 domain services
+- [ ] [P2] 迁移 evolution 用例：提交、选择、反馈、指标归入 application
+- [ ] [P2] 迁移 evolution 接口：runtime API evolution handlers 归入 interfaces
+- [ ] [P2] 建立上下文契约：仅通过 application 接口对外暴露能力
+
+## Phase 6（P2）Security Context 迁移
+
+- [ ] [P2] 定义 security 子域：鉴权、输入校验、挂载策略、命令安全
+- [ ] [P2] 迁移安全策略实现：mount-policy/command-safety 等收敛
+- [ ] [P2] 迁移接口防线：API 参数校验与限流规则归位
+- [ ] [P2] 建立统一安全服务入口：供各 context 通过契约调用
+- [ ] [P2] 去除散落实现：清理多点重复校验逻辑
+
+## Phase 7（P2）巨型文件拆分与去耦
+
+- [ ] [P2] 拆分 runtime-api-parsers：按资源类型拆分 parser 模块
+- [ ] [P2] 拆分 ipc：按协议、握手、消息路由、鉴权分离
+- [ ] [P2] 拆分 evolution-service：按策略/评分/审核/编排解耦
+- [ ] [P2] 拆分仓储巨型实现：读写职责分离、查询对象化
+- [ ] [P2] 建立文件尺寸阈值：新增“单文件行数与 import 数”治理门槛
+
+## Phase 8（P3）收敛、治理与文档
+
+- [ ] [P3] 清理遗留入口：移除过渡期 facade 并完成 import 收敛
+- [ ] [P3] 统一依赖方向校验：CI 增加层级依赖静态检查
+- [ ] [P3] 更新架构文档：输出 context map、依赖图、迁移后约束
+- [ ] [P3] 统一测试布局：测试按 context 就近放置并规范命名
+- [ ] [P3] 形成长期机制：新模块准入模板与 DDD 代码评审清单
+
+## 执行策略（建议）
+
+- 小步迁移：每次只迁一个 context 的一个层次。
+- 兼容优先：先 facade 转发，再逐步替换调用方。
+- 测试护栏：每个 Task 完成后跑对应子集回归，Phase 结束跑全量。
+- 可回滚：每个 Phase 保持可独立回退，避免大爆炸式重构。

@@ -26,6 +26,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: DDD dependency boundaries
+        run: npm run ddd:deps-check
+
       - name: Tests
         run: npm test
 
