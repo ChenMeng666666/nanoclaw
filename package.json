@@ -19,7 +19,7 @@
     "auth": "tsx src/whatsapp-auth.ts",
     "verify:node": "node scripts/check-node-version.js",
     "test": "vitest run",
-    "test:phase0": "vitest run src/runtime-api.test.ts src/runtime-api.memory-validation.test.ts src/runtime-api-reflection-trigger.test.ts src/container-runner.test.ts src/container-runner.integration.test.ts src/container-runtime.test.ts src/container-runtime.integration.test.ts src/channels/registry.test.ts src/channels/telegram.test.ts src/db.test.ts src/__tests__/db-routing.test.ts",
+    "test:ddd-baseline": "vitest run src/runtime-api.test.ts src/runtime-api.memory-validation.test.ts src/runtime-api-reflection-trigger.test.ts src/container-runner.test.ts src/container-runner.integration.test.ts src/container-runtime.test.ts src/container-runtime.integration.test.ts src/channels/registry.test.ts src/channels/telegram.test.ts src/db.test.ts src/__tests__/db-routing.test.ts",
     "test:watch": "vitest",
     "test:e2e": "tsx tests/e2e-agent-flow.ts",
     "test:run": "bash tests/run-tests.sh",

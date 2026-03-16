@@ -29,8 +29,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Phase 0 regression baseline
-        run: npm run test:phase0
+      - name: Iteration regression baseline
+        run: npm run test:ddd-baseline
 
       - name: Tests
         run: npm test
