@@ -11,7 +11,7 @@ import {
   commit as commitSqliteTransaction,
   rollback as rollbackSqliteTransaction,
   transaction as withSqliteTransaction,
-} from './platform/persistence/sqlite/transaction-manager.js';
+} from './platform/persistence/sqlite.js';
 
 /** 初始化数据库引用（由主 db.ts 调用） */
 export function setDatabase(database: Database.Database): void {
@@ -67,7 +67,7 @@ export {
   deactivateChannelInstance,
   createOrUpdateUserProfile,
   getUserProfile,
-} from './infrastructure/persistence/repositories/agent/core-repository.js';
+} from './platform/persistence/repositories.js';
 
 // ===== Memories =====
 export {
@@ -80,7 +80,7 @@ export {
   incrementMemoryAccess,
   deleteMemory,
   type MemoryQueryOptions,
-} from './infrastructure/persistence/repositories/agent/memory-repository.js';
+} from './platform/persistence/repositories.js';
 
 // ===== Reflections =====
 export {
@@ -90,7 +90,7 @@ export {
   getLearningTask,
   getLearningTasksByAgent,
   updateLearningTask,
-} from './infrastructure/persistence/repositories/agent/learning-repository.js';
+} from './platform/persistence/repositories.js';
 
 // ===== Evolution Log / Gene =====
 export {
@@ -105,7 +105,7 @@ export {
   getEcosystemMetrics,
   getEvolutionEntriesByStatus,
   getEvolutionEntryByAssetId,
-} from './infrastructure/persistence/repositories/agent/evolution-read-repository.js';
+} from './platform/persistence/repositories.js';
 
 export {
   createEvolutionEntry,
@@ -123,13 +123,13 @@ export {
   updateGeneStatus,
   updateGeneGDIScore,
   type CreateGeneInput,
-} from './infrastructure/persistence/repositories/agent/evolution-write-repository.js';
+} from './platform/persistence/repositories.js';
 export {
   logAudit,
   createScheduledTaskForLearning,
   getAuditLogs,
   type AuditLogEntry,
-} from './infrastructure/persistence/repositories/agent/audit-repository.js';
+} from './platform/persistence/repositories.js';
 
 // ===== Learning Results =====
 export {
@@ -138,4 +138,4 @@ export {
   getLearningResultsByAgent,
   getRecentLearningResults,
   type LearningResultEntry,
-} from './infrastructure/persistence/repositories/agent/learning-repository.js';
+} from './platform/persistence/repositories.js';

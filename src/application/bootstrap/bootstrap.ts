@@ -18,7 +18,7 @@ import { startRuntimeAPI } from '../../runtime-api.js';
 import {
   getChannelFactory,
   getRegisteredChannelNames,
-} from '../../channels/registry.js';
+} from '../../platform/integration/channels.js';
 import { GroupQueue } from '../../group-queue.js';
 import { startSchedulerLoop } from '../../task-scheduler.js';
 import { startIpcWatcher } from '../../ipc.js';
@@ -30,7 +30,7 @@ import {
   shouldDropMessage,
 } from '../../sender-allowlist.js';
 import type { Channel, NewMessage } from '../../types/core-runtime.js';
-import '../../channels/index.js'; // Register channels
+import '../../platform/integration/register-default-channels.js';
 
 export class Bootstrap {
   public static async init(): Promise<void> {

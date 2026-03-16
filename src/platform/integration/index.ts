@@ -1,2 +1,2 @@
-export * from './embedding/index.js';
-export * from './query-expansion/index.js';
+export * from './channels.js';
+export * from './providers.js';

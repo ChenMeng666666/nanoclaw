@@ -1,3 +1,3 @@
-export * from './sqlite/schema.js';
-export * from './sqlite/transaction-manager.js';
-export * from './repositories/index.js';
+export * as sqlite from './sqlite.js';
+export * from './facades.js';
+export * from './repositories.js';

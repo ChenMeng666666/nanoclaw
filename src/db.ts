@@ -5,16 +5,17 @@ import crypto from 'crypto';
 import { ASSISTANT_NAME, STORE_DIR } from './config.js';
 import { logger } from './logger.js';
 import { setDatabase } from './db-agents.js';
-import { migrateJsonState as runJsonStateMigration } from './infrastructure/persistence/sqlite/migrations/json-state.js';
-import { initializeSchemaTables } from './platform/persistence/sqlite/schema.js';
+import {
+  migrateJsonState as runJsonStateMigration,
+  initializeSchemaTables,
+} from './platform/persistence/sqlite.js';
 import {
   setRouterState as setRouterStateForMigration,
   setSession as setSessionForMigration,
   setRegisteredGroup as setRegisteredGroupForMigration,
-} from './infrastructure/persistence/facades/domain-facade.js';
+} from './platform/persistence/facades.js';
 
-export * from './infrastructure/persistence/facades/chat-facade.js';
-export * from './infrastructure/persistence/facades/domain-facade.js';
+export * from './platform/persistence/facades.js';
 
 let db: Database.Database;
 
