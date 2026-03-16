@@ -81,11 +81,27 @@ src/
 
 ## Phase 1（P1）共享层与平台层归位
 
-- [ ] [P1] 识别 shared/kernel 候选：logger、errors、utils、核心类型
-- [ ] [P1] 识别 shared/config 候选：配置模型、校验器、装配入口
-- [ ] [P1] 识别 platform/persistence 候选：sqlite、transaction、schema、通用仓储
-- [ ] [P1] 识别 platform/integration 候选：外部依赖适配器与 provider 注册
-- [ ] [P1] 设计别名与导出策略：统一 barrel/export 边界，避免跨层直连
+- [x] [P1] 识别 shared/kernel 候选：logger、errors、utils、核心类型
+- [x] [P1] 识别 shared/config 候选：配置模型、校验器、装配入口
+- [x] [P1] 识别 platform/persistence 候选：sqlite、transaction、schema、通用仓储
+- [x] [P1] 识别 platform/integration 候选：外部依赖适配器与 provider 注册
+- [x] [P1] 设计别名与导出策略：统一 barrel/export 边界，避免跨层直连
+
+### Phase 1 迭代执行增量（2026-03-16）
+
+- shared/kernel 落地：新增 `src/shared/kernel`，收口 logger/errors/utils/core-runtime 类型导出；`src/logger.ts` 保留兼容门面并转发到 shared/kernel。
+- shared/config 落地：新增 `src/shared/config` 聚合导出；`src/config.ts` 继续作为稳定入口并转发到 shared/config。
+- platform/persistence 落地：新增 `src/platform/persistence`（sqlite/facades/repositories/index）；`src/db.ts`、`src/db-agents.ts` 通过 platform 层导入与导出，保持外部 API 不变。
+- platform/integration 落地：新增 `src/platform/integration`（channels/providers/index 与默认 channel 注册入口）；启动编排改由 platform/integration 入口接入注册中心。
+- 别名与导出策略：本轮采用“新目录聚合导出 + 旧入口 facade 转发”统一边界；路径别名先保留为后续阶段策略项，避免影响当前运行时解析链路。
+
+### Phase 1 迭代执行增量（2026-03-16）
+
+- shared/kernel 落地：新增 `src/shared/kernel`，收口 logger/errors/utils/core-runtime 类型导出；`src/logger.ts` 保留兼容门面并转发到 shared/kernel。
+- shared/config 落地：新增 `src/shared/config` 聚合导出；`src/config.ts` 继续作为稳定入口并转发到 shared/config。
+- platform/persistence 落地：新增 `src/platform/persistence`（sqlite/facades/repositories/index）；`src/db.ts`、`src/db-agents.ts` 通过 platform 层导入与导出，保持外部 API 不变。
+- platform/integration 落地：新增 `src/platform/integration`（channels/providers/index 与默认 channel 注册入口）；启动编排改由 platform/integration 入口接入注册中心。
+- 别名与导出策略：本轮采用“新目录聚合导出 + 旧入口 facade 转发”统一边界；路径别名先保留为后续阶段策略项，避免影响当前运行时解析链路。
 
 ## Phase 2（P1）Messaging Context 迁移
 
