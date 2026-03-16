@@ -119,6 +119,12 @@ src/
 - 通道与路由接口归位：在 `contexts/messaging/interfaces` 落地 channel registry 与 router 实现；旧入口 `src/channels/registry.ts`、`src/router.ts` 保留为转发门面。
 - 基础设施归位：在 `contexts/messaging/infrastructure` 收敛 `group-queue`、`db-routing` 与 message 持久化相关导出；启动编排改为从 messaging context 接入 queue/router。
 
+### Phase 2 迭代执行增量（2026-03-17）
+
+- 应用核心实现实搬：`MessagePipeline`、`MessageOrchestrator`、`StateRecoveryService` 的实现体迁移到 `contexts/messaging/application/*`，降低新旧路径双向桥接复杂度。
+- 旧路径兼容门面收口：`src/application/message/message-pipeline.ts`、`src/application/bootstrap/message-orchestrator.ts`、`src/application/message/state-recovery-service.ts` 改为仅转发到 messaging context。
+- 依赖方向收敛：`contexts/messaging/application` 内部改为优先引用 context 自身的 interfaces/infrastructure/application 入口（router/group-queue/group-utils/state-recovery），减少跨目录耦合。
+
 ## Phase 3（P1）Runtime Context 迁移
 
 - [ ] [P1] 定义 runtime 子域：容器生命周期、执行器、IPC、运行时安全
