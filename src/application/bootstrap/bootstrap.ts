@@ -4,7 +4,7 @@ import { checkSystemDependencies } from '../../infrastructure/system/dependency-
 import {
   ensureContainerRuntimeRunning,
   cleanupOrphans,
-} from '../../container-runtime.js';
+} from '../../contexts/runtime/infrastructure/container-runtime.js';
 import { initDatabase, storeMessage, storeChatMetadata } from '../../db.js';
 import { preloadRoutingCache } from '../../db-routing.js';
 import {
@@ -14,14 +14,14 @@ import {
 import { AppLifecycleManager } from './app-lifecycle.js';
 import { MessageOrchestrator } from '../../contexts/messaging/application/message-orchestrator.js';
 import { restoreRemoteControl } from '../remote-control.js';
-import { startRuntimeAPI } from '../../runtime-api.js';
+import { startRuntimeAPI } from '../../contexts/runtime/application/runtime-api-service.js';
 import {
   getChannelFactory,
   getRegisteredChannelNames,
 } from '../../platform/integration/channels.js';
 import { GroupQueue } from '../../contexts/messaging/infrastructure/group-queue.js';
 import { startSchedulerLoop } from '../../task-scheduler.js';
-import { startIpcWatcher } from '../../ipc.js';
+import { startIpcWatcher } from '../../contexts/runtime/infrastructure/ipc-watcher.js';
 import {
   findChannel,
   formatOutbound,

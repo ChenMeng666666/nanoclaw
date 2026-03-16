@@ -62,6 +62,50 @@ exports[`barrel export contract > contexts/messaging export surface is stable 5`
 ]
 `;
 
+exports[`barrel export contract > contexts/runtime export surface is stable 1`] = `
+[
+  "application",
+  "domain",
+  "infrastructure",
+  "interfaces",
+]
+`;
+
+exports[`barrel export contract > contexts/runtime export surface is stable 2`] = `[]`;
+
+exports[`barrel export contract > contexts/runtime export surface is stable 3`] = `
+[
+  "analyzeLearningNeeds",
+  "analyzeLearningOutcome",
+  "extractKnowledgePoints",
+  "generateDailySummary",
+  "generateRuntimeReflection",
+  "inferPlanPriority",
+  "normalizeLearningNeeds",
+  "orchestrateLearningIntent",
+  "splitToPoints",
+  "startRuntimeAPI",
+]
+`;
+
+exports[`barrel export contract > contexts/runtime export surface is stable 4`] = `
+[
+  "createRuntimeApiRouter",
+]
+`;
+
+exports[`barrel export contract > contexts/runtime export surface is stable 5`] = `
+[
+  "CONTAINER_RUNTIME_BIN",
+  "cleanupOrphans",
+  "ensureContainerRuntimeRunning",
+  "processTaskIpc",
+  "readonlyMountArgs",
+  "startIpcWatcher",
+  "stopContainer",
+]
+`;
+
 exports[`barrel export contract > platform/integration export surface is stable 1`] = `
 [
   "DEFAULT_PROVIDER_CONFIG",
