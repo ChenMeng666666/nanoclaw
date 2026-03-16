@@ -26,8 +26,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: DDD dependency boundaries
-        run: npm run ddd:deps-check
+      - name: Lint
+        run: npm run lint
+
+      - name: Phase 0 regression baseline
+        run: npm run test:phase0
 
       - name: Tests
         run: npm test

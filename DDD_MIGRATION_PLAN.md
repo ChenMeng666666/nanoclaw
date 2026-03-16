@@ -61,12 +61,23 @@ src/
 - [x] [P0] 补齐回归基线：锁定关键测试集（runtime-api/container/channels/db）
 - [x] [P0] 建立迁移看板：为每个 context 定义 owner、完成标准、回滚条件
 
-Phase 0 交付物：
+### Phase 0 执行增量（2026-03-16）
 
-- docs/ddd/PHASE0_BASELINE.md
-- docs/ddd/PHASE0_KANBAN.md
-- scripts/check-ddd-dependencies.js
-- npm scripts: ddd:deps-check, test:phase0
+- 边界冻结验收标准：本阶段仅新增治理规则与测试护栏，不迁移业务实现、不改外部 API 行为、不改运行时语义。
+- 依赖规则落地：在 ESLint 增加 `src/contexts` 分层限制（domain/application/interfaces）与跨 context 禁向规则。
+- 依赖白名单：允许 `shared/*`、`platform/*`、同 context 的合法分层依赖、以及跨 context 的 `application` 契约调用。
+- 兼容策略落地：旧入口在迁移期保留 facade 转发，迁移顺序固定为“新实现先落位 -> 旧入口转发 -> 调用方渐进切换 -> 稳定后移除 facade”。
+- 回归基线落地：新增 `test:phase0` 并接入 CI，锁定 runtime-api/container/channels/db 关键测试子集。
+
+### Phase 0 迁移看板（基线）
+
+| Context | Owner | 完成标准 | 回滚条件 |
+| --- | --- | --- | --- |
+| messaging | 待指派（架构负责人） | 分层目录齐备；跨层/跨 context 依赖通过规则校验；关键回归通过 | 出现行为偏差、消息路由异常、回归失败即回退到 facade 转发前 |
+| runtime | 待指派（运行时负责人） | 启停/调度/IPC 路径通过基线回归；旧入口可转发 | 启动失败、API 退化、容器执行异常即回退 |
+| memory | 待指派（记忆负责人） | 读写检索与生命周期语义不变；数据库相关回归通过 | 检索质量明显下降、写入失败、DB 回归失败即回退 |
+| evolution | 待指派（进化负责人） | 提交/选择/反馈路径契约不变；评审链路可用 | 评分或审核流程异常、关键接口失败即回退 |
+| security | 待指派（安全负责人） | 鉴权/校验/命令安全规则仍生效；安全回归通过 | 出现绕过鉴权、校验失效或策略降级即回退 |
 
 ## Phase 1（P1）共享层与平台层归位
 

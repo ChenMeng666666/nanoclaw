@@ -75,4 +75,65 @@ export default tseslint.config(
       'no-console': 'off',
     },
   },
+  {
+    files: ['src/contexts/*/domain/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['../application/**', '../infrastructure/**', '../interfaces/**'],
+              message:
+                'domain 层禁止依赖 application/infrastructure/interfaces，请改为通过领域协议协作。',
+            },
+            {
+              group: ['../../*/application/**', '../../*/infrastructure/**', '../../*/interfaces/**'],
+              message: 'contexts 间禁止跨层直连，需经 application 契约或 shared/platform。',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/contexts/*/application/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['../infrastructure/**', '../interfaces/**'],
+              message: 'application 层禁止依赖 infrastructure/interfaces，实现细节应通过端口注入。',
+            },
+            {
+              group: ['../../*/domain/**', '../../*/infrastructure/**', '../../*/interfaces/**'],
+              message: '跨 context 访问请经目标 context 的 application 契约。',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/contexts/*/interfaces/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['../infrastructure/**'],
+              message: 'interfaces 层禁止直接依赖 infrastructure，请通过 application 协调。',
+            },
+            {
+              group: ['../../*/domain/**', '../../*/infrastructure/**', '../../*/interfaces/**'],
+              message: '跨 context 访问请经目标 context 的 application 契约。',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );
