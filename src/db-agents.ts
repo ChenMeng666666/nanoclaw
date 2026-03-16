@@ -11,7 +11,7 @@ import {
   commit as commitSqliteTransaction,
   rollback as rollbackSqliteTransaction,
   transaction as withSqliteTransaction,
-} from './infrastructure/persistence/sqlite/transaction-manager.js';
+} from './platform/persistence/sqlite/transaction-manager.js';
 
 /** 初始化数据库引用（由主 db.ts 调用） */
 export function setDatabase(database: Database.Database): void {

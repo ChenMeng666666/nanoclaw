@@ -6,7 +6,7 @@ import { ASSISTANT_NAME, STORE_DIR } from './config.js';
 import { logger } from './logger.js';
 import { setDatabase } from './db-agents.js';
 import { migrateJsonState as runJsonStateMigration } from './infrastructure/persistence/sqlite/migrations/json-state.js';
-import { initializeSchemaTables } from './infrastructure/persistence/sqlite/schema.js';
+import { initializeSchemaTables } from './platform/persistence/sqlite/schema.js';
 import {
   setRouterState as setRouterStateForMigration,
   setSession as setSessionForMigration,
