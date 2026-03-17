@@ -105,7 +105,7 @@ export {
   getEcosystemMetrics,
   getEvolutionEntriesByStatus,
   getEvolutionEntryByAssetId,
-} from './platform/persistence/repositories.js';
+} from './infrastructure/persistence/repositories/agent/evolution-read-repository.js';
 
 export {
   createEvolutionEntry,
