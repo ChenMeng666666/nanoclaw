@@ -3,9 +3,7 @@ import type http from 'http';
 import { SECURITY_CONFIG } from '../../../config.js';
 import { validateAdditionalMounts } from '../../../mount-security.js';
 import type { AdditionalMount } from '../../../types/core-runtime.js';
-import { createApiError } from '../../../interfaces/http/response.js';
 import { CommandSafetyService } from '../domain/index.js';
-import { createRuntimeRateLimitGuard } from '../interfaces/http/rate-limit.js';
 
 export interface RuntimeApiAuthOptions {
   allowNoAuth: boolean;
@@ -18,11 +16,11 @@ export interface SecurityApplicationService {
     req: http.IncomingMessage,
     options: RuntimeApiAuthOptions,
   ): boolean;
-  enforceRuntimeRateLimit(
+  isRuntimeRateLimitExceeded(
     req: http.IncomingMessage,
     path: string,
     now: number,
-  ): void;
+  ): boolean;
   validateCommandSafety(command: string): boolean;
   assertCommandsSafe(commands: string[]): void;
   validateAdditionalMounts(
@@ -36,8 +34,25 @@ export interface SecurityApplicationService {
   }>;
 }
 
-export function createSecurityApplicationService(): SecurityApplicationService {
-  const runtimeRateLimitGuard = createRuntimeRateLimitGuard();
+interface RuntimeRateLimitGuard {
+  reset(): void;
+  isRateLimitedApiPath(path: string): boolean;
+  consume(req: http.IncomingMessage, now: number): boolean;
+}
+
+const NOOP_RATE_LIMIT_GUARD: RuntimeRateLimitGuard = {
+  reset() {},
+  isRateLimitedApiPath() {
+    return false;
+  },
+  consume() {
+    return true;
+  },
+};
+
+export function createSecurityApplicationService(
+  runtimeRateLimitGuard: RuntimeRateLimitGuard = NOOP_RATE_LIMIT_GUARD,
+): SecurityApplicationService {
   const commandSafetyService = new CommandSafetyService();
 
   return {
@@ -53,20 +68,14 @@ export function createSecurityApplicationService(): SecurityApplicationService {
         typeof requestApiKey === 'string' && requestApiKey === options.apiKey
       );
     },
-    enforceRuntimeRateLimit(req, path, now) {
+    isRuntimeRateLimitExceeded(req, path, now) {
       if (!SECURITY_CONFIG.networkSecurity.enableRateLimiting) {
-        return;
+        return false;
       }
       if (!runtimeRateLimitGuard.isRateLimitedApiPath(path)) {
-        return;
+        return false;
       }
-      if (!runtimeRateLimitGuard.consume(req, now)) {
-        throw createApiError(
-          429,
-          'RATE_LIMIT_EXCEEDED',
-          'Too many runtime API requests',
-        );
-      }
+      return !runtimeRateLimitGuard.consume(req, now);
     },
     validateCommandSafety(command) {
       return commandSafetyService.validateCommandSafety(command);

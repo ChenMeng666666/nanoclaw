@@ -2,12 +2,17 @@ import type http from 'http';
 import { URL } from 'url';
 
 import { logger } from '../../../../logger.js';
+import { createRuntimeRateLimitGuard } from '../../../../interfaces/http/middleware/rate-limit.js';
 import { createSecurityApplicationService } from '../../../security/application/index.js';
 import { createEvolutionHandlers } from './handlers/evolution-handlers.js';
 import { handleLearningCollaborationEndpoints } from './handlers/learning-collaboration-handlers.js';
 import { createMemoryHandlers } from './handlers/memory-handlers.js';
 import { createLearningHandlers } from './handlers/learning-handlers.js';
-import { isApiError, writeJSON } from '../../../../interfaces/http/response.js';
+import {
+  createApiError,
+  isApiError,
+  writeJSON,
+} from '../../../../interfaces/http/response.js';
 
 export interface RuntimeApiRouteContext {
   req: http.IncomingMessage;
@@ -30,7 +35,9 @@ export function createRuntimeApiRouter(options: RuntimeApiRouterOptions): {
     res: http.ServerResponse,
   ) => Promise<void>;
 } {
-  const securityService = createSecurityApplicationService();
+  const securityService = createSecurityApplicationService(
+    createRuntimeRateLimitGuard(),
+  );
   const memoryHandlers = createMemoryHandlers();
   const evolutionHandlers = createEvolutionHandlers();
   const learningHandlers = createLearningHandlers();
@@ -70,7 +77,13 @@ export function createRuntimeApiRouter(options: RuntimeApiRouterOptions): {
       const context = { req, res, url, path };
 
       try {
-        securityService.enforceRuntimeRateLimit(req, path, Date.now());
+        if (securityService.isRuntimeRateLimitExceeded(req, path, Date.now())) {
+          throw createApiError(
+            429,
+            'RATE_LIMIT_EXCEEDED',
+            'Too many runtime API requests',
+          );
+        }
 
         if (await memoryHandlers.handle(req, res, url, path)) {
           return;
