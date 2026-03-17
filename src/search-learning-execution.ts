@@ -3,7 +3,7 @@
  * 子代理并行执行搜索和学习，比较新旧方法
  */
 import { memoryApplicationService as memoryManager } from './contexts/memory/application/index.js';
-import { evolutionManager } from './evolution-manager.js';
+import { evolutionApplicationService as evolutionManager } from './contexts/evolution/application/index.js';
 import { ExternalSkillsSearcher } from './external-skills-search.js';
 import type { Memory } from './types/agent-memory.js';
 import type { EvolutionEntry } from './types/evolution.js';

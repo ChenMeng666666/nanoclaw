@@ -1,1 +1,1 @@
-export { createEvolutionHandlers } from '../../../../../interfaces/http/handlers/evolution-handlers.js';
+export { createEvolutionHandlers } from '../../../../evolution/interfaces/http/evolution-handlers.js';

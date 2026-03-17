@@ -2,7 +2,7 @@ import { logger } from '../../logger.js';
 import type { Server } from 'http';
 import { reflectionScheduler } from '../scheduling/reflection-scheduler.js';
 import { memoryApplicationService as memoryManager } from '../../contexts/memory/application/index.js';
-import { evolutionManager } from '../../evolution-manager.js';
+import { evolutionApplicationService as evolutionManager } from '../../contexts/evolution/application/index.js';
 import { EVOLUTION_CONFIG } from '../../config.js';
 import { LocalLLMQueryExpansionProvider } from '../../query-expansion/local-llm-provider.js';
 import { contextEngineRegistry } from '../../contexts/memory/infrastructure/context-engine-adapter.js';

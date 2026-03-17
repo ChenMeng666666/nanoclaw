@@ -165,11 +165,20 @@ src/
 
 ## Phase 5（P2）Evolution Context 迁移
 
-- [ ] [P2] 定义 evolution 领域边界：策略、评分、晋升、审核
-- [ ] [P2] 迁移 evolution 领域服务：按能力拆到 domain services
-- [ ] [P2] 迁移 evolution 用例：提交、选择、反馈、指标归入 application
-- [ ] [P2] 迁移 evolution 接口：runtime API evolution handlers 归入 interfaces
-- [ ] [P2] 建立上下文契约：仅通过 application 接口对外暴露能力
+- [x] [P2] 定义 evolution 领域边界：策略、评分、晋升、审核
+- [x] [P2] 迁移 evolution 领域服务：按能力拆到 domain services
+- [x] [P2] 迁移 evolution 用例：提交、选择、反馈、指标归入 application
+- [x] [P2] 迁移 evolution 接口：runtime API evolution handlers 归入 interfaces
+- [x] [P2] 建立上下文契约：仅通过 application 接口对外暴露能力
+
+### Phase 5 迭代执行增量（2026-03-17）
+
+- evolution context 分层落位：新增 `src/contexts/evolution/{domain,application,infrastructure,interfaces}` 与 `src/contexts/evolution/index.ts`，形成 evolution 子域导出边界。
+- application 契约收口：新增 `contexts/evolution/application/evolution-application-service.ts` 与 `index.ts`，统一暴露 `evolutionApplicationService` 作为对外调用入口。
+- domain services 归位：在 `contexts/evolution/domain/index.ts` 聚合导出策略、评分、命令安全、capsule、evolution 领域服务。
+- interfaces 归位：将 evolution HTTP handlers 实现迁移到 `contexts/evolution/interfaces/http/evolution-handlers.ts`，旧入口 `src/interfaces/http/handlers/evolution-handlers.ts` 收敛为兼容 facade 转发。
+- runtime 接线收敛：`contexts/runtime/interfaces/http/handlers/evolution-handlers.ts` 改为依赖 evolution context 接口层入口。
+- 上下文契约生效：`app-lifecycle`、`reflection-executor`、`search-learning-execution` 的 evolution 调用改为经 `contexts/evolution/application` 入口，减少对旧路径直连。
 
 ## Phase 6（P2）Security Context 迁移
 

@@ -22,7 +22,7 @@ import type {
 } from '../../types/agent-memory.js';
 import { logger } from '../../logger.js';
 import { memoryApplicationService as memoryManager } from '../../contexts/memory/application/index.js';
-import { evolutionManager } from '../../evolution-manager.js';
+import { evolutionApplicationService as evolutionManager } from '../../contexts/evolution/application/index.js';
 
 export class ReflectionExecutor {
   /**
