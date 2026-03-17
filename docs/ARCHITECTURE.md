@@ -106,7 +106,7 @@ NanoClaw 是一个个人 Claude 助手，其设计哲学是：
 | ---------- | ------------------------------------------- | ------------------------------ |
 | 主调度器   | `src/index.ts`                              | 状态管理、消息循环、Agent 调用 |
 | 通道注册表 | `src/channels/registry.ts`                  | 通道自注册（启动时）           |
-| IPC 处理   | `src/ipc.ts`                                | IPC 监视器和任务处理           |
+| IPC 处理   | `src/contexts/runtime/infrastructure/ipc-watcher.ts` | IPC 监视器和任务处理 |
 | 消息路由   | `src/router.ts`                             | 消息格式化和出站路由           |
 | 智能体路由 | `src/agent-router.ts`                       | 根据消息 JID 路由到对应 Agent  |
 | 容器运行器 | `src/container-runner.ts`                   | 生成流式 Agent 容器            |
@@ -115,7 +115,7 @@ NanoClaw 是一个个人 Claude 助手，其设计哲学是：
 | 团队管理   | `src/team-manager.ts`                       | 智能体团队管理                 |
 | 智能体通信 | `src/agent-communication.ts`                | 智能体间消息传递               |
 | 数据库     | `src/db.ts`, `src/db-agents.ts`             | SQLite 操作                    |
-| 运行时 API | `src/runtime-api.ts`                        | HTTP API 供容器内 Agent 调用   |
+| 运行时 API | `src/contexts/runtime/application/runtime-api-service.ts` | HTTP API 供容器内 Agent 调用 |
 | 记忆管理   | `src/memory-manager.ts`                     | 分层记忆系统                   |
 | 上下文引擎 | `src/context-engine/default-engine.ts`      | 记忆组装、摄取与作用域检索     |
 | 认知管理   | `src/cognition-manager.ts`                  | 认知文件生成                   |
@@ -1198,72 +1198,25 @@ systemctl --user status nanoclaw
 
 ---
 
-## 关键文件索引
+## DDD 结构索引
 
-### 核心文件
+### Context 索引
 
-| 文件               | 行数  | 功能               |
-| ------------------ | ----- | ------------------ |
-| `src/index.ts`     | ~500  | 主调度器、消息循环 |
-| `src/types.ts`     | ~800  | 类型定义           |
-| `src/config.ts`    | ~200  | 配置管理           |
-| `src/db.ts`        | ~1500 | 数据库操作         |
-| `src/db-agents.ts` | ~650  | 智能体数据库操作   |
+| Context | 目录 | 关键职责 |
+| --- | --- | --- |
+| runtime | `src/contexts/runtime/` | Runtime API 编排、容器运行时接线 |
+| security | `src/contexts/security/` | 鉴权、限流、输入校验、命令与挂载安全 |
+| memory | `src/contexts/memory/` | 记忆检索、迁移、发布控制、观测指标 |
+| evolution | `src/contexts/evolution/` | Gene 生命周期、审核链路、治理指标 |
+| messaging | `src/contexts/messaging/` | 消息路由、消息流水线、状态恢复 |
 
-### 智能体系统
+### DDD 治理文档
 
-| 文件                          | 行数 | 功能                 |
-| ----------------------------- | ---- | -------------------- |
-| `src/agent-router.ts`         | ~190 | 智能体路由           |
-| `src/memory-manager.ts`       | ~320 | 分层记忆系统         |
-| `src/cognition-manager.ts`    | ~100 | 认知文件生成         |
-| `src/reflection-scheduler.ts` | ~330 | 反思调度器           |
-| `src/evolution-manager.ts`    | ~500 | 进化系统 (GEP 1.5.0) |
-| `src/keystore.ts`             | ~220 | 密钥管理             |
-
-### 多智能体协作
-
-| 文件                             | 行数 | 功能         |
-| -------------------------------- | ---- | ------------ |
-| `src/agent-communication.ts`     | ~200 | 智能体间通信 |
-| `src/team-manager.ts`            | ~310 | 团队管理     |
-| `src/collaboration-scheduler.ts` | ~280 | 协作任务调度 |
-
-### 容器和运行时
-
-| 文件                       | 行数 | 功能            |
-| -------------------------- | ---- | --------------- |
-| `src/container-runner.ts`  | ~800 | 容器运行器      |
-| `src/container-runtime.ts` | ~400 | 容器运行时      |
-| `src/ipc.ts`               | ~600 | IPC 处理        |
-| `src/runtime-api.ts`       | ~800 | 运行时 HTTP API |
-
-### 消息和调度
-
-| 文件                       | 行数 | 功能          |
-| -------------------------- | ---- | ------------- |
-| `src/channels/registry.ts` | ~150 | 通道注册表    |
-| `src/channels/telegram.ts` | ~600 | Telegram 通道 |
-| `src/router.ts`            | ~300 | 消息路由      |
-| `src/group-queue.ts`       | ~200 | 组队列        |
-| `src/task-scheduler.ts`    | ~360 | 任务调度器    |
-
-### 安全系统
-
-| 文件                     | 行数 | 功能     |
-| ------------------------ | ---- | -------- |
-| `src/security.ts`        | ~300 | 安全核心 |
-| `src/security-alerts.ts` | ~200 | 安全告警 |
-| `src/secret-scanner.ts`  | ~200 | 秘密扫描 |
-| `src/skill-verifier.ts`  | ~150 | 技能验证 |
-| `src/keystore-audit.ts`  | ~150 | 密钥审计 |
-| `src/mount-security.ts`  | ~150 | 挂载安全 |
-
-### 总计
-
-- **TypeScript 代码**: 约 15,000 行
-- **核心模块**: 30+ 个
-- **数据库表**: 20+ 个
+- `docs/DDD_CONTEXT_MAP.md`
+- `docs/DDD_DEPENDENCY_GRAPH.md`
+- `docs/DDD_CONSTRAINTS.md`
+- `docs/DDD_MODULE_TEMPLATE.md`
+- `docs/DDD_REVIEW_CHECKLIST.md`
 
 ---
 
@@ -1287,6 +1240,6 @@ systemctl --user status nanoclaw
 
 ---
 
-**文档版本**: 1.3.0
-**最后更新**: 2026-03-15 12:00
+**文档版本**: 1.4.0
+**最后更新**: 2026-03-17 00:00
 **维护者**: NanoClaw Team

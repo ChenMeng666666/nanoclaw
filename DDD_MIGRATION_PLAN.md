@@ -214,11 +214,19 @@ src/
 
 ## Phase 8（P3）收敛、治理与文档
 
-- [ ] [P3] 清理遗留入口：移除过渡期 facade 并完成 import 收敛
-- [ ] [P3] 统一依赖方向校验：CI 增加层级依赖静态检查
-- [ ] [P3] 更新架构文档：输出 context map、依赖图、迁移后约束
-- [ ] [P3] 统一测试布局：测试按 context 就近放置并规范命名
-- [ ] [P3] 形成长期机制：新模块准入模板与 DDD 代码评审清单
+- [x] [P3] 清理遗留入口：移除过渡期 facade 并完成 import 收敛
+- [x] [P3] 统一依赖方向校验：CI 增加层级依赖静态检查
+- [x] [P3] 更新架构文档：输出 context map、依赖图、迁移后约束
+- [x] [P3] 统一测试布局：测试按 context 就近放置并规范命名
+- [x] [P3] 形成长期机制：新模块准入模板与 DDD 代码评审清单
+
+### Phase 8 迭代执行增量（2026-03-17）
+
+- 遗留入口清理：删除 `src/runtime-api.ts`、`src/ipc.ts`、`src/interfaces/http/runtime-api-router.ts`、`src/interfaces/http/parsers/runtime-api-parsers.ts`、`src/interfaces/http/handlers/evolution-handlers.ts`、`src/application/bootstrap/message-orchestrator.ts`、`src/application/message/message-pipeline.ts` 等过渡 facade；对应测试与 runtime 基础设施改为直接引用目标实现路径。
+- 依赖方向校验落地：新增 `scripts/check-ddd-dependencies.ts` 与 `npm run lint:ddd-deps`，并在 CI 增加 `DDD dependency check` 阶段；对既有迁移白名单场景保持显式例外，形成可演进门禁。
+- 架构文档补齐：新增 `docs/DDD_CONTEXT_MAP.md`、`docs/DDD_DEPENDENCY_GRAPH.md`、`docs/DDD_CONSTRAINTS.md`，并更新 `docs/ARCHITECTURE.md` 的 DDD 结构索引与治理文档入口。
+- 测试布局收敛：将 runtime helper 与 reflection 触发契约测试迁移至 `src/contexts/runtime/**` 下就近目录（`runtime-api-service.test.ts`、`runtime-api-reflection-trigger.test.ts`），`test:ddd-baseline` 同步改为 context 就近路径。
+- 长期机制建立：新增 `docs/DDD_MODULE_TEMPLATE.md` 与 `docs/DDD_REVIEW_CHECKLIST.md`，并在 `.github/PULL_REQUEST_TEMPLATE.md` 增加 DDD 治理核对项。
 
 ## 执行策略（建议）
 

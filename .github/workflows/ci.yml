@@ -29,6 +29,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: DDD dependency check
+        run: npm run lint:ddd-deps
+
       - name: Iteration regression baseline
         run: npm run test:ddd-baseline
 

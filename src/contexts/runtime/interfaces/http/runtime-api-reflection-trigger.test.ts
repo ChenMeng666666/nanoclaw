@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
-import type * as dbAgentsType from './db-agents.js';
+import type * as dbAgentsType from '../../../../db-agents.js';
 
 const mocks = vi.hoisted(() => ({
   triggerReflection: vi.fn(),
   getAgentByFolder: vi.fn(),
 }));
 
-vi.mock('./application/learning/reflection-executor.js', () => ({
+vi.mock('../../../../application/learning/reflection-executor.js', () => ({
   reflectionExecutor: {
     triggerReflection: mocks.triggerReflection,
     createLearningTask: vi.fn(),
@@ -16,17 +16,19 @@ vi.mock('./application/learning/reflection-executor.js', () => ({
   },
 }));
 
-vi.mock('./db-agents.js', async () => {
-  const actual = await vi.importActual<typeof dbAgentsType>('./db-agents.js');
+vi.mock('../../../../db-agents.js', async () => {
+  const actual = await vi.importActual<typeof dbAgentsType>(
+    '../../../../db-agents.js',
+  );
   return {
     ...actual,
     getAgentByFolder: mocks.getAgentByFolder,
   };
 });
 
-import { startRuntimeAPI } from './runtime-api.js';
+import { startRuntimeAPI } from '../../application/runtime-api-service.js';
 
-describe('runtime-api reflection trigger endpoint', () => {
+describe('runtime context reflection trigger endpoint', () => {
   let server: Server | null = null;
   let baseUrl = '';
 

@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { _initTestDatabase } from './db.js';
+import { _initTestDatabase } from '../../../db.js';
 import {
   normalizeLearningNeeds,
   inferPlanPriority,
   splitToPoints,
   analyzeLearningOutcome,
-} from './runtime-api.js';
+} from './runtime-api-service.js';
 
-describe('runtime-api helpers', () => {
+describe('runtime context runtime-api helpers', () => {
   beforeEach(() => {
     _initTestDatabase();
   });

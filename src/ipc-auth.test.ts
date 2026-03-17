@@ -9,7 +9,8 @@ import {
   getTaskById,
   setRegisteredGroup,
 } from './db.js';
-import { processTaskIpc, type IpcDeps } from './ipc.js';
+import { processTaskIpc } from './ipc/task-router.js';
+import type { IpcDeps } from './ipc/types.js';
 import type { RegisteredGroup } from './types/core-runtime.js';
 
 // Set up registered groups used across tests

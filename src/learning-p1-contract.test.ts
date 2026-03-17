@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createAgent } from './db-agents.js';
 import { _initTestDatabase } from './db.js';
-import { startRuntimeAPI } from './runtime-api.js';
+import { startRuntimeAPI } from './contexts/runtime/application/runtime-api-service.js';
 
 describe('learning p1 contracts', () => {
   let server: Server | null = null;

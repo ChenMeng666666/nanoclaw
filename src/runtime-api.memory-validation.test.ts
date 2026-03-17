@@ -8,7 +8,7 @@ vi.mock('./embedding-providers/registry.js', () => ({
 
 import { _initTestDatabase } from './db.js';
 import { createAgent } from './db-agents.js';
-import { startRuntimeAPI } from './runtime-api.js';
+import { startRuntimeAPI } from './contexts/runtime/application/runtime-api-service.js';
 import { MEMORY_CONFIG } from './config.js';
 import { memoryManager } from './memory-manager.js';
 import { evolutionManager } from './evolution-manager.js';

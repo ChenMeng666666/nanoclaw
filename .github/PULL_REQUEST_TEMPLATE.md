@@ -7,6 +7,12 @@
 ## Description
 
 
+## DDD Governance
+
+- [ ] I reviewed docs/DDD_REVIEW_CHECKLIST.md and all applicable items are satisfied
+- [ ] For new module work, docs/DDD_MODULE_TEMPLATE.md is filled and linked in this PR
+- [ ] I ran `npm run lint` and `npm run lint:ddd-deps`
+
 ## For Skills
 
 - [ ] I have not made any changes to source code
