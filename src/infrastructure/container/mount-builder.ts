@@ -7,7 +7,7 @@ import {
   resolveGroupIpcPath,
 } from '../../group-folder.js';
 import { logger } from '../../logger.js';
-import { validateAdditionalMounts } from '../../mount-security.js';
+import { securityApplicationService } from '../../contexts/security/application/index.js';
 import type { RegisteredGroup } from '../../types/core-runtime.js';
 import type { VolumeMount } from '../../domain/container/mount-policy.js';
 
@@ -182,7 +182,7 @@ export function buildVolumeMounts(
 
   // Additional mounts validated against external allowlist (tamper-proof from containers)
   if (group.containerConfig?.additionalMounts) {
-    const validatedMounts = validateAdditionalMounts(
+    const validatedMounts = securityApplicationService.validateAdditionalMounts(
       group.containerConfig.additionalMounts,
       group.name,
       isMain,

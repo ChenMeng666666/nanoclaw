@@ -15,7 +15,7 @@ import {
   parseRequiredIntegerInRange,
   parseRequiredString,
   readJSON,
-} from '../../../../interfaces/http/parsers/runtime-api-parsers.js';
+} from '../../../security/interfaces/http/runtime-api-parsers.js';
 import {
   createApiError,
   writeJSON,

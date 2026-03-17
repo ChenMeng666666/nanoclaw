@@ -1,7 +1,7 @@
 import { evolutionManager } from './evolution-manager.js';
 import { type SignalType, type Signal } from './signal-extractor.js';
 import { logger } from './logger.js';
-import { isCommandAllowed } from './config.js';
+import { securityApplicationService } from './contexts/security/application/index.js';
 import {
   type MainExperienceInput,
   type EvolutionEntry,
@@ -193,11 +193,11 @@ export class MainEvolutionApplier {
     }
 
     const unsafeCommands = commands.filter(
-      (command) => !isCommandAllowed(command),
+      (command) => !securityApplicationService.validateCommandSafety(command),
     );
     if (unsafeCommands.length > 0) {
       const safeCommands = commands.filter((command) =>
-        isCommandAllowed(command),
+        securityApplicationService.validateCommandSafety(command),
       );
       evolutionManager.createValidationReport(
         gene.id,

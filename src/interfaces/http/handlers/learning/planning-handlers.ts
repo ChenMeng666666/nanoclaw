@@ -24,7 +24,7 @@ import {
   offsetSchedule,
   resolveLearningSchedulePreference,
 } from '../../../../domain/learning/services/learning-scheduler.js';
-import { readJSON } from '../../parsers/runtime-api-parsers.js';
+import { readJSON } from '../../../../contexts/security/interfaces/http/runtime-api-parsers.js';
 import { writeJSON } from '../../response.js';
 
 export function createPlanningHandlers(): {

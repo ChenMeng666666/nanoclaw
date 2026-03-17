@@ -1,18 +1,13 @@
 import type http from 'http';
 import { URL } from 'url';
 
-import { SECURITY_CONFIG } from '../../../../config.js';
 import { logger } from '../../../../logger.js';
-import { createRuntimeRateLimitGuard } from '../../../../interfaces/http/middleware/rate-limit.js';
+import { createSecurityApplicationService } from '../../../security/application/index.js';
 import { createEvolutionHandlers } from './handlers/evolution-handlers.js';
 import { handleLearningCollaborationEndpoints } from './handlers/learning-collaboration-handlers.js';
 import { createMemoryHandlers } from './handlers/memory-handlers.js';
 import { createLearningHandlers } from './handlers/learning-handlers.js';
-import {
-  createApiError,
-  isApiError,
-  writeJSON,
-} from '../../../../interfaces/http/response.js';
+import { isApiError, writeJSON } from '../../../../interfaces/http/response.js';
 
 export interface RuntimeApiRouteContext {
   req: http.IncomingMessage;
@@ -35,14 +30,14 @@ export function createRuntimeApiRouter(options: RuntimeApiRouterOptions): {
     res: http.ServerResponse,
   ) => Promise<void>;
 } {
-  const rateLimitGuard = createRuntimeRateLimitGuard();
+  const securityService = createSecurityApplicationService();
   const memoryHandlers = createMemoryHandlers();
   const evolutionHandlers = createEvolutionHandlers();
   const learningHandlers = createLearningHandlers();
 
   return {
     resetRateLimitState() {
-      rateLimitGuard.reset();
+      securityService.resetRateLimitState();
     },
     handler: async (req, res) => {
       res.setHeader('Access-Control-Allow-Origin', '*');
@@ -50,12 +45,7 @@ export function createRuntimeApiRouter(options: RuntimeApiRouterOptions): {
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key');
 
       if (req.method !== 'OPTIONS') {
-        const apiKey = req.headers['x-api-key'] as string | undefined;
-        if (
-          !options.allowNoAuth &&
-          options.apiKey &&
-          (!apiKey || apiKey !== options.apiKey)
-        ) {
+        if (!securityService.isAuthorizedRuntimeRequest(req, options)) {
           logger.warn(
             {
               method: req.method,
@@ -80,18 +70,7 @@ export function createRuntimeApiRouter(options: RuntimeApiRouterOptions): {
       const context = { req, res, url, path };
 
       try {
-        if (
-          rateLimitGuard.isRateLimitedApiPath(path) &&
-          SECURITY_CONFIG.networkSecurity.enableRateLimiting
-        ) {
-          if (!rateLimitGuard.consume(req, Date.now())) {
-            throw createApiError(
-              429,
-              'RATE_LIMIT_EXCEEDED',
-              'Too many runtime API requests',
-            );
-          }
-        }
+        securityService.enforceRuntimeRateLimit(req, path, Date.now());
 
         if (await memoryHandlers.handle(req, res, url, path)) {
           return;

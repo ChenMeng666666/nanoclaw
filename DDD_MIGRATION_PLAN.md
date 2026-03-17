@@ -182,11 +182,19 @@ src/
 
 ## Phase 6（P2）Security Context 迁移
 
-- [ ] [P2] 定义 security 子域：鉴权、输入校验、挂载策略、命令安全
-- [ ] [P2] 迁移安全策略实现：mount-policy/command-safety 等收敛
-- [ ] [P2] 迁移接口防线：API 参数校验与限流规则归位
-- [ ] [P2] 建立统一安全服务入口：供各 context 通过契约调用
-- [ ] [P2] 去除散落实现：清理多点重复校验逻辑
+- [x] [P2] 定义 security 子域：鉴权、输入校验、挂载策略、命令安全
+- [x] [P2] 迁移安全策略实现：mount-policy/command-safety 等收敛
+- [x] [P2] 迁移接口防线：API 参数校验与限流规则归位
+- [x] [P2] 建立统一安全服务入口：供各 context 通过契约调用
+- [x] [P2] 去除散落实现：清理多点重复校验逻辑
+
+### Phase 6 迭代执行增量（2026-03-17）
+
+- security context 分层落位：新增 `src/contexts/security/{domain,application,infrastructure,interfaces}` 与 `src/contexts/security/index.ts`，形成 security 子域导出边界。
+- 统一安全服务入口：新增 `contexts/security/application/security-application-service.ts`，集中承接 Runtime 鉴权、限流、命令安全与挂载校验能力。
+- runtime 接线收敛：`runtime-api-router` 改为依赖 security application 入口处理鉴权与限流，移除路由内散落安全分支。
+- 参数校验入口归位：memory/evolution/learning/collaboration handlers 的 runtime parser 引用统一改为 `contexts/security/interfaces/http/runtime-api-parsers`。
+- 命令与挂载策略收敛：`main-evolution-applier` 与 `mount-builder` 改为通过 security application 契约调用，减少对旧散落实现的直连。
 
 ## Phase 7（P2）巨型文件拆分与去耦
 

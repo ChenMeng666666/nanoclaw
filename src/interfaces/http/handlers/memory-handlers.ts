@@ -16,7 +16,7 @@ import {
   parseReleaseControlPatch,
   parseRequiredString,
   readJSON,
-} from '../parsers/runtime-api-parsers.js';
+} from '../../../contexts/security/interfaces/http/runtime-api-parsers.js';
 import { createApiError, writeJSON } from '../response.js';
 
 function withTimeout<T>(

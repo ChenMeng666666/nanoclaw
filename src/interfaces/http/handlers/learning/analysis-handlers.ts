@@ -27,7 +27,7 @@ import {
   parseOptionalStringWithLimit,
   parseRequiredString,
   readJSON,
-} from '../../parsers/runtime-api-parsers.js';
+} from '../../../../contexts/security/interfaces/http/runtime-api-parsers.js';
 import { writeJSON } from '../../response.js';
 
 export function createAnalysisHandlers(): {
