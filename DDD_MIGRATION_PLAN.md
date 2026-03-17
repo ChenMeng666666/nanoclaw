@@ -127,11 +127,19 @@ src/
 
 ## Phase 3（P1）Runtime Context 迁移
 
-- [ ] [P1] 定义 runtime 子域：容器生命周期、执行器、IPC、运行时安全
-- [ ] [P1] 迁移运行时应用服务：启动编排、恢复、调度触发归入 application
-- [ ] [P1] 迁移 runtime API 接口层：HTTP handlers/parsers/router 边界收敛
-- [ ] [P1] 迁移运行基础设施：container/ipc 命令构建与执行归入 infrastructure
-- [ ] [P1] 保留兼容 facade：旧 runtime 入口文件仅做转发
+- [x] [P1] 定义 runtime 子域：容器生命周期、执行器、IPC、运行时安全
+- [x] [P1] 迁移运行时应用服务：启动编排、恢复、调度触发归入 application
+- [x] [P1] 迁移 runtime API 接口层：HTTP handlers/parsers/router 边界收敛
+- [x] [P1] 迁移运行基础设施：container/ipc 命令构建与执行归入 infrastructure
+- [x] [P1] 保留兼容 facade：旧 runtime 入口文件仅做转发
+
+### Phase 3 迭代执行增量（2026-03-17）
+
+- runtime context 分层落位：新增 `src/contexts/runtime/{domain,application,interfaces,infrastructure}` 与 `src/contexts/runtime/index.ts` 聚合导出，形成 runtime 子域边界。
+- 运行时应用服务归位：新增 `contexts/runtime/application/runtime-api-service.ts` 承接 Runtime API 启动编排；`bootstrap` 改为优先依赖 runtime context 应用层入口。
+- runtime API 接口层归位：新增 `contexts/runtime/interfaces/http/runtime-api-router.ts` 并在接口层统一接入 memory/evolution/learning/collaboration 路由处理。
+- 基础设施能力归位：新增 `contexts/runtime/infrastructure/container-runtime.ts` 与 `contexts/runtime/infrastructure/ipc-watcher.ts`，容器运行时与 IPC watcher 通过 runtime context 基础设施入口暴露。
+- 兼容门面收口：`src/runtime-api.ts`、`src/container-runtime.ts`、`src/interfaces/http/runtime-api-router.ts` 改为转发到 runtime context 新实现，保持外部调用契约稳定。
 
 ## Phase 4（P2）Memory Context 迁移
 

@@ -4,10 +4,10 @@ import { URL } from 'url';
 import { SECURITY_CONFIG } from '../../../../config.js';
 import { logger } from '../../../../logger.js';
 import { createRuntimeRateLimitGuard } from '../../../../interfaces/http/middleware/rate-limit.js';
-import { createEvolutionHandlers } from '../../../../interfaces/http/handlers/evolution-handlers.js';
-import { handleLearningCollaborationEndpoints } from '../../../../interfaces/http/handlers/learning-collaboration-handlers.js';
-import { createMemoryHandlers } from '../../../../interfaces/http/handlers/memory-handlers.js';
-import { createLearningHandlers } from '../../../../interfaces/http/handlers/learning/index.js';
+import { createEvolutionHandlers } from './handlers/evolution-handlers.js';
+import { handleLearningCollaborationEndpoints } from './handlers/learning-collaboration-handlers.js';
+import { createMemoryHandlers } from './handlers/memory-handlers.js';
+import { createLearningHandlers } from './handlers/learning-handlers.js';
 import {
   createApiError,
   isApiError,

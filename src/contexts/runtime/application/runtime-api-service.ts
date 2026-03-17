@@ -4,6 +4,8 @@ import net from 'net';
 import { RUNTIME_API_CONFIG } from '../../../config.js';
 import { logger } from '../../../logger.js';
 import { createRuntimeApiRouter } from '../interfaces/http/runtime-api-router.js';
+import type { RuntimeApiRouteContext } from '../interfaces/http/runtime-api-router.js';
+import { handleRuntimeLegacyRoute } from './legacy-route-handler.js';
 
 export {
   analyzeLearningNeeds,
@@ -25,12 +27,14 @@ export interface RuntimeAPIOptions {
   enabled: boolean;
   port: number;
   host: string;
+  handleLegacyRoute: (context: RuntimeApiRouteContext) => Promise<boolean>;
 }
 
 const DEFAULT_OPTIONS: RuntimeAPIOptions = {
   enabled: process.env.RUNTIME_API_ENABLED !== 'false',
   port: RUNTIME_API_CONFIG.port,
   host: process.env.RUNTIME_API_HOST || '127.0.0.1',
+  handleLegacyRoute: handleRuntimeLegacyRoute,
 };
 
 function checkPortAvailable(port: number, host: string): Promise<boolean> {
@@ -104,6 +108,7 @@ export async function startRuntimeAPI(
     port: opts.port,
     allowNoAuth,
     apiKey: runtimeApiKey,
+    handleLegacyRoute: opts.handleLegacyRoute,
   });
   router.resetRateLimitState();
 
