@@ -41,12 +41,15 @@ import {
   calculateAverageRating,
   calculateShannonDiversity,
   cosineSimilarity,
-  normalizeSimilarityThreshold,
 } from './evolution-service-math.js';
 import {
   buildReReviewReason,
   evaluateAutoReviewEntry,
 } from './evolution-service-review.js';
+import {
+  detectDuplicateSignal,
+  type EvolutionDuplicateCandidateRow,
+} from './evolution-duplicate-detector.js';
 
 export class EvolutionService {
   private strategyService: StrategyService;
@@ -90,30 +93,9 @@ export class EvolutionService {
     );
   }
 
-  // Update strategy in use cases when strategy changes
   updateStrategy(): void {
     const config = this.strategyService.getConfig();
     this.selectAndReviewUseCase.setStrategy(config.strategy);
-    // SubmitExperienceUseCase takes config in constructor, but it references it by value?
-    // Actually SubmitExperienceUseCase stores config.
-    // We might need to update it. But SubmitExperienceUseCase doesn't seem to have setConfig.
-    // However, EvolutionManager.setStrategy only called this.selectAndReviewUseCase.setStrategy(strategy).
-    // So maybe SubmitExperienceUseCase doesn't need update?
-    // Looking at SubmitExperienceUseCase, it uses config.autoApproveThreshold etc.
-    // If we want to support dynamic config update for SubmitExperienceUseCase, we might need to recreate it or add setter.
-    // But for now I'll follow EvolutionManager's behavior.
-
-    // Actually, EvolutionManager re-created SubmitExperienceUseCase? No.
-    // It just updated this.config.
-    // And passed this.config to SubmitExperienceUseCase.
-    // If SubmitExperienceUseCase holds a reference to the config object, it sees updates.
-    // In EvolutionManager: this.config = { ...DEFAULT_CONFIG, ...config };
-    // this.submitExperienceUseCase = new SubmitExperienceUseCase(this.config, ...);
-    // So it holds reference.
-    // In StrategyService, getConfig() returns this.config.
-    // So if StrategyService updates this.config in place, it works.
-    // But StrategyService.setStrategy updates this.config.strategy.
-    // So it should be fine if we pass the config object.
   }
 
   async submitExperience(
@@ -232,7 +214,6 @@ export class EvolutionService {
         await this.triggerReReview(id, avgRating, feedbackCount);
       }
 
-      // Update GDI Score
       this.updateGeneGDIScore(id);
     }
   }
@@ -290,7 +271,6 @@ export class EvolutionService {
     const gdiScore = this.calculateGDIScore(gene);
     updateGeneGDIScore(geneId, gdiScore);
 
-    // Update ecosystem status
     this.updateEcosystemStatus(geneId, gdiScore);
 
     logger.info({ geneId, gdiScore }, 'GDI score updated (GEP)');
@@ -301,14 +281,12 @@ export class EvolutionService {
   calculateEcosystemMetrics(): EcosystemMetrics {
     const db = getDatabase();
 
-    // Get all Genes
     const allGenes = db.prepare('SELECT * FROM evolution_log').all() as Array<{
       ecosystem_status: string;
       gdi_score: string;
       category: string;
     }>;
 
-    // Count by status
     const promotedGenes = allGenes.filter(
       (g) => g.ecosystem_status === 'promoted',
     ).length;
@@ -319,18 +297,14 @@ export class EvolutionService {
       (g) => g.ecosystem_status === 'archived',
     ).length;
 
-    // Get all Capsules
     const totalCapsules = db
       .prepare('SELECT COUNT(*) as count FROM capsules')
       .get() as { count: number };
 
-    // Calculate Shannon Diversity
-    // Type assertion to fix TS error
     const shannonDiversity = calculateShannonDiversity(
       allGenes as unknown as EvolutionEntry[],
     );
 
-    // Calculate Average GDI Score
     const gdiScores = allGenes
       .map((g) => {
         try {
@@ -380,8 +354,8 @@ export class EvolutionService {
     const safeLimit = Math.max(1, Math.min(200, timelineLimit));
     const current = this.calculateEcosystemMetrics();
     const timeline = getEcosystemMetrics(safeLimit)
-      .map((item: EcosystemMetrics) => ({
-        timestamp: (item as any).timestamp,
+      .map((item: EcosystemMetrics & { timestamp?: string }) => ({
+        timestamp: item.timestamp ?? '',
         shannonDiversity: item.shannonDiversity,
         avgGDIScore: item.avgGDIScore,
         totalGenes: item.totalGenes,
@@ -418,51 +392,19 @@ export class EvolutionService {
       .prepare(
         "SELECT * FROM evolution_log WHERE created_at >= datetime('now', '-7 days')",
       )
-      .all() as EvolutionEntry[];
+      .all() as EvolutionDuplicateCandidateRow[];
 
     if (existingEntries.length === 0) {
       return { isDuplicate: false, similarity: 0 };
     }
 
-    // Generate embedding for current content
     const currentEmbedding = await generateEmbedding(content);
-
-    for (const existing of existingEntries) {
-      if (!existing.contentEmbedding) continue;
-
-      try {
-        const existingEmbedding = JSON.parse(
-          existing.contentEmbedding as unknown as string,
-        );
-        if (!Array.isArray(existingEmbedding)) continue;
-        const similarity = cosineSimilarity(
-          currentEmbedding,
-          existingEmbedding,
-        );
-
-        const isSameAuthor = existing.sourceAgentId === authorId;
-        const threshold = normalizeSimilarityThreshold(
-          isSameAuthor
-            ? EVOLUTION_CONFIG.duplicateThreshold.sameAuthor
-            : EVOLUTION_CONFIG.duplicateThreshold.differentAuthor,
-        );
-
-        if (similarity >= threshold) {
-          return {
-            isDuplicate: true,
-            similarity,
-            reason: isSameAuthor
-              ? 'Same author, high content similarity'
-              : 'Different author, very high content similarity',
-            existingAssetId: existing.asset_id,
-          };
-        }
-      } catch {
-        continue;
-      }
-    }
-
-    return { isDuplicate: false, similarity: 0 };
+    return detectDuplicateSignal(
+      existingEntries,
+      currentEmbedding,
+      authorId,
+      EVOLUTION_CONFIG.duplicateThreshold,
+    );
   }
 
   createValidationReport(

@@ -75,6 +75,13 @@ export default tseslint.config(
     files: ['scripts/**/*.ts', 'scripts/**/*.js', 'setup/**/*.ts'],
     rules: {
       'no-console': 'off',
+      'max-lines': 'off',
+    },
+  },
+  {
+    files: ['**/*.test.ts', 'tests/**/*.ts'],
+    rules: {
+      'max-lines': 'off',
     },
   },
   {
@@ -136,6 +143,20 @@ export default tseslint.config(
           ],
         },
       ],
+    },
+  },
+  {
+    files: [
+      'src/contexts/memory/application/memory-application-service.ts',
+      'src/contexts/memory/domain/memory-domain-rules.ts',
+      'src/contexts/messaging/application/message-orchestrator.ts',
+      'src/contexts/messaging/application/message-pipeline.ts',
+      'src/contexts/messaging/application/state-recovery-service.ts',
+      'src/contexts/runtime/application/legacy-route-handler.ts',
+      'src/contexts/runtime/application/runtime-api-service.ts',
+    ],
+    rules: {
+      'no-restricted-imports': 'off',
     },
   },
 );

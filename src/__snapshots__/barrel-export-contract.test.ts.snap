@@ -80,6 +80,7 @@ exports[`barrel export contract > contexts/runtime export surface is stable 3`] 
   "extractKnowledgePoints",
   "generateDailySummary",
   "generateRuntimeReflection",
+  "handleRuntimeLegacyRoute",
   "inferPlanPriority",
   "normalizeLearningNeeds",
   "orchestrateLearningIntent",

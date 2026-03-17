@@ -64,7 +64,9 @@ export function cleanupOrphans(namePrefix: string = 'nanoclaw-'): void {
     for (const name of orphans) {
       try {
         execSync(stopContainer(name), { stdio: 'pipe' });
-      } catch {}
+      } catch (err) {
+        logger.debug({ err, name }, 'Skip orphan cleanup failure');
+      }
     }
     if (orphans.length > 0) {
       logger.info(
