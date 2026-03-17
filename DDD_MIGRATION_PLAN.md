@@ -198,11 +198,19 @@ src/
 
 ## Phase 7（P2）巨型文件拆分与去耦
 
-- [ ] [P2] 拆分 runtime-api-parsers：按资源类型拆分 parser 模块
-- [ ] [P2] 拆分 ipc：按协议、握手、消息路由、鉴权分离
-- [ ] [P2] 拆分 evolution-service：按策略/评分/审核/编排解耦
-- [ ] [P2] 拆分仓储巨型实现：读写职责分离、查询对象化
-- [ ] [P2] 建立文件尺寸阈值：新增“单文件行数与 import 数”治理门槛
+- [x] [P2] 拆分 runtime-api-parsers：按资源类型拆分 parser 模块
+- [x] [P2] 拆分 ipc：按协议、握手、消息路由、鉴权分离
+- [x] [P2] 拆分 evolution-service：按策略/评分/审核/编排解耦
+- [x] [P2] 拆分仓储巨型实现：读写职责分离、查询对象化
+- [x] [P2] 建立文件尺寸阈值：新增“单文件行数与 import 数”治理门槛
+
+### Phase 7 迭代执行增量（2026-03-17）
+
+- runtime-api-parsers 按资源类型拆分：`shared/memory/learning/evolution/release-control` 子模块落位；`runtime-api-parsers.ts` 保持兼容 facade 导出。
+- IPC 主流程拆分：`ipc.ts` 收敛为 facade，新增 `ipc/{protocol,auth,task-router,watcher,types}`，将协议解析、鉴权判定、路由分发与 watcher 协同拆开。
+- evolution-service 去耦：提取评分/相似度与审核规则到 `evolution-service-math.ts`、`evolution-service-review.ts`，服务类保留编排职责并复用 Strategy/Scoring/Review 组件。
+- evolution 仓储拆分：读仓储拆为 `evolution-read/{entries,capsules,chains,reports,metrics}`，写仓储拆为 `evolution-write/{entries,capsules,chains,reports,metrics}`，原 read/write 文件改兼容导出。
+- 查询对象化与治理门槛：在 read 仓储引入 `ApprovedEvolutionEntriesQuery` 内部查询对象；ESLint 增加 `max-lines` 与 `import/max-dependencies` 规则作为文件规模治理基线。
 
 ## Phase 8（P3）收敛、治理与文档
 

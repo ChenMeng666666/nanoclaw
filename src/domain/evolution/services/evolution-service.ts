@@ -37,6 +37,16 @@ import type { CommandSafetyService } from './command-safety-service.js';
 import type { StrategyService } from './strategy-service.js';
 import { SubmitExperienceUseCase } from '../../../application/evolution/use-cases/submit-experience.js';
 import { SelectAndReviewUseCase } from '../../../application/evolution/use-cases/select-and-review.js';
+import {
+  calculateAverageRating,
+  calculateShannonDiversity,
+  cosineSimilarity,
+  normalizeSimilarityThreshold,
+} from './evolution-service-math.js';
+import {
+  buildReReviewReason,
+  evaluateAutoReviewEntry,
+} from './evolution-service-review.js';
 
 export class EvolutionService {
   private strategyService: StrategyService;
@@ -169,20 +179,28 @@ export class EvolutionService {
   ): Promise<EvolutionEntry[]> {
     logger.debug({ query, tags, limit }, 'Querying evolution (GEP)');
 
-    const entries = getApprovedEvolutionEntries(tags, limit);
+    const entries = getApprovedEvolutionEntries(
+      tags,
+      limit,
+    ) as EvolutionEntry[];
 
     if (query) {
       const queryEmbedding = await generateEmbedding(query);
 
       const scored = entries
-        .filter((e) => e.contentEmbedding && e.contentEmbedding.length > 0)
-        .map((entry) => ({
+        .filter(
+          (entry: EvolutionEntry) =>
+            entry.contentEmbedding && entry.contentEmbedding.length > 0,
+        )
+        .map((entry: EvolutionEntry) => ({
           entry,
-          score: this.cosineSimilarity(queryEmbedding, entry.contentEmbedding!),
+          score: cosineSimilarity(queryEmbedding, entry.contentEmbedding!),
         }))
-        .sort((a, b) => b.score - a.score);
+        .sort(
+          (a: { score: number }, b: { score: number }) => b.score - a.score,
+        );
 
-      return scored.map((s) => s.entry);
+      return scored.map((item: { entry: EvolutionEntry }) => item.entry);
     }
 
     return entries;
@@ -207,7 +225,7 @@ export class EvolutionService {
 
     const entry = getEvolutionEntry(id);
     if (entry) {
-      const avgRating = this.calculateAverageRating(entry.feedback);
+      const avgRating = calculateAverageRating(entry.feedback);
       const feedbackCount = entry.feedback.length;
 
       if (avgRating < 3 || feedbackCount >= 10) {
@@ -308,7 +326,7 @@ export class EvolutionService {
 
     // Calculate Shannon Diversity
     // Type assertion to fix TS error
-    const shannonDiversity = this.calculateShannonDiversity(
+    const shannonDiversity = calculateShannonDiversity(
       allGenes as unknown as EvolutionEntry[],
     );
 
@@ -362,7 +380,7 @@ export class EvolutionService {
     const safeLimit = Math.max(1, Math.min(200, timelineLimit));
     const current = this.calculateEcosystemMetrics();
     const timeline = getEcosystemMetrics(safeLimit)
-      .map((item) => ({
+      .map((item: EcosystemMetrics) => ({
         timestamp: (item as any).timestamp,
         shannonDiversity: item.shannonDiversity,
         avgGDIScore: item.avgGDIScore,
@@ -417,13 +435,13 @@ export class EvolutionService {
           existing.contentEmbedding as unknown as string,
         );
         if (!Array.isArray(existingEmbedding)) continue;
-        const similarity = this.cosineSimilarity(
+        const similarity = cosineSimilarity(
           currentEmbedding,
           existingEmbedding,
         );
 
         const isSameAuthor = existing.sourceAgentId === authorId;
-        const threshold = this.normalizeSimilarityThreshold(
+        const threshold = normalizeSimilarityThreshold(
           isSameAuthor
             ? EVOLUTION_CONFIG.duplicateThreshold.sameAuthor
             : EVOLUTION_CONFIG.duplicateThreshold.differentAuthor,
@@ -524,77 +542,15 @@ export class EvolutionService {
     updateGeneStatus(geneId, status);
   }
 
-  private calculateShannonDiversity(genes: EvolutionEntry[]): number {
-    const categoryCounts: Record<string, number> = {};
-    const total = genes.length;
-
-    if (total === 0) return 0;
-
-    for (const gene of genes) {
-      const cat = gene.category || 'learn';
-      categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
-    }
-
-    let diversity = 0;
-    for (const count of Object.values(categoryCounts)) {
-      const p = count / total;
-      diversity -= p * Math.log2(p);
-    }
-
-    return diversity;
-  }
-
-  private cosineSimilarity(a: number[], b: number[]): number {
-    if (a.length !== b.length) return 0;
-
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-
-    for (let i = 0; i < a.length; i++) {
-      dotProduct += a[i] * b[i];
-      normA += a[i] * a[i];
-      normB += b[i] * b[i];
-    }
-
-    if (normA === 0 || normB === 0) return 0;
-
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-  }
-
-  private normalizeSimilarityThreshold(value: number): number {
-    if (!Number.isFinite(value)) {
-      return 0.95;
-    }
-    return Math.min(1, Math.max(0, value));
-  }
-
-  private calculateAverageRating(
-    feedback: Array<{ rating: number }> | undefined | null,
-  ): number {
-    if (!feedback || !Array.isArray(feedback) || feedback.length === 0)
-      return 0;
-
-    const sum = feedback.reduce((acc, f) => acc + (f?.rating || 0), 0);
-    return sum / feedback.length;
-  }
-
   private async triggerReReview(
     id: number,
     avgRating: number,
     feedbackCount: number,
   ): Promise<void> {
-    const reasons: string[] = [];
-
-    if (avgRating < 3) {
-      reasons.push(`Low average rating: ${avgRating.toFixed(2)}`);
-    }
-
-    if (feedbackCount >= 10) {
-      reasons.push(`High feedback count: ${feedbackCount}`);
-    }
-
-    await this.markForReReview(id, reasons.join('; '));
+    await this.markForReReview(
+      id,
+      buildReReviewReason(avgRating, feedbackCount),
+    );
 
     logger.info({ id, avgRating, feedbackCount }, 'Re-review triggered (GEP)');
   }
@@ -605,62 +561,6 @@ export class EvolutionService {
     description: string;
     tags: string[];
   }): Promise<{ confidence: number; issues: string[] }> {
-    const issues: string[] = [];
-    let confidence = 0.8;
-
-    if (entry.content.length < 50) {
-      issues.push('Content too short');
-      confidence -= 0.2;
-    }
-
-    if (!entry.abilityName || entry.abilityName.length < 2) {
-      issues.push('Invalid ability name');
-      confidence -= 0.15;
-    }
-
-    const hasCode =
-      entry.content.includes('```') ||
-      entry.content.includes('function') ||
-      entry.content.includes('class') ||
-      entry.content.includes('const ') ||
-      entry.content.includes('export');
-    if (hasCode) {
-      confidence += 0.1;
-    }
-
-    const experienceKeywords = [
-      '经验',
-      '方法',
-      '技巧',
-      '模式',
-      '最佳实践',
-      'learned',
-      'discovered',
-      'found',
-      'technique',
-      'pattern',
-      'how to',
-      'solution',
-    ];
-    const lowerContent = entry.content.toLowerCase();
-    const hasExperience = experienceKeywords.some((kw) =>
-      lowerContent.includes(kw.toLowerCase()),
-    );
-    if (hasExperience) {
-      confidence += 0.05;
-    }
-
-    if (entry.tags.length > 0) {
-      confidence += 0.05;
-    }
-
-    if (entry.description && entry.description.length > 20) {
-      confidence += 0.05;
-    }
-
-    return {
-      confidence: Math.min(Math.max(confidence, 0), 1),
-      issues,
-    };
+    return evaluateAutoReviewEntry(entry);
   }
 }
