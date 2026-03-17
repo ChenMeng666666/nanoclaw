@@ -1,7 +1,6 @@
 import type http from 'http';
 import type { URL } from 'url';
 
-import { getMemories } from '../../../contexts/memory/infrastructure/persistence/memory-repository.js';
 import { MEMORY_CONFIG } from '../../../config.js';
 import { memoryApplicationService as memoryManager } from '../../../contexts/memory/application/index.js';
 import {
@@ -193,13 +192,18 @@ export function createMemoryHandlers(): {
           : undefined;
         const normalizedScope = normalizeMemoryScope(scope, sessionId);
 
-        const memories = getMemories(agentFolder, level, userJid, {
-          scope: normalizedScope,
-          sessionId,
-          sourceType,
-          messageType,
-          tags,
-        });
+        const memories = await memoryManager.listMemories(
+          agentFolder,
+          level,
+          userJid,
+          {
+            scope: normalizedScope,
+            sessionId,
+            sourceType,
+            messageType,
+            tags,
+          },
+        );
 
         writeJSON(res, 200, { memories });
         return true;

@@ -143,11 +143,25 @@ src/
 
 ## Phase 4（P2）Memory Context 迁移
 
-- [ ] [P2] 定义 memory 领域模型：记忆条目、检索策略、生命周期规则
-- [ ] [P2] 迁移 memory 用例：写入、检索、评分、治理流程归入 application
-- [ ] [P2] 迁移 persistence 映射：mappers/repositories 按 memory 边界收敛
-- [ ] [P2] 迁移 context-engine 适配：作为 memory 基础设施能力接入
-- [ ] [P2] 清理跨域耦合：移除 memory 对无关 context 的直接依赖
+- [x] [P2] 定义 memory 领域模型：记忆条目、检索策略、生命周期规则
+- [x] [P2] 迁移 memory 用例：写入、检索、评分、治理流程归入 application
+- [x] [P2] 迁移 persistence 映射：mappers/repositories 按 memory 边界收敛
+- [x] [P2] 迁移 context-engine 适配：作为 memory 基础设施能力接入
+- [x] [P2] 清理跨域耦合：移除 memory 对无关 context 的直接依赖
+
+### Phase 4 迭代执行增量（2026-03-17）
+
+- memory context 分层落位：新增 `src/contexts/memory/{domain,application,interfaces,infrastructure}` 与 `src/contexts/memory/index.ts`，形成 memory 子域统一导出边界。
+- memory 用例入口收敛：新增 `contexts/memory/application/memory-application-service.ts`，统一暴露 memory 应用服务；原 `src/memory-manager.ts` 继续作为兼容实现入口。
+- persistence 映射收敛：新增 `contexts/memory/infrastructure/persistence/{memory-repository,memory-mapper}.ts` 与 `index.ts`，将 memory 仓储与 mapper 通过 memory context 基础设施出口统一转发。
+- context-engine 适配接入：新增 `contexts/memory/infrastructure/context-engine-adapter.ts`，由 memory 基础设施统一暴露 `contextEngineRegistry` 与 `ContextEngine` 能力。
+- 跨域依赖清理：application/domain/http/messaging 侧 memory 访问改为依赖 `contexts/memory/application` 与 `contexts/memory/infrastructure` 入口，移除对 `memory-manager` 与 `context-engine` 旧路径的直接耦合。
+- 本次迭代提交：`0efe606`，完成 Phase 4 迁移入口收敛与兼容边界落地。
+- Phase 4 技术债后半段收敛：`contexts/memory/application/memory-application-service.ts` 从兼容别名升级为真实实现承载；`src/memory-manager.ts` 收敛为兼容 facade。
+- domain 规则下沉：新增 `contexts/memory/domain/memory-domain-rules.ts`，并通过 `contexts/memory/domain/index.ts` 统一导出生命周期治理与评分规则。
+- 接口层用例收口：`/api/memory/list` 改为经 `memoryApplicationService.listMemories` 访问，避免接口层直连仓储实现。
+- memory 子模块语义映射：在 `contexts/memory/application/{contracts,services,support}` 与 `contexts/memory/infrastructure/{adapters,observability}` 新增适配导出，按语义承接 `memory-manager/*` 子模块入口。
+- 依赖路径收敛：`memory-application-service` 与 `memory-domain-rules` 改为优先依赖 `contexts/memory` 语义路径，减少新实现对旧目录的直接引用。
 
 ## Phase 5（P2）Evolution Context 迁移
 
