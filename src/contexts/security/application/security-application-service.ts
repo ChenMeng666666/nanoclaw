@@ -60,8 +60,11 @@ export function createSecurityApplicationService(
       runtimeRateLimitGuard.reset();
     },
     isAuthorizedRuntimeRequest(req, options) {
-      if (options.allowNoAuth || !options.apiKey) {
+      if (options.allowNoAuth) {
         return true;
+      }
+      if (!options.apiKey) {
+        return false;
       }
       const requestApiKey = req.headers['x-api-key'];
       return (

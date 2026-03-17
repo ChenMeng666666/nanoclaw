@@ -216,9 +216,17 @@ migrate_version() {
 # 检查 Runtime API 是否可用
 check_runtime_api() {
     local API_URL="${RUNTIME_API_URL:-http://host.docker.internal:3456}"
+    local -a CURL_ARGS=(
+        -s
+        --connect-timeout 5
+    )
+
+    if [ -n "${RUNTIME_API_KEY:-}" ]; then
+        CURL_ARGS+=(-H "X-API-Key: ${RUNTIME_API_KEY}")
+    fi
 
     if command -v curl &> /dev/null; then
-        if curl -s --connect-timeout 5 "$API_URL/api/memory/list?agentFolder=test" > /dev/null 2>&1; then
+        if curl "${CURL_ARGS[@]}" "$API_URL/api/memory/list?agentFolder=test" > /dev/null 2>&1; then
             log_info "Runtime API 可用：$API_URL"
             return 0
         else

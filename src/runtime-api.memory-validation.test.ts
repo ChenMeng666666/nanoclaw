@@ -52,6 +52,37 @@ describe('runtime api memory validation', () => {
     vi.restoreAllMocks();
   });
 
+  it('rejects request without api key when auth is enabled', async () => {
+    const response = await fetch(`${baseUrl}/api/memory/search`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        agentFolder: 'agent-runtime-api-memory',
+        query: 'hello',
+        limit: 3,
+      }),
+    });
+    expect(response.status).toBe(401);
+  });
+
+  it('rejects request with mismatched api key when auth is enabled', async () => {
+    const response = await fetch(`${baseUrl}/api/memory/search`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': 'wrong-key',
+      },
+      body: JSON.stringify({
+        agentFolder: 'agent-runtime-api-memory',
+        query: 'hello',
+        limit: 3,
+      }),
+    });
+    expect(response.status).toBe(401);
+  });
+
   it('rejects invalid level and invalid limit', async () => {
     const invalidLevel = await fetch(`${baseUrl}/api/memory/add`, {
       method: 'POST',

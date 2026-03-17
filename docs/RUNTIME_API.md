@@ -14,6 +14,7 @@
 # .env
 RUNTIME_API_PORT=3456        # API 端口（默认 3456）
 RUNTIME_API_ENABLED=true     # 是否启用（默认 true）
+RUNTIME_API_KEY=your-api-key # 默认必填；仅本地开发可改用 RUNTIME_API_ALLOW_NO_AUTH=true
 ```
 
 ## API 端点
@@ -32,6 +33,7 @@ RUNTIME_API_ENABLED=true     # 是否启用（默认 true）
 ```bash
 curl -X POST http://localhost:3456/api/memory/search \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: ${RUNTIME_API_KEY}" \
   -d '{
     "query": "用户偏好",
     "agentFolder": "andy",
@@ -69,6 +71,7 @@ curl -X POST http://localhost:3456/api/memory/search \
 ```bash
 curl -X POST http://localhost:3456/api/memory/add \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: ${RUNTIME_API_KEY}" \
   -d '{
     "agentFolder": "andy",
     "content": "用户说他明天有重要会议",
@@ -87,6 +90,7 @@ curl -X POST http://localhost:3456/api/memory/add \
 
 ```bash
 curl -G http://localhost:3456/api/memory/list \
+  -H "X-API-Key: ${RUNTIME_API_KEY}" \
   --data-urlencode "agentFolder=andy" \
   --data-urlencode "level=L2" \
   --data-urlencode "userJid=tg:123456789"
@@ -103,6 +107,14 @@ curl -G http://localhost:3456/api/memory/list \
 - `INVALID_LIMIT`: `limit` 非法或越界
 - `MEMORY_CONTENT_TOO_LONG`: `content` 超过最大长度
 
+鉴权失败（所有 Runtime API 端点通用）：
+
+```json
+{
+  "error": "Unauthorized: Invalid API key"
+}
+```
+
 ### 进化库 API
 
 #### POST /api/evolution/query
@@ -112,6 +124,7 @@ curl -G http://localhost:3456/api/memory/list \
 ```bash
 curl -X POST http://localhost:3456/api/evolution/query \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: ${RUNTIME_API_KEY}" \
   -d '{
     "query": "如何处理用户情绪化对话",
     "tags": ["沟通技巧", "情绪管理"],
@@ -126,6 +139,7 @@ curl -X POST http://localhost:3456/api/evolution/query \
 ```bash
 curl -X POST http://localhost:3456/api/evolution/submit \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: ${RUNTIME_API_KEY}" \
   -d '{
     "abilityName": "情绪化对话处理技巧",
     "description": "当用户情绪激动时的应对方法",
@@ -150,6 +164,7 @@ curl -X POST http://localhost:3456/api/evolution/submit \
 ```bash
 curl -X POST http://localhost:3456/api/evolution/feedback \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: ${RUNTIME_API_KEY}" \
   -d '{
     "id": 123,
     "agentId": "beth",
@@ -168,6 +183,7 @@ curl -X POST http://localhost:3456/api/evolution/feedback \
 
 ```bash
 curl -G http://localhost:3456/api/learning/tasks \
+  -H "X-API-Key: ${RUNTIME_API_KEY}" \
   --data-urlencode "agentFolder=andy"
 ```
 
@@ -178,6 +194,7 @@ curl -G http://localhost:3456/api/learning/tasks \
 ```bash
 curl -X POST http://localhost:3456/api/learning/task/create \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: ${RUNTIME_API_KEY}" \
   -d '{
     "agentFolder": "andy",
     "description": "学习 Python 数据分析基础",
@@ -198,12 +215,16 @@ curl -X POST http://localhost:3456/api/learning/task/create \
 // 在 container 内的 agent 代码中使用
 
 const RUNTIME_API_URL = process.env.RUNTIME_API_URL || 'http://host.docker.internal:3456';
+const RUNTIME_API_KEY = process.env.RUNTIME_API_KEY;
 
 // 查询记忆
 async function searchMemories(query: string, agentFolder: string) {
   const response = await fetch(`${RUNTIME_API_URL}/api/memory/search`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': RUNTIME_API_KEY || '',
+    },
     body: JSON.stringify({
       query,
       agentFolder,
@@ -218,7 +239,10 @@ async function searchMemories(query: string, agentFolder: string) {
 async function addMemory(content: string, agentFolder: string, level = 'L1') {
   const response = await fetch(`${RUNTIME_API_URL}/api/memory/add`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': RUNTIME_API_KEY || '',
+    },
     body: JSON.stringify({
       content,
       agentFolder,
@@ -232,7 +256,10 @@ async function addMemory(content: string, agentFolder: string, level = 'L1') {
 async function queryExperience(query: string, tags?: string[]) {
   const response = await fetch(`${RUNTIME_API_URL}/api/evolution/query`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': RUNTIME_API_KEY || '',
+    },
     body: JSON.stringify({ query, tags, limit: 20 }),
   });
   const data = await response.json();
@@ -243,7 +270,10 @@ async function queryExperience(query: string, tags?: string[]) {
 async function submitExperience(abilityName: string, content: string, sourceAgentId: string) {
   const response = await fetch(`${RUNTIME_API_URL}/api/evolution/submit`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': RUNTIME_API_KEY || '',
+    },
     body: JSON.stringify({
       abilityName,
       content,
@@ -263,11 +293,14 @@ import requests
 import os
 
 RUNTIME_API_URL = os.environ.get('RUNTIME_API_URL', 'http://host.docker.internal:3456')
+RUNTIME_API_KEY = os.environ.get('RUNTIME_API_KEY', '')
+HEADERS = {'X-API-Key': RUNTIME_API_KEY} if RUNTIME_API_KEY else {}
 
 def search_memories(query: str, agent_folder: str, limit: int = 10):
     """查询记忆"""
     response = requests.post(
         f'{RUNTIME_API_URL}/api/memory/search',
+        headers=HEADERS,
         json={
             'query': query,
             'agentFolder': agent_folder,
@@ -280,6 +313,7 @@ def add_memory(content: str, agent_folder: str, level: str = 'L1'):
     """添加记忆"""
     response = requests.post(
         f'{RUNTIME_API_URL}/api/memory/add',
+        headers=HEADERS,
         json={
             'content': content,
             'agentFolder': agent_folder,
@@ -292,6 +326,7 @@ def query_experience(query: str, tags: list = None):
     """查询进化库"""
     response = requests.post(
         f'{RUNTIME_API_URL}/api/evolution/query',
+        headers=HEADERS,
         json={
             'query': query,
             'tags': tags or [],
@@ -304,6 +339,7 @@ def submit_experience(ability_name: str, content: str, source_agent_id: str):
     """提交经验"""
     response = requests.post(
         f'{RUNTIME_API_URL}/api/evolution/submit',
+        headers=HEADERS,
         json={
             'abilityName': ability_name,
             'content': content,
@@ -342,7 +378,7 @@ RUNTIME_API_URL=http://host.docker.internal:3456
 
 ## 安全考虑
 
-⚠️ **注意**: 运行时 API 支持 `X-API-Key` 认证；若未配置 `RUNTIME_API_KEY`，非生产环境仍可启动，仅建议本地开发使用。
+⚠️ **注意**: 运行时 API 默认要求 `X-API-Key` 认证；未配置 `RUNTIME_API_KEY` 时会拒绝启动。仅当显式设置 `RUNTIME_API_ALLOW_NO_AUTH=true` 时，才允许无密钥模式（仅建议本地开发临时使用）。
 
 生产环境建议：
 1. 强制设置 `RUNTIME_API_KEY`

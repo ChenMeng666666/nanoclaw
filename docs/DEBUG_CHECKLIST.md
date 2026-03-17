@@ -59,14 +59,14 @@ echo "MEMORY_MAIN_PIPELINE=memory_manager"
 
 ```bash
 # 1. 统一看板健康检查
-curl -s -H "x-api-key: $RUNTIME_API_KEY" "http://127.0.0.1:${RUNTIME_API_PORT:-3456}/api/governance/metrics/dashboard?timelineLimit=12"
+curl -s -H "X-API-Key: $RUNTIME_API_KEY" "http://127.0.0.1:${RUNTIME_API_PORT:-3456}/api/governance/metrics/dashboard?timelineLimit=12"
 
 # 2. 晋升失败演练：检查失败原因码与审计日志
 grep -E 'Capsule|promote|promotion|failure|reasonCode' logs/nanoclaw.log | tail -50
 sqlite3 store/messages.db "SELECT created_at, action, resource_type, details FROM audit_log WHERE resource_type IN ('evolution','capsule') ORDER BY id DESC LIMIT 20;"
 
 # 3. 检索退化演练：检查召回质量指标
-curl -s -H "x-api-key: $RUNTIME_API_KEY" "http://127.0.0.1:${RUNTIME_API_PORT:-3456}/api/memory/metrics/dashboard?timelineLimit=24"
+curl -s -H "X-API-Key: $RUNTIME_API_KEY" "http://127.0.0.1:${RUNTIME_API_PORT:-3456}/api/memory/metrics/dashboard?timelineLimit=24"
 
 # 4. 迁移异常演练：检查迁移任务日志
 grep -E 'Memory migration task completed|Memory migration task failed|migration' logs/nanoclaw.log | tail -30

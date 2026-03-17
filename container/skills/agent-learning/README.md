@@ -131,7 +131,7 @@ bash /workspace/group/.learning-system/init.sh
 
 ```bash
 # 测试 API 连接
-curl http://host.docker.internal:3456/api/memory/list?agentFolder=test
+curl -H "X-API-Key: ${RUNTIME_API_KEY}" http://host.docker.internal:3456/api/memory/list?agentFolder=test
 ```
 
 ### 容器内缺少 jq
@@ -176,6 +176,7 @@ agent 可以将学习收获提交到进化库分享给其他 agent：
 ```bash
 curl -X POST http://host.docker.internal:3456/api/evolution/submit \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: ${RUNTIME_API_KEY}" \
   -d '{
     "abilityName": "情绪化对话处理技巧",
     "content": "1. 观察用户用词变化\n2. 先表达理解，再给建议",

@@ -88,6 +88,7 @@ fi
 ```bash
 curl -X POST http://host.docker.internal:3456/api/learning/plan/create \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: ${RUNTIME_API_KEY}" \
   -d '{
     "agentFolder": "mimi",
     "topic": "提升情绪化对话处理能力",
@@ -130,6 +131,7 @@ curl -X POST http://host.docker.internal:3456/api/learning/plan/create \
 # 开始学习任务
 curl -X POST http://host.docker.internal:3456/api/learning/task/start \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: ${RUNTIME_API_KEY}" \
   -d '{
     "agentFolder": "mimi",
     "taskId": "返回的 taskId",
@@ -139,6 +141,7 @@ curl -X POST http://host.docker.internal:3456/api/learning/task/start \
 # 完成学习任务并记录反思
 curl -X POST http://host.docker.internal:3456/api/learning/task/complete \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: ${RUNTIME_API_KEY}" \
   -d '{
     "agentFolder": "mimi",
     "taskId": "xxx",
@@ -158,12 +161,14 @@ curl -X POST http://host.docker.internal:3456/api/learning/task/complete \
 **查询我的学习计划**：
 ```bash
 curl -G http://host.docker.internal:3456/api/learning/plans \
+  -H "X-API-Key: ${RUNTIME_API_KEY}" \
   --data-urlencode "agentFolder=mimi"
 ```
 
 **查询我的学习任务**：
 ```bash
 curl -G http://host.docker.internal:3456/api/learning/tasks \
+  -H "X-API-Key: ${RUNTIME_API_KEY}" \
   --data-urlencode "agentFolder=mimi"
 # 可按状态过滤：?status=pending&status=in_progress&status=completed
 ```
@@ -171,6 +176,7 @@ curl -G http://host.docker.internal:3456/api/learning/tasks \
 **查询定时任务**（scheduled_tasks 表中的任务）：
 ```bash
 curl -G http://host.docker.internal:3456/api/scheduled/tasks \
+  -H "X-API-Key: ${RUNTIME_API_KEY}" \
   --data-urlencode "groupFolder=mimi"
 # 可按状态过滤：?status=active&status=completed
 ```
@@ -184,6 +190,7 @@ curl -G http://host.docker.internal:3456/api/scheduled/tasks \
 ```bash
 # 查看当前学习计划
 curl -G http://host.docker.internal:3456/api/learning/plans \
+  -H "X-API-Key: ${RUNTIME_API_KEY}" \
   --data-urlencode "agentFolder=mimi" \
   --data-urlencode "status=active"
 ```
