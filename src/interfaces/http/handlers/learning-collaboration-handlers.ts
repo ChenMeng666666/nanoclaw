@@ -22,7 +22,7 @@ import {
   createTeam,
   removeMemberFromTeam,
 } from '../../../team-manager.js';
-import { readJSON } from '../../../contexts/security/interfaces/http/runtime-api-parsers.js';
+import { readJSON } from '../../../contexts/security/interfaces/http/runtime-api-parsers/index.js';
 import { writeJSON } from '../response.js';
 
 export async function handleLearningCollaborationEndpoints(

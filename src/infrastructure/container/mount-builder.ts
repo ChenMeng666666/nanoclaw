@@ -7,7 +7,7 @@ import {
   resolveGroupIpcPath,
 } from '../../group-folder.js';
 import { logger } from '../../logger.js';
-import { securityApplicationService } from '../../contexts/security/application/index.js';
+import { securityApplicationService } from '../../contexts/security/application/security-application-service.js';
 import type { RegisteredGroup } from '../../types/core-runtime.js';
 import type { VolumeMount } from '../../domain/container/mount-policy.js';
 

@@ -228,6 +228,101 @@ src/
 - 测试布局收敛：将 runtime helper 与 reflection 触发契约测试迁移至 `src/contexts/runtime/**` 下就近目录（`runtime-api-service.test.ts`、`runtime-api-reflection-trigger.test.ts`），`test:ddd-baseline` 同步改为 context 就近路径。
 - 长期机制建立：新增 `docs/DDD_MODULE_TEMPLATE.md` 与 `docs/DDD_REVIEW_CHECKLIST.md`，并在 `.github/PULL_REQUEST_TEMPLATE.md` 增加 DDD 治理核对项。
 
+## Phase 9（P3）反模式治理与结构收敛
+
+- [ ] [P3] 治理 learning domain 跨层反向依赖（domain 直连 db/application）
+- [ ] [P3] 治理 evolution domain 反向依赖 use case（domain 直连 application）
+- [ ] [P3] 治理 memory/messaging/runtime 贫血模型（domain 仅类型转发）
+- [ ] [P3] 拆分 Bootstrap 上帝对象（启动编排职责下沉）
+- [ ] [P3] 拆分 MessageOrchestrator/MessagePipeline 上帝对象（策略与流程解耦）
+- [ ] [P3] 治理协作接口跨层直连（handler 直连 db/team/scheduler）
+
+### Phase 9 治理清单（模板化）
+
+#### 9.1 learning domain 跨层反向依赖治理
+
+- 问题描述：`domain/learning/services/learning-scheduler.ts` 存在 domain 直连 `db.js` 与应用执行器，违反 DDD 依赖方向。
+- 目标结构：`interfaces -> application -> domain -> infrastructure`，domain 仅依赖仓储/执行端口接口。
+- 迁移步骤：
+  - 在 learning context 定义 `LearningTaskRepositoryPort` 与 `ReflectionExecutionPort`。
+  - 将 `db.js` 与 `reflectionExecutor` 调用下沉到 application/infrastructure 适配器。
+  - domain 服务改为依赖注入端口，移除对具体实现 import。
+- 验收标准：
+  - `src/domain/**` 不再直接 import `db.js` 或 `application/**`。
+  - `lint:ddd-deps` 通过，学习相关回归测试通过。
+- 责任人：学习域负责人（主责）+ 持久化负责人（协作）。
+
+#### 9.2 evolution domain 反向依赖 use case 治理
+
+- 问题描述：`domain/evolution/services/evolution-service.ts` 直接依赖 `application/evolution/use-cases`。
+- 目标结构：application 组合 domain，domain 仅保留策略/规则/评分能力。
+- 迁移步骤：
+  - 将 use case 组合逻辑上移到 `contexts/evolution/application/*`。
+  - `EvolutionService` 暴露纯领域能力接口。
+  - 替换调用方为 application service 入口。
+- 验收标准：
+  - `domain/evolution/**` 内无 `application/**` import。
+  - evolution API 与自动评审链路回归通过。
+- 责任人：进化域负责人。
+
+#### 9.3 memory/messaging/runtime 贫血模型治理
+
+- 问题描述：部分 context 的 domain 层以类型聚合/转发为主，领域行为未充分承载。
+- 目标结构：domain 持有实体、值对象与不变量；application 仅编排流程。
+- 迁移步骤：
+  - 为 memory/messaging/runtime 建立最小可测领域对象（策略、规则、状态转移）。
+  - 将评分、触发判定、生命周期规则由 application 下沉至 domain。
+  - application 改为调用 domain policy/aggregate。
+- 验收标准：
+  - 各 context/domain 至少落地 1 个可测试行为对象。
+  - application 规则分支数下降，核心行为单测覆盖增加。
+- 责任人：各 context 负责人（memory/messaging/runtime）。
+
+#### 9.4 Bootstrap 上帝对象拆分
+
+- 问题描述：`application/bootstrap/bootstrap.ts` 同时承载配置、依赖检查、DB、通道、调度、IPC、API 启停等职责。
+- 目标结构：`StartupPipeline + RuntimeBootstrap + ChannelBootstrap + SchedulerBootstrap` 分层编排。
+- 迁移步骤：
+  - 按启动阶段拆分子启动器并定义统一生命周期接口。
+  - `Bootstrap` 收敛为 orchestrator，仅串联步骤和失败回滚策略。
+  - 副作用逻辑下沉至 infrastructure adapters。
+- 验收标准：
+  - `bootstrap.ts` 复杂度显著下降（职责单一化）。
+  - 启停链路回归、容器与 runtime API 相关测试通过。
+- 责任人：应用启动链路负责人。
+
+#### 9.5 MessageOrchestrator/MessagePipeline 上帝对象拆分
+
+- 问题描述：消息编排类集中处理策略判定、队列游标、容器调用、上下文注入与持久化，职责过载。
+- 目标结构：`InboundPolicy + TriggerPolicy + CursorService + AgentExecutionService + ContextAssemblyService`。
+- 迁移步骤：
+  - 先提取纯策略模块（可单测），再抽取外部依赖端口（queue/db/container/channel）。
+  - 编排类仅保留流程 orchestration。
+  - 完成调用方与测试迁移。
+- 验收标准：
+  - orchestrator/pipeline 圈复杂度下降。
+  - 消息路由、恢复、执行链路回归通过。
+- 责任人：消息域负责人（主责）+ 运行时负责人（协作）。
+
+#### 9.6 协作接口跨层直连治理
+
+- 问题描述：`interfaces/http/handlers/learning-collaboration-handlers.ts` 存在接口层直连 db、team-manager、scheduler 的跨层耦合。
+- 目标结构：接口层仅解析与响应；协作能力经 application façade 暴露。
+- 迁移步骤：
+  - 按 `messages/tasks/teams/identity` 拆分协作应用服务。
+  - handler 改为调用 application use case，DB 访问下沉 repository。
+  - 统一 DTO 与参数校验入口。
+- 验收标准：
+  - interfaces 层不再直接 import `db.js`、`team-manager.js`、`collaboration-scheduler.js`。
+  - 协作 API 契约测试通过。
+- 责任人：接口层负责人（主责）+ 协作域负责人（协作）。
+
+### Phase 9 迭代执行增量（2026-03-17）
+
+- 过渡文件清理：移除 `src/contexts/**` 下纯转发/纯聚合 `index` 与 façade 文件（含 runtime/security/memory/evolution/messaging 多个过渡入口），并清理 `barrel-export-contract` 测试资产。
+- import 路径收敛：将业务引用改为直接指向真实实现文件（如 `memory-application-service`、`evolution-application-service`、`security-application-service`、`runtime-api-parsers/index`）。
+- 依赖门禁复核：`npm run lint:ddd-deps` 通过，继续维持跨 context 依赖方向约束。
+
 ## 执行策略（建议）
 
 - 小步迁移：每次只迁一个 context 的一个层次。

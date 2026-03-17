@@ -1,7 +1,7 @@
 import { evolutionManager } from './evolution-manager.js';
 import { type SignalType, type Signal } from './signal-extractor.js';
 import { logger } from './logger.js';
-import { securityApplicationService } from './contexts/security/application/index.js';
+import { securityApplicationService } from './contexts/security/application/security-application-service.js';
 import {
   type MainExperienceInput,
   type EvolutionEntry,

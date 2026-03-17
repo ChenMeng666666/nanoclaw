@@ -3,8 +3,8 @@ import type { URL } from 'url';
 
 import { MEMORY_CONFIG } from '../../../../config.js';
 import { getEvolutionEntriesByCategory } from '../../../../db-agents.js';
-import { evolutionApplicationService as evolutionManager } from '../../application/index.js';
-import { memoryApplicationService as memoryManager } from '../../../memory/application/index.js';
+import { evolutionApplicationService as evolutionManager } from '../../application/evolution-application-service.js';
+import { memoryApplicationService as memoryManager } from '../../../memory/application/memory-application-service.js';
 import type { Signal, SignalType } from '../../../../signal-extractor.js';
 import {
   parseEvolutionCategory,
@@ -15,7 +15,7 @@ import {
   parseRequiredIntegerInRange,
   parseRequiredString,
   readJSON,
-} from '../../../security/interfaces/http/runtime-api-parsers.js';
+} from '../../../security/interfaces/http/runtime-api-parsers/index.js';
 import {
   createApiError,
   writeJSON,

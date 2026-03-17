@@ -2,7 +2,7 @@ import type http from 'http';
 import type { URL } from 'url';
 
 import { MEMORY_CONFIG } from '../../../config.js';
-import { memoryApplicationService as memoryManager } from '../../../contexts/memory/application/index.js';
+import { memoryApplicationService as memoryManager } from '../../../contexts/memory/application/memory-application-service.js';
 import {
   normalizeMemoryScope,
   parseMemoryLevel,
@@ -16,7 +16,7 @@ import {
   parseReleaseControlPatch,
   parseRequiredString,
   readJSON,
-} from '../../../contexts/security/interfaces/http/runtime-api-parsers.js';
+} from '../../../contexts/security/interfaces/http/runtime-api-parsers/index.js';
 import { createApiError, writeJSON } from '../response.js';
 
 function withTimeout<T>(

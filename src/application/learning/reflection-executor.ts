@@ -21,8 +21,8 @@ import type {
   Memory,
 } from '../../types/agent-memory.js';
 import { logger } from '../../logger.js';
-import { memoryApplicationService as memoryManager } from '../../contexts/memory/application/index.js';
-import { evolutionApplicationService as evolutionManager } from '../../contexts/evolution/application/index.js';
+import { memoryApplicationService as memoryManager } from '../../contexts/memory/application/memory-application-service.js';
+import { evolutionApplicationService as evolutionManager } from '../../contexts/evolution/application/evolution-application-service.js';
 
 export class ReflectionExecutor {
   /**

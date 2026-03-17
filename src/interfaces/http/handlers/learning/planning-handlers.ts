@@ -1,7 +1,7 @@
 import type http from 'http';
 import type { URL } from 'url';
 
-import { memoryApplicationService as memoryManager } from '../../../../contexts/memory/application/index.js';
+import { memoryApplicationService as memoryManager } from '../../../../contexts/memory/application/memory-application-service.js';
 import { reflectionExecutor } from '../../../../application/learning/reflection-executor.js';
 import {
   createScheduledTaskForLearning,
@@ -24,7 +24,7 @@ import {
   offsetSchedule,
   resolveLearningSchedulePreference,
 } from '../../../../domain/learning/services/learning-scheduler.js';
-import { readJSON } from '../../../../contexts/security/interfaces/http/runtime-api-parsers.js';
+import { readJSON } from '../../../../contexts/security/interfaces/http/runtime-api-parsers/index.js';
 import { writeJSON } from '../../response.js';
 
 export function createPlanningHandlers(): {

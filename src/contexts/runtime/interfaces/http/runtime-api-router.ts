@@ -3,11 +3,11 @@ import { URL } from 'url';
 
 import { logger } from '../../../../logger.js';
 import { createRuntimeRateLimitGuard } from '../../../../interfaces/http/middleware/rate-limit.js';
-import { createSecurityApplicationService } from '../../../security/application/index.js';
+import { createSecurityApplicationService } from '../../../security/application/security-application-service.js';
 import { createEvolutionHandlers } from './handlers/evolution-handlers.js';
-import { handleLearningCollaborationEndpoints } from './handlers/learning-collaboration-handlers.js';
+import { handleLearningCollaborationEndpoints } from '../../../../interfaces/http/handlers/learning-collaboration-handlers.js';
 import { createMemoryHandlers } from './handlers/memory-handlers.js';
-import { createLearningHandlers } from './handlers/learning-handlers.js';
+import { createLearningHandlers } from '../../../../interfaces/http/handlers/learning/index.js';
 import {
   createApiError,
   isApiError,

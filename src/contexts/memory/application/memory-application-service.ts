@@ -17,7 +17,7 @@ import {
   findLifecycleMergeTarget,
   mergeTags,
   mergeLifecycleContent,
-} from '../domain/index.js';
+} from '../domain/memory-domain-rules.js';
 import {
   MemoryMetricsTracker,
   type MemoryDashboardMetrics,

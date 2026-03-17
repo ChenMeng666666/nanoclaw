@@ -3,7 +3,7 @@ import type {
   NewMessage,
   RegisteredGroup,
 } from '../types/core-runtime.js';
-import type { AppState } from './message/state-recovery-service.js';
+import type { AppState } from '../contexts/messaging/application/state-recovery-service.js';
 
 /**
  * Interface for system-level skills that can be triggered by messages.

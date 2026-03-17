@@ -3,7 +3,7 @@ import type http from 'http';
 import { SECURITY_CONFIG } from '../../../config.js';
 import { validateAdditionalMounts } from '../../../mount-security.js';
 import type { AdditionalMount } from '../../../types/core-runtime.js';
-import { CommandSafetyService } from '../domain/index.js';
+import { CommandSafetyService } from '../../../domain/evolution/services/command-safety-service.js';
 
 export interface RuntimeApiAuthOptions {
   allowNoAuth: boolean;

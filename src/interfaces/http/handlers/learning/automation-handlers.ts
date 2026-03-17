@@ -8,7 +8,7 @@ import {
   upsertLearningAutomationTask,
 } from '../../../../domain/learning/services/learning-scheduler.js';
 import { updateTask, getTasksForGroup, getAllTasks } from '../../../../db.js';
-import { readJSON } from '../../../../contexts/security/interfaces/http/runtime-api-parsers.js';
+import { readJSON } from '../../../../contexts/security/interfaces/http/runtime-api-parsers/index.js';
 import { writeJSON } from '../../response.js';
 
 const LEARNING_AUTOMATION_DAILY_PLAN_PROMPT =
