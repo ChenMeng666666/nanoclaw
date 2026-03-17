@@ -232,7 +232,7 @@ src/
 
 - [ ] [P3] 治理 learning domain 跨层反向依赖（domain 直连 db/application）
 - [ ] [P3] 治理 evolution domain 反向依赖 use case（domain 直连 application）
-- [ ] [P3] 治理 memory/messaging/runtime 贫血模型（domain 仅类型转发）
+- [x] [P3] 治理 memory/messaging/runtime 贫血模型（domain 仅类型转发）
 - [ ] [P3] 拆分 Bootstrap 上帝对象（启动编排职责下沉）
 - [ ] [P3] 拆分 MessageOrchestrator/MessagePipeline 上帝对象（策略与流程解耦）
 - [ ] [P3] 治理协作接口跨层直连（handler 直连 db/team/scheduler）
@@ -322,6 +322,8 @@ src/
 - 过渡文件清理：移除 `src/contexts/**` 下纯转发/纯聚合 `index` 与 façade 文件（含 runtime/security/memory/evolution/messaging 多个过渡入口），并清理 `barrel-export-contract` 测试资产。
 - import 路径收敛：将业务引用改为直接指向真实实现文件（如 `memory-application-service`、`evolution-application-service`、`security-application-service`、`runtime-api-parsers/index`）。
 - 依赖门禁复核：`npm run lint:ddd-deps` 通过，继续维持跨 context 依赖方向约束。
+- 领域行为下沉（memory/messaging/runtime）：新增 `memoryDomainRules`、`TriggerPolicy`、`RuntimeApiSecurityPolicyService` 三个可测试领域对象；应用层改为调用 domain policy，减少 domain 类型转发。
+- 领域测试补齐：新增 `memory-domain-rules.test.ts`、`trigger-policy.test.ts`、`runtime-api-security-policy.test.ts`，覆盖评分/生命周期合并、触发判定与运行时鉴权策略。
 
 ## 执行策略（建议）
 

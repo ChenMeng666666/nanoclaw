@@ -36,6 +36,7 @@ import { LearningSystemInitializer } from '../../../infrastructure/system/learni
 import { MessagePipeline } from './message-pipeline.js';
 import { RemoteControlSystemSkill } from '../../../application/skills/remote-control-skill.js';
 import type { SystemSkill } from '../../../application/system-skill.js';
+import { triggerPolicy } from '../domain/trigger-policy.js';
 
 export class MessageOrchestrator {
   private messageLoopRunning = false;
@@ -237,29 +238,23 @@ export class MessageOrchestrator {
             }
 
             const isMainGroup = group.isMain === true;
-            const needsTrigger = group.requiresTrigger === true && !isMainGroup;
+            const needsTrigger = triggerPolicy.shouldRequireTrigger(
+              isMainGroup,
+              group.requiresTrigger,
+            );
 
             if (needsTrigger) {
               logger.debug({ chatJid }, '=== Checking trigger ===');
               const allowlistCfg = loadSenderAllowlist();
-              const hasTrigger = groupMessages.some((m) => {
-                const hasPattern = TRIGGER_PATTERN.test(m.content.trim());
-                const isAllowed =
-                  m.is_from_me ||
-                  isTriggerAllowed(chatJid, m.sender, allowlistCfg);
-                logger.debug(
-                  {
-                    chatJid,
-                    messageId: m.id,
-                    content: m.content,
-                    hasPattern,
-                    isAllowed,
-                    triggerPattern: TRIGGER_PATTERN,
-                  },
-                  '=== Trigger check ===',
-                );
-                return hasPattern && isAllowed;
-              });
+              const hasTrigger = triggerPolicy.hasEligibleTrigger(
+                groupMessages.map((message) => ({
+                  content: message.content,
+                  sender: message.sender,
+                  isFromMe: Boolean(message.is_from_me),
+                })),
+                TRIGGER_PATTERN,
+                (sender) => isTriggerAllowed(chatJid, sender, allowlistCfg),
+              );
               if (!hasTrigger) {
                 logger.warn({ chatJid }, 'No trigger message found, skipping');
                 continue;

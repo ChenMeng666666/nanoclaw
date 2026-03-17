@@ -11,13 +11,7 @@ import {
 } from '../infrastructure/persistence/memory-repository.js';
 import type { Memory } from '../../../types/agent-memory.js';
 import { logger } from '../../../logger.js';
-import {
-  calculateQualityScore,
-  calculateImportance,
-  findLifecycleMergeTarget,
-  mergeTags,
-  mergeLifecycleContent,
-} from '../domain/memory-domain-rules.js';
+import { memoryDomainRules } from '../domain/memory-domain-rules.js';
 import {
   MemoryMetricsTracker,
   type MemoryDashboardMetrics,
@@ -159,8 +153,8 @@ export class MemoryApplicationService {
     }
 
     const embedding = await generateEmbedding(content);
-    const importance = calculateImportance(content, level);
-    const mergeTarget = findLifecycleMergeTarget(
+    const importance = memoryDomainRules.calculateImportance(content, level);
+    const mergeTarget = memoryDomainRules.findLifecycleMergeTarget(
       agentFolder,
       content,
       embedding,
@@ -169,18 +163,25 @@ export class MemoryApplicationService {
       metadata,
     );
     if (mergeTarget) {
-      const mergedTags = mergeTags(mergeTarget.tags, metadata?.tags);
-      const mergedContent = mergeLifecycleContent(
+      const mergedTags = memoryDomainRules.mergeTags(
+        mergeTarget.tags,
+        metadata?.tags,
+      );
+      const mergedContent = memoryDomainRules.mergeLifecycleContent(
         mergeTarget.content,
         content,
         mergeTarget.isConflict,
       );
-      const qualityScore = calculateQualityScore(mergedContent, {
-        sourceType: metadata?.sourceType || mergeTarget.sourceType || 'direct',
-        scope: metadata?.scope || mergeTarget.scope,
-        tags: mergedTags,
-        messageType: metadata?.messageType,
-      });
+      const qualityScore = memoryDomainRules.calculateQualityScore(
+        mergedContent,
+        {
+          sourceType:
+            metadata?.sourceType || mergeTarget.sourceType || 'direct',
+          scope: metadata?.scope || mergeTarget.scope,
+          tags: mergedTags,
+          messageType: metadata?.messageType,
+        },
+      );
       updateMemory(mergeTarget.id, {
         content: mergedContent,
         importance: Math.min(1, Math.max(mergeTarget.importance, importance)),
@@ -199,7 +200,7 @@ export class MemoryApplicationService {
       );
       return;
     }
-    const qualityScore = calculateQualityScore(content, {
+    const qualityScore = memoryDomainRules.calculateQualityScore(content, {
       sourceType: metadata?.sourceType || 'direct',
       scope:
         metadata?.scope ||

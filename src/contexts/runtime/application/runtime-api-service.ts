@@ -5,6 +5,7 @@ import { RUNTIME_API_CONFIG } from '../../../config.js';
 import { logger } from '../../../logger.js';
 import { createRuntimeApiRouter } from '../interfaces/http/runtime-api-router.js';
 import type { RuntimeApiRouteContext } from '../interfaces/http/runtime-api-router.js';
+import { runtimeApiSecurityPolicyService } from '../domain/runtime-api-security-policy.js';
 import { handleRuntimeLegacyRoute } from './legacy-route-handler.js';
 
 export {
@@ -93,11 +94,10 @@ export async function startRuntimeAPI(
 
   const allowNoAuth = process.env.RUNTIME_API_ALLOW_NO_AUTH === 'true';
   const runtimeApiKey = process.env.RUNTIME_API_KEY;
-  if (!runtimeApiKey && !allowNoAuth) {
-    throw new Error(
-      'RUNTIME_API_KEY is required unless RUNTIME_API_ALLOW_NO_AUTH=true',
-    );
-  }
+  const securityPolicy = runtimeApiSecurityPolicyService.resolve({
+    allowNoAuth,
+    runtimeApiKey,
+  });
   if (!runtimeApiKey && allowNoAuth) {
     logger.warn(
       'Runtime API running without API key because RUNTIME_API_ALLOW_NO_AUTH=true',
@@ -106,8 +106,8 @@ export async function startRuntimeAPI(
 
   const router = createRuntimeApiRouter({
     port: opts.port,
-    allowNoAuth,
-    apiKey: runtimeApiKey,
+    allowNoAuth: securityPolicy.allowNoAuth,
+    apiKey: securityPolicy.apiKey,
     handleLegacyRoute: opts.handleLegacyRoute,
   });
   router.resetRateLimitState();

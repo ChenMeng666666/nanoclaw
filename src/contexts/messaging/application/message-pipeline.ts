@@ -21,6 +21,7 @@ import {
 } from '../../../sender-allowlist.js';
 import type { Channel, RegisteredGroup } from '../../../types/core-runtime.js';
 import { logger } from '../../../logger.js';
+import { triggerPolicy } from '../domain/trigger-policy.js';
 import {
   contextEngineRegistry,
   type ContextEngine,
@@ -87,12 +88,18 @@ export class MessagePipeline {
         return { ok: true, code: 'skipped_no_messages' };
       }
 
-      if (!isMainGroup && group.requiresTrigger === true) {
+      if (
+        triggerPolicy.shouldRequireTrigger(isMainGroup, group.requiresTrigger)
+      ) {
         const allowlistCfg = loadSenderAllowlist();
-        const hasTrigger = missedMessages.some(
-          (m) =>
-            TRIGGER_PATTERN.test(m.content.trim()) &&
-            (m.is_from_me || isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
+        const hasTrigger = triggerPolicy.hasEligibleTrigger(
+          missedMessages.map((message) => ({
+            content: message.content,
+            sender: message.sender,
+            isFromMe: Boolean(message.is_from_me),
+          })),
+          TRIGGER_PATTERN,
+          (sender) => isTriggerAllowed(chatJid, sender, allowlistCfg),
         );
         if (!hasTrigger) {
           return { ok: true, code: 'skipped_missing_trigger' };
