@@ -4,7 +4,7 @@ import type { URL } from 'url';
 import { MEMORY_CONFIG } from '../../../config.js';
 import { getEvolutionEntriesByCategory } from '../../../db-agents.js';
 import { evolutionManager } from '../../../evolution-manager.js';
-import { memoryManager } from '../../../memory-manager.js';
+import { memoryApplicationService as memoryManager } from '../../../contexts/memory/application/index.js';
 import type { Signal, SignalType } from '../../../signal-extractor.js';
 import {
   parseEvolutionCategory,

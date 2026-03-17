@@ -1,1 +1,1 @@
-export { createMemoryHandlers } from '../../../../../interfaces/http/handlers/memory-handlers.js';
+export { createMemoryHandlers } from '../../../../../contexts/memory/interfaces/http/memory-handlers.js';

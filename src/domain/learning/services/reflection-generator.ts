@@ -1,4 +1,4 @@
-import { memoryManager } from '../../../memory-manager.js';
+import { memoryApplicationService as memoryManager } from '../../../contexts/memory/application/index.js';
 import {
   getLearningTasksByAgent,
   getReflectionsByAgent,

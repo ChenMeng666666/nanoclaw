@@ -21,8 +21,10 @@ import {
 } from '../../../sender-allowlist.js';
 import type { Channel, RegisteredGroup } from '../../../types/core-runtime.js';
 import { logger } from '../../../logger.js';
-import { contextEngineRegistry } from '../../../context-engine/registry.js';
-import type { ContextEngine } from '../../../context-engine/interface.js';
+import {
+  contextEngineRegistry,
+  type ContextEngine,
+} from '../../memory/infrastructure/context-engine-adapter.js';
 import { saveAppState, type AppState } from './state-recovery-service.js';
 import { getAvailableGroups } from './group-utils.js';
 

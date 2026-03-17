@@ -1,9 +1,9 @@
 import type http from 'http';
 import type { URL } from 'url';
 
-import { getMemories } from '../../../db-agents.js';
+import { getMemories } from '../../../contexts/memory/infrastructure/persistence/memory-repository.js';
 import { MEMORY_CONFIG } from '../../../config.js';
-import { memoryManager } from '../../../memory-manager.js';
+import { memoryApplicationService as memoryManager } from '../../../contexts/memory/application/index.js';
 import {
   normalizeMemoryScope,
   parseMemoryLevel,

@@ -13,7 +13,7 @@ import {
   incrementMemoryAccess,
   deleteMemory,
   getDuplicateMemory,
-} from './db-agents.js';
+} from './contexts/memory/infrastructure/persistence/memory-repository.js';
 import type { Memory } from './types/agent-memory.js';
 import { logger } from './logger.js';
 

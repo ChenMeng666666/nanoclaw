@@ -1,11 +1,11 @@
 import { logger } from '../../logger.js';
 import type { Server } from 'http';
 import { reflectionScheduler } from '../scheduling/reflection-scheduler.js';
-import { memoryManager } from '../../memory-manager.js';
+import { memoryApplicationService as memoryManager } from '../../contexts/memory/application/index.js';
 import { evolutionManager } from '../../evolution-manager.js';
 import { EVOLUTION_CONFIG } from '../../config.js';
 import { LocalLLMQueryExpansionProvider } from '../../query-expansion/local-llm-provider.js';
-import { contextEngineRegistry } from '../../context-engine/registry.js';
+import { contextEngineRegistry } from '../../contexts/memory/infrastructure/context-engine-adapter.js';
 import type { GroupQueue } from '../../group-queue.js';
 import type { Channel } from '../../types/core-runtime.js';
 import { MainEvolutionApplier } from '../../main-evolution-applier.js';
