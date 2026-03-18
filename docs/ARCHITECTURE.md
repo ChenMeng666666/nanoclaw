@@ -1,6 +1,6 @@
 # NanoClaw 完整架构文档
 
-> 最后更新: 2026-03-15 12:00
+> 最后更新: 2026-03-18 10:30
 
 ## 目录
 
@@ -32,15 +32,15 @@ NanoClaw 是一个个人 Claude 助手，其设计哲学是：
 
 ### 技术栈
 
-| 组件     | 技术                                                   |
-| -------- | ------------------------------------------------------ |
-| 运行时   | Node.js 20+                                            |
-| 容器     | Docker (跨平台) / Apple Container (macOS 原生)         |
-| 数据库   | SQLite (better-sqlite3)                                |
-| 向量嵌入 | @xenova/transformers + all-MiniLM-L6-v2                |
-| 定时任务 | node-cron                                              |
-| 密钥存储 | keytar (系统 keychain) + AES-256-GCM 加密文件 fallback |
-| 协议标准 | GEP 1.5.0 (Genome Evolution Protocol)                  |
+| 组件     | 技术                                                                 |
+| -------- | -------------------------------------------------------------------- |
+| 运行时   | Node.js 20+                                                          |
+| 容器     | Docker（默认）+ Apple Container（通过 skill 切换）                   |
+| 数据库   | SQLite（better-sqlite3）+ sqlite-vec（向量检索）                    |
+| 向量嵌入 | @xenova/transformers（默认）+ node-llama-cpp（本地模型补充能力）     |
+| 定时任务 | node-cron                                                            |
+| 密钥存储 | keytar（系统 keychain）+ AES-256-GCM 加密文件 fallback               |
+| 协议标准 | GEP 1.5.0（Genome Evolution Protocol）                               |
 
 ---
 
@@ -49,80 +49,54 @@ NanoClaw 是一个个人 Claude 助手，其设计哲学是：
 ### 整体架构图
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    消息通道层（Skill 按需安装）                     │
-│  ┌──────────┐  ┌──────────┐  ┌─────────┐  ┌─────────┐        │
-│  │ Telegram │  │ WhatsApp │  │  Slack  │  │  Gmail  │  ...    │
-│  └────┬─────┘  └────┬─────┘  └────┬────┘  └────┬────┘        │
-└───────┼──────────────┼─────────────┼─────────────┼─────────────┘
-        │              │             │             │
-        └──────────────┴─────────────┴─────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      主进程 (Node.js)                            │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │  消息路由 & 调度层                                          │  │
-│  │  ┌──────────────┐  ┌──────────────────┐  ┌─────────────┐│  │
-│  │  │ Agent Router │  │  Task Scheduler  │  │  Group Queue││  │
-│  │  └──────┬───────┘  └────────┬─────────┘  └──────┬──────┘│  │
-│  └─────────┼────────────────────┼─────────────────────┼─────────┘  │
-│  ┌─────────┼────────────────────┼─────────────────────┼─────────┐  │
-│  │  ┌──────▼───────┐  ┌────────▼────────┐  ┌───────▼──────┐  │  │
-│  │  │  数据库层    │  │  运行时 API     │  │  IPC 监视     │  │  │
-│  │  │  (SQLite)    │  │  (HTTP Server)  │  │  (File Watch) │  │  │
-│  │  └──────┬───────┘  └────────┬────────┘  └───────┬──────┘  │  │
-│  └─────────┼────────────────────┼─────────────────────┼─────────┘  │
-└────────────┼────────────────────┼─────────────────────┼─────────────┘
-             │                    │                     │
-             └────────────────────┴─────────────────────┘
-                                  │
-                                  ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        容器隔离层                                 │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │  每个 Agent 一个独立容器 (Linux VM)                         │  │
-│  │                                                             │  │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │  │
-│  │  │  Agent 1     │  │  Agent 2     │  │  Agent 3     │   │  │
-│  │  │  (container) │  │  (container) │  │  (container) │  │  │
-│  │  │              │  │              │  │              │   │  │
-│  │  │  ┌────────┐  │  │  ┌────────┐  │  │  ┌────────┐ │   │  │
-│  │  │  │Claude  │  │  │  │Claude  │  │  │  │Claude  │ │   │  │
-│  │  │  │Agent   │  │  │  │Agent   │  │  │  │Agent   │ │   │  │
-│  │  │  │SDK     │  │  │  │SDK     │  │  │  │SDK     │ │   │  │
-│  │  │  └────────┘  │  │  └────────┘  │  │  └────────┘ │   │  │
-│  │  │              │  │              │  │              │   │  │
-│  │  │  隔离文件系统 │  │  隔离文件系统 │  │  隔离文件系统 │   │  │
-│  │  │  groups/andy/│  │  groups/beth/│  │  groups/chad/│   │  │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘   │  │
-│  └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ 消息通道层（WhatsApp / Telegram / Slack / Gmail ...）                        │
+└───────────────────────────────┬──────────────────────────────────────────────┘
+                                ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ app/bootstrap (Bootstrap)                                                   │
+│ 负责配置校验、依赖检查、通道连接、调度与 Runtime API 启停                        │
+└───────────────┬──────────────────────────────────────────────────────────────┘
+                ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ DDD Context 层（interfaces → application → domain → infrastructure）         │
+│ - messaging: 路由、消息流水线、状态恢复                                        │
+│ - runtime: Runtime API、容器运行时、IPC                                       │
+│ - memory: 记忆检索/治理/生命周期规则                                           │
+│ - evolution: Gene 提交/评审/反馈与治理                                         │
+│ - security: 鉴权、限流、参数校验、命令/挂载安全                                │
+└───────────────┬──────────────────────────────────────────────────────────────┘
+                ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ shared + platform                                                            │
+│ - shared/kernel & shared/config: 核心类型、日志、错误与配置                   │
+│ - platform/persistence: SQLite 与仓储装配                                    │
+│ - platform/integration: 通道注册与外部 provider 适配                          │
+└───────────────┬──────────────────────────────────────────────────────────────┘
+                ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ 数据与执行层                                                                   │
+│ - SQLite: store/messages.db                                                  │
+│ - 容器执行: Docker 默认，按能力可切换 Apple Container                          │
+│ - Agent 隔离运行: 每个 group 独立容器与文件系统                                │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 核心模块说明
 
-| 模块       | 文件                                        | 职责                           |
-| ---------- | ------------------------------------------- | ------------------------------ |
-| 主调度器   | `src/index.ts`                              | 状态管理、消息循环、Agent 调用 |
-| 通道注册表 | `src/channels/registry.ts`                  | 通道自注册（启动时）           |
-| IPC 处理   | `src/contexts/runtime/infrastructure/ipc-watcher.ts` | IPC 监视器和任务处理 |
-| 消息路由   | `src/router.ts`                             | 消息格式化和出站路由           |
-| 智能体路由 | `src/agent-router.ts`                       | 根据消息 JID 路由到对应 Agent  |
-| 容器运行器 | `src/container-runner.ts`                   | 生成流式 Agent 容器            |
-| 任务调度器 | `src/task-scheduler.ts`                     | 运行定时任务                   |
-| 协作调度器 | `src/collaboration-scheduler.ts`            | 协作任务调度和分配             |
-| 团队管理   | `src/team-manager.ts`                       | 智能体团队管理                 |
-| 智能体通信 | `src/agent-communication.ts`                | 智能体间消息传递               |
-| 数据库     | `src/db.ts`, `src/db-agents.ts`             | SQLite 操作                    |
-| 运行时 API | `src/contexts/runtime/application/runtime-api-service.ts` | HTTP API 供容器内 Agent 调用 |
-| 记忆管理   | `src/memory-manager.ts`                     | 分层记忆系统                   |
-| 上下文引擎 | `src/context-engine/default-engine.ts`      | 记忆组装、摄取与作用域检索     |
-| 认知管理   | `src/cognition-manager.ts`                  | 认知文件生成                   |
-| 反思调度   | `src/reflection-scheduler.ts`               | 定时反思调度                   |
-| 进化管理   | `src/evolution-manager.ts`                  | 进化库管理                     |
-| 密钥存储   | `src/keystore.ts`                           | 加密密钥管理                   |
-| 安全系统   | `src/security.ts`, `src/security-alerts.ts` | 安全事件检测和处理             |
+| 模块 | 文件 | 职责 |
+| --- | --- | --- |
+| 启动编排 | `src/application/bootstrap/bootstrap.ts` | 系统启动、依赖检查、通道接线、子系统装配 |
+| 主入口 | `src/index.ts` | 最小入口，委托 Bootstrap |
+| messaging context | `src/contexts/messaging/**` | 消息路由、编排、状态恢复、队列基础设施 |
+| runtime context | `src/contexts/runtime/**` | Runtime API 服务、HTTP 路由、容器运行时、IPC watcher |
+| memory context | `src/contexts/memory/**` | 记忆应用服务、领域规则、仓储与 context-engine 适配 |
+| evolution context | `src/contexts/evolution/**` | 提交/选择/反馈用例、评审与治理链路 |
+| security context | `src/contexts/security/**` | 鉴权、限流、参数校验、挂载与命令安全 |
+| platform/persistence | `src/platform/persistence/**` | SQLite 接入、事务与仓储装配 |
+| platform/integration | `src/platform/integration/**` | 通道 provider 注册与接线 |
+| shared/kernel+config | `src/shared/**` | 核心类型、错误、日志、配置聚合 |
+| 兼容 facade | `src/logger.ts`, `src/config.ts`, `src/router.ts`, `src/channels/registry.ts`, `src/memory-manager.ts` | 迁移期兼容导出与转发，避免一次性破坏调用方 |
 
 ---
 
@@ -398,6 +372,7 @@ interface AbilityChain {
 | ---------------------------------- | ---- | -------------------------------------- |
 | `/api/evolution/query`             | POST | 查询进化库（支持标签与 limit）         |
 | `/api/evolution/submit`            | POST | 提交经验（自动生成 Gene）              |
+| `/api/evolution/select-gene`       | POST | 按类别/信号选择最优 Gene               |
 | `/api/evolution/feedback`          | POST | 提交使用反馈                           |
 | `/api/evolution/metrics/dashboard` | GET  | 获取进化看板指标（summary + timeline） |
 | `/api/governance/metrics/dashboard`| GET  | 获取统一治理看板（进化 + 记忆）        |
@@ -572,6 +547,10 @@ interface DailyLearningSummary {
 | `/api/learning/system/version`         | GET  | 查询学习体系版本                     |
 | `/api/learning/system/update`          | POST | 触发学习体系更新                     |
 | `/api/learning/system/diff`            | GET  | 查询版本差异                         |
+| `/api/scheduled/tasks`                 | POST | 写入定时任务（cron/interval/once）    |
+| `/api/reflection/trigger`              | POST | 触发反思执行                         |
+| `/api/signals/extract`                 | POST | 解析输入并提取信号                   |
+| `/api/saturation/detect`               | POST | 识别饱和状态并产出治理信号           |
 
 学习 API 以 [openapi.yaml](./openapi.yaml) 为准，`docs/RUNTIME_API.md` 为使用示例；学习体系版本信息以 Runtime API 与 OpenAPI 定义为准。
 
@@ -1037,94 +1016,56 @@ const SECURITY_CONFIG = {
 ### 进程架构
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      部署架构                                      │
-│                                                                   │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │                    Systemd / Launchd                        │  │
-│  │                    (服务管理器)                               │  │
-│  └──────────────────────────────┬────────────────────────────┘  │
-│                                 │                                 │
-│                                 ▼                                 │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │                  Node.js 主进程 (PID 1234)                 │  │
-│  │                                                             │  │
-│  │  ┌─────────────────────────────────────────────────────┐   │  │
-│  │  │  Thread Pool (libuv)                                │   │  │
-│  │  │  - I/O 操作                                          │   │  │
-│  │  │  - 定时任务                                          │   │  │
-│  │  └─────────────────────────────────────────────────────┘   │  │
-│  │                                                             │  │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐   │  │
-│  │  │  Channels│ │ Scheduler│ │ Runtime  │ │   IPC    │   │  │
-│  │  │  (事件)  │ │  (定时)  │ │  API     │ │ (Watcher) │   │  │
-│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘   │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                                 │                                 │
-│         ┌───────────────────────┼───────────────────────┐        │
-│         ▼                       ▼                       ▼        │
-│  ┌─────────────┐         ┌─────────────┐         ┌─────────────┐│
-│  │  Container  │         │  Container  │         │  Container  ││
-│  │  Agent 1    │         │  Agent 2    │         │  Agent 3    ││
-│  │  (PID 4567) │         │  (PID 5678) │         │  (PID 6789) ││
-│  └─────────────┘         └─────────────┘         └─────────────┘│
-│                                                                   │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │                    数据存储                                  │  │
-│  │  ┌─────────────────────────────────────────────────────┐   │  │
-│  │  │  SQLite Database (nanoclaw.db)                     │   │  │
-│  │  │  - 消息、记忆、进化库、任务                          │   │  │
-│  │  └─────────────────────────────────────────────────────┘   │  │
-│  │                                                             │  │
-│  │  ┌─────────────────────────────────────────────────────┐   │  │
-│  │  │  文件系统                                            │   │  │
-│  │  │  - groups/{name}/CLAUDE.md (每个组)                 │   │  │
-│  │  │  - groups/CLAUDE.md (全局)                          │   │  │
-│  │  │  - .claude/ / .trae/ (会话、缓存、技能)             │   │  │
-│  │  └─────────────────────────────────────────────────────┘   │  │
-│  └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ 服务管理层                                                                    │
+│ - macOS: launchd                                                              │
+│ - Linux: systemd-user / systemd-system                                        │
+│ - 无 systemd（WSL/精简 Linux）: nohup wrapper fallback                        │
+└───────────────────────────────┬──────────────────────────────────────────────┘
+                                ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Node.js 主进程                                                                │
+│ - Bootstrap 初始化 DDD contexts                                                │
+│ - Runtime API（默认 3456，端口冲突自动探测后续可用端口）                      │
+│ - Security Application Service 统一鉴权、限流、参数校验                        │
+└───────────────┬──────────────────────────────────────────────────────────────┘
+                ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ 容器层                                                                         │
+│ - 每个 Agent 独立容器与挂载策略校验                                            │
+│ - Docker 默认网络模式 bridge，可配置 none                                      │
+└───────────────┬──────────────────────────────────────────────────────────────┘
+                ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ 数据层                                                                         │
+│ - SQLite: store/messages.db                                                    │
+│ - groups/* 与 .trae/* 持久化认知、会话、技能                                   │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 目录结构
 
-```
+```text
 nanoclaw/
-├── src/                          # 源代码
-│   ├── index.ts                  # 主入口
-│   ├── channels/                 # 消息通道
-│   ├── container-runner.ts       # 容器运行器
-│   ├── db.ts                     # 数据库
-│   ├── memory-manager.ts         # 记忆管理
-│   ├── evolution-manager.ts      # 进化管理
-│   ├── agent-router.ts           # 智能体路由
-│   ├── team-manager.ts           # 团队管理
-│   ├── collaboration-scheduler.ts # 协作调度
-│   ├── agent-communication.ts    # 智能体通信
-│   ├── runtime-api.ts            # 运行时 API
-│   ├── security.ts               # 安全系统
+├── src/
+│   ├── app/bootstrap/                  # 启动编排
+│   ├── shared/{kernel,config}/         # 共享内核与配置
+│   ├── platform/{persistence,integration}/
+│   ├── contexts/
+│   │   ├── messaging/{domain,application,interfaces,infrastructure}
+│   │   ├── runtime/{domain,application,interfaces,infrastructure}
+│   │   ├── memory/{domain,application,interfaces,infrastructure}
+│   │   ├── evolution/{domain,application,interfaces,infrastructure}
+│   │   └── security/{domain,application,interfaces,infrastructure}
+│   ├── index.ts                         # 主入口
+│   ├── db.ts                            # 数据库兼容入口
+│   ├── logger.ts                        # 兼容 facade
+│   ├── config.ts                        # 兼容 facade
 │   └── ...
-├── container/                    # 容器相关
-│   ├── build.sh                  # 容器构建脚本
-│   ├── Dockerfile                # Docker 镜像
-│   └── skills/                   # 容器内可用技能
-├── groups/                       # 组目录
-│   ├── CLAUDE.md                 # 全局记忆
-│   ├── andy/                     # Agent 1 目录
-│   │   ├── CLAUDE.md             # Agent 1 认知
-│   │   ├── .claude/              # Agent 1 会话
-│   │   └── files/                # Agent 1 文件
-│   ├── beth/                     # Agent 2 目录
-│   └── ...
-├── .claude/                      # Claude 兼容目录
-│   ├── sessions/                 # 会话
-│   ├── cache/                    # 缓存
-│   └── skills/                   # 技能
-├── .trae/                        # Trae 主目录（技能、会话、缓存）
-│   └── skills/
-├── nanoclaw.db                   # SQLite 数据库
-├── .env                          # 环境变量
-├── package.json                  # 依赖
+├── store/messages.db                    # SQLite 主库
+├── groups/                              # 组目录与 Agent 认知
+├── container/                           # 容器镜像与内置 skills
+├── docs/                                # 架构、约束、OpenAPI
 └── ...
 ```
 
@@ -1136,6 +1077,10 @@ nanoclaw/
 | `ANTHROPIC_BASE_URL`      | Anthropic API URL (可选代理)          | 否   |
 | `NANOCLAW_ENCRYPTION_KEY` | 加密密钥 (32字节 hex)                 | 是   |
 | `RUNTIME_API_KEY`         | 运行时 API 密钥（请求头 `X-API-Key`） | 是   |
+| `RUNTIME_API_ALLOW_NO_AUTH` | 允许开发态无密钥访问 Runtime API       | 否   |
+| `RUNTIME_API_TRUST_PROXY` | Runtime API 是否信任代理头             | 否   |
+| `CONTAINER_NETWORK_MODE`  | 容器网络模式（bridge/none）            | 否   |
+| `CONTAINER_ALLOW_HOST_GATEWAY` | 是否允许 host-gateway 映射        | 否   |
 | `ASSISTANT_NAME`          | 触发词 (默认: @Andy)                  | 否   |
 | `TIMEZONE`                | 时区 (默认: Asia/Shanghai)            | 否   |
 | `NODE_ENV`                | 环境 (development/production)         | 否   |
@@ -1171,6 +1116,18 @@ systemctl --user restart nanoclaw
 systemctl --user status nanoclaw
 ```
 
+#### Linux / WSL（无 systemd）
+
+```bash
+# setup 会自动生成 start-nanoclaw.sh
+bash ./start-nanoclaw.sh
+
+# 停止
+kill $(cat ./nanoclaw.pid)
+```
+
+运行时会优先探测 systemd（root 为 system-level，普通用户为 user-level）；若 user session 不可用或宿主缺失 systemd，则自动回退 nohup 模式。
+
 ### 运行环境说明
 
 - **目标运行环境**: mac mini M1（16G 内存 + 1T 存储）
@@ -1199,6 +1156,17 @@ systemctl --user status nanoclaw
 ---
 
 ## DDD 结构索引
+
+### DDD 迁移执行状态（对齐 DDD_MIGRATION_PLAN）
+
+| 阶段 | 状态 | 架构影响摘要 |
+| --- | --- | --- |
+| Phase 0 | 已完成 | 建立分层与跨 context 依赖门禁，接入 ddd-baseline 回归集 |
+| Phase 1 | 已完成 | shared/platform 归位，旧入口通过 facade 保持兼容 |
+| Phase 2-6 | 已完成 | messaging/runtime/memory/evolution/security 五大 context 分层落位 |
+| Phase 7 | 已完成 | runtime-api-parsers、ipc、evolution 仓储与服务拆分去耦 |
+| Phase 8 | 已完成 | 清理大量过渡 facade，CI 增加 `lint:ddd-deps` 门禁 |
+| Phase 9 | 部分完成 | 已完成 memory/messaging/runtime 领域行为下沉；learning/evolution/Bootstrap/协作跨层治理仍待完成 |
 
 ### Context 索引
 
@@ -1240,6 +1208,15 @@ systemctl --user status nanoclaw
 
 ---
 
-**文档版本**: 1.4.0
-**最后更新**: 2026-03-17 00:00
+## 架构版本历史
+
+| 文档版本 | 日期 | 变更摘要 |
+| --- | --- | --- |
+| 1.5.0 | 2026-03-18 | 对齐 DDD_MIGRATION_PLAN（Phase0-9）：更新 DDD 分层主架构图、模块职责、API 契约、部署拓扑、技术栈与目录结构，补充迁移执行状态。 |
+| 1.4.0 | 2026-03-17 | 纳入 DDD 结构索引与治理文档入口。 |
+
+---
+
+**文档版本**: 1.5.0
+**最后更新**: 2026-03-18 10:30
 **维护者**: NanoClaw Team
