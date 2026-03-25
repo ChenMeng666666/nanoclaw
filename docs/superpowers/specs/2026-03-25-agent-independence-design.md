@@ -19,9 +19,25 @@
 ### 1.2 设计原则
 
 1. **非侵入式扩展**：不直接重写或大面积修改上游核心代码，新增功能放在 `src/custom/` 目录
+   - 对核心文件的修改必须使用 `// [CUSTOM: <模块功能>] 开始` 与 `// [CUSTOM] 结束` 注释包裹
+   - 新增代码优先通过中间件、钩子或事件监听模式接入
 2. **渐进式重构**：保留现有功能兼容，不破坏用户使用习惯
 3. **安全优先**：遵循 CLAUDE.md 的安全准则，agent 无法接触到真实 API 密钥
 4. **主体优先**：agent 是最小能力主体，所有记忆、任务、经验都能追溯到明确 agent
+
+### 1.3 阶段范围边界
+
+**阶段 1 仅包含**：
+- agent 身份模型（数据库表、基础属性）
+- agent 配置模型（模型、容器配置）
+- 容器运行逻辑改造（接受 agent 参数）
+- 消息路由改造（使用 agent 配置）
+
+**阶段 1 不包含（后续阶段实现）**：
+- 容灾机制（fallback_config）
+- agent 与 channel 绑定
+- 复杂的 agent 身份配置（appearance、quotes 等）
+- `/setup-agent` skill
 
 ---
 
@@ -52,25 +68,6 @@ CREATE TABLE IF NOT EXISTS agents (
 - `status`：状态，`active`、`paused`、`archived`
 - `description`：简短描述
 
-**新增 `agent_channel_bindings` 表**：
-
-```sql
-CREATE TABLE IF NOT EXISTS agent_channel_bindings (
-  id TEXT PRIMARY KEY,
-  agent_id TEXT NOT NULL,
-  channel_name TEXT NOT NULL,
-  enabled INTEGER NOT NULL DEFAULT 1,
-  settings TEXT,
-  FOREIGN KEY (agent_id) REFERENCES agents(id)
-);
-```
-
-**字段说明**：
-- `agent_id`：关联的 agent ID
-- `channel_name`：通道名称（如 "telegram"、"whatsapp"）
-- `enabled`：是否启用
-- `settings`：特定通道的配置（JSON 格式）
-
 **新增 `agent_group_associations` 表**：
 
 ```sql
@@ -96,7 +93,7 @@ CREATE TABLE IF NOT EXISTS agent_group_associations (
 ```
 data/agents/
 ├── <agent-id>/
-│   ├── identity.json          # 详细人设（JSON 格式）
+│   ├── identity.json          # 身份信息（基础）
 │   ├── config.json            # 模型和运行配置
 │   ├── workspace/             # agent 专属工作区
 │   │   ├── files/             # 文件操作目录
@@ -104,16 +101,12 @@ data/agents/
 │   └── logs/                  # 容器日志
 ```
 
-**identity.json 示例**：
+**identity.json 示例（阶段 1 简化版）**：
 
 ```json
 {
   "name": "Mimi",
   "role": "首席决策辅助 / 团队大姐大",
-  "appearance": "极具视觉冲击力的极致沙漏身材...",
-  "personality": "ENFJ，勇敢、睿智、热情...",
-  "quotes": ["别怕，有米米在呢..."],
-  "behavior_rules": ["绝对主见", "撕碎员工手册", "拒绝前摇"],
   "system_prompt": "你是米米（Mimi），我的精神领袖与决策后盾..."
 }
 ```
@@ -131,14 +124,6 @@ data/agents/
     "base_url": "https://api.anthropic.com",
     "auth_mode": "proxy"
   },
-  "fallback_config": {
-    "enabled": false,
-    "strategy": "local",
-    "local_config": {
-      "provider": "ollama",
-      "model": "llama3:8b"
-    }
-  },
   "runtime_config": {
     "container_timeout": 1800000,
     "memory_limit": "4g",
@@ -151,20 +136,19 @@ data/agents/
 ### 3.2 配置说明
 
 **model_config**：
-- `model`：模型名称（必填）
-- `base_url`：API 端点（必填）
-- `auth_mode`：认证模式，`proxy`（使用凭证代理）或 `direct`（直接模式）
-
-**fallback_config**（可选，默认关闭）：
-- `enabled`：是否启用容灾机制
-- `strategy`：容灾策略，`local`（本地模型）或 `fallback_model`（备用模型）
-- `local_config`：本地模型配置
+- `model`：模型名称（必填），默认值：`claude-3-sonnet-20250219`
+- `base_url`：API 端点（必填），默认值：`https://api.anthropic.com`
+- `auth_mode`：认证模式（必填），默认值：`proxy`
+  - `proxy`：使用凭证代理（agent 无法接触真实密钥）
+  - `direct`：直接模式（仅用于特定场景）
 
 **runtime_config**：
-- `container_timeout`：容器超时时间（毫秒）
-- `memory_limit`：内存限制
-- `mount_strategy`：挂载策略，`group_inherit`（继承自 group）或 `custom`（自定义）
-- `additional_mounts`：额外挂载列表
+- `container_timeout`：容器超时时间（毫秒），默认值：`1800000`（30 分钟）
+- `memory_limit`：内存限制，默认值：`4g`
+- `mount_strategy`：挂载策略，默认值：`group_inherit`
+  - `group_inherit`：继承自 group 的挂载配置
+  - `custom`：使用 agent 的自定义挂载配置
+- `additional_mounts`：额外挂载列表，默认值：`[]`
 
 ### 3.3 与现有 group 配置的关系
 
@@ -186,9 +170,13 @@ data/agents/
 
 ### 4.2 容器运行逻辑改造
 
-**src/container-runner.ts 改造**：
+**对 `src/container-runner.ts` 的修改方式**：
+- 使用 `// [CUSTOM: agent-support] 开始` 和 `// [CUSTOM] 结束` 包裹所有修改
+- 通过新增函数和中间件模式接入，不修改现有核心逻辑
 
 ```typescript
+// [CUSTOM: agent-support] 开始
+
 interface ContainerInput {
   prompt: string;
   sessionId?: string;
@@ -199,18 +187,40 @@ interface ContainerInput {
   agentConfig?: AgentConfig;
 }
 
-async function runContainerAgent(input: ContainerInput) {
-  let config = getAgentConfig(input.agentId, input.groupFolder);
+/**
+ * 获取 agent 配置（新增函数）
+ */
+async function getAgentConfig(agentId?: string, groupFolder?: string): Promise<AgentConfig> {
+  // 实现逻辑...
+}
 
-  const containerOptions = {
-    env: {
-      ANTHROPIC_MODEL: config.model_config.model,
-      ANTHROPIC_BASE_URL: config.model_config.base_url,
-      ANTHROPIC_AUTH_MODE: config.model_config.auth_mode,
-    },
-    timeout: config.runtime_config.container_timeout,
-    // ... 其他选项
-  };
+/**
+ * 使用 agent 配置构建容器选项（新增函数）
+ */
+function buildContainerOptionsForAgent(
+  input: ContainerInput,
+  config: AgentConfig
+): ContainerOptions {
+  // 实现逻辑...
+}
+
+// [CUSTOM] 结束
+
+async function runContainerAgent(input: ContainerInput) {
+  // [CUSTOM: agent-support] 开始
+  let config: AgentConfig | null = null;
+  if (input.agentId || input.agentConfig) {
+    config = input.agentConfig || await getAgentConfig(input.agentId, input.groupFolder);
+  }
+  // [CUSTOM] 结束
+
+  // 现有代码...
+
+  // [CUSTOM: agent-support] 开始
+  const containerOptions = config
+    ? buildContainerOptionsForAgent(input, config)
+    : buildContainerOptions(input);
+  // [CUSTOM] 结束
 
   return await executeContainer(input, containerOptions);
 }
@@ -218,28 +228,71 @@ async function runContainerAgent(input: ContainerInput) {
 
 ### 4.3 消息路由改造
 
+**对 `src/index.ts` 的修改方式**：
+- 使用 `// [CUSTOM: agent-support] 开始` 和 `// [CUSTOM] 结束` 包裹所有修改
+- 通过新增函数和中间件模式接入，不修改现有核心逻辑
+
 ```typescript
+// [CUSTOM: agent-support] 开始
+
+/**
+ * 获取 group 的默认 agent（新增函数）
+ */
+async function getPrimaryAgentByGroup(groupFolder: string): Promise<Agent | null> {
+  // 实现逻辑...
+}
+
+/**
+ * 使用 agent 上下文格式化 prompt（新增函数）
+ */
+function formatPromptWithAgentContext(
+  messages: Message[],
+  agent: Agent | null
+): string {
+  // 实现逻辑...
+}
+
+// [CUSTOM] 结束
+
 async function processGroupMessages(groupFolder: string) {
-  const primaryAgent = getPrimaryAgentByGroup(groupFolder);
+  // 现有代码...
 
-  const formattedPrompt = formatPromptWithAgentContext(
-    messages,
-    primaryAgent.identity,
-    primaryAgent.config
-  );
+  // [CUSTOM: agent-support] 开始
+  const primaryAgent = await getPrimaryAgentByGroup(groupFolder);
+  const formattedPrompt = formatPromptWithAgentContext(messages, primaryAgent);
+  // [CUSTOM] 结束
 
+  // [CUSTOM: agent-support] 开始
   const response = await runContainerAgent({
     prompt: formattedPrompt,
     groupFolder,
     chatJid,
     isMain,
-    agentId: primaryAgent.id,
-    agentConfig: primaryAgent.config
+    agentId: primaryAgent?.id,
+    agentConfig: primaryAgent?.config
   });
+  // [CUSTOM] 结束
 
-  await channel.sendMessage(chatJid, response);
+  // 现有代码...
 }
 ```
+
+### 4.4 边界条件处理
+
+**agent 不存在时的 fallback 机制**：
+- 当指定的 agent 不存在或配置无效时，回退到现有 group 配置
+- 记录警告日志，但不阻塞消息处理
+- 提供 `/migrate-to-agent` 命令将现有 group 迁移为 agent
+
+**agent 配置变更时的策略**：
+- agent 配置变更后，下一次容器运行时自动使用新配置
+- 正在运行的容器继续使用旧配置，直到完成
+- 提供 `/reload-agent-config` 命令强制重载配置
+
+**agent 工作区管理**：
+- agent 创建时自动初始化工作区目录
+- agent 归档时保留工作区（作为历史记录）
+- agent 删除时提示确认，工作区可选保留或删除
 
 ---
 
@@ -268,6 +321,7 @@ interface UpdateAgentInput {
 
 interface DeleteAgentInput {
   agentId: string;
+  keepWorkspace?: boolean;
 }
 
 interface RunAgentInput {
@@ -290,7 +344,6 @@ interface RunAgentInput {
 { type: 'run_agent', payload: RunAgentInput }
 
 // 绑定管理
-{ type: 'bind_agent_to_channel', payload: { agentId, channelName } }
 { type: 'bind_agent_to_group', payload: { agentId, groupFolder, isPrimary } }
 ```
 
@@ -302,7 +355,7 @@ interface RunAgentInput {
 1. 创建 `src/custom/` 目录
 2. 创建 `src/custom/agent/types.ts`（类型定义）
 3. 创建 `src/custom/agent/db.ts`（数据库操作）
-4. 数据库迁移：新增 `agents`, `agent_channel_bindings`, `agent_group_associations` 表
+4. 数据库迁移：新增 `agents`, `agent_group_associations` 表
 
 ### 阶段 1.2：配置管理（1 天）
 1. 创建 `src/custom/agent/config.ts`（配置文件管理）
@@ -310,8 +363,8 @@ interface RunAgentInput {
 3. 创建配置验证和合并逻辑
 
 ### 阶段 1.3：运行逻辑改造（2 天）
-1. 改造 `src/container-runner.ts` 接受 agent 参数
-2. 改造 `src/index.ts` 的消息路由逻辑
+1. 改造 `src/container-runner.ts` 接受 agent 参数（使用 `// [CUSTOM]` 注释）
+2. 改造 `src/index.ts` 的消息路由逻辑（使用 `// [CUSTOM]` 注释）
 3. 测试容器运行和消息处理
 
 ### 阶段 1.4：API 接口（1 天）
@@ -323,10 +376,7 @@ interface RunAgentInput {
 1. 确保现有功能正常工作
 2. 测试默认 agent 逻辑
 3. 处理边界条件（如 agent 不存在时的 fallback）
-
-### 阶段 1.6：Skill 开发（可选，阶段 1 完成后）
-1. 创建 `/setup-agent` skill
-2. 实现 agent 创建和配置界面
+4. 实现 agent 配置变更后的容器重建策略
 
 ---
 
@@ -341,6 +391,7 @@ interface RunAgentInput {
 ### 集成测试
 - `agent-integration.test.ts`：端到端测试
 - 测试从消息接收 → agent 选择 → 响应发送的完整流程
+- 测试边界条件（agent 不存在、配置无效等）
 
 ---
 
@@ -352,6 +403,7 @@ interface RunAgentInput {
 ✅ **配置与 group 解耦**：agent 配置独立于 group 上下文
 ✅ **独立运行容器**：每个 agent 可指定不同的容器配置
 ✅ **为阶段 2 奠定基础**：agent 抽象已建立，记忆系统可直接绑定
+✅ **兼容性保留**：现有功能正常工作，用户无感知
 
 **用户体验**：现有功能无感知，但可以通过 `/run_agent` 命令指定使用特定 agent，体验个性化的回复风格。
 
@@ -365,7 +417,7 @@ interface RunAgentInput {
 |------|------|
 | 风险控制 | 渐进式重构避免了大面积故障 |
 | 价值平衡 | 获得 agent 抽象的核心价值，但保留现有功能稳定 |
-| 技术债务 | 兼容性逻辑可在阶段 2 或阶段 3 清除 |
+| 技术债务 | 兼容性逻辑明确标注 `// [CUSTOM]` 标记，在阶段 2 记忆系统完成后清除 |
 | 开发效率 | 代码复用更多，开发更快 |
 | 与 upstream 同步 | 代码边界清晰，防冲突标记明确 |
 
@@ -380,8 +432,14 @@ interface RunAgentInput {
 
 遵循极简主义原则：
 - 现阶段只需要最基本的配置（model、base_url、auth_mode）
-- 容灾机制默认关闭，避免复杂度
 - 可以在后续阶段根据需求扩展
+
+### 9.4 为什么某些功能移到后续阶段
+
+严格控制阶段 1 范围：
+- 避免功能过度膨胀
+- 确保阶段 1 专注于核心目标（agent 独立运行单元）
+- 减少风险，提高可执行性
 
 ---
 
@@ -391,16 +449,19 @@ interface RunAgentInput {
 - 建立 agent 私有的记忆存储
 - 支持记忆的读取、写入、检索
 - 支持记忆的归档和摘要
+- **清除阶段 1 的兼容性逻辑**
 
 ### 阶段 3：共同进化系统
 - 支持多个 agent 协作
 - 建立经验分享机制
 - 支持知识的传递和继承
+- **实现 agent 与 channel 绑定**
 
 ### 阶段 4：Private Moltbook
 - 建立全局知识图谱
 - 支持知识的可视化查询
 - 建立知识反哺机制
+- **实现容灾机制**
 
 ### 阶段 5：向上知识反哺
 - 建立知识筛选和审核机制
