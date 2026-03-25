@@ -8,7 +8,18 @@
 
 ## 1. 概述
 
-### 1.1 设计目标
+### 1.1 与 ARCHITECTURE.md 的对应关系
+
+本设计文档直接对应 `ARCHITECTURE.md` 的第 12 节（阶段 1 入口），实现了以下目标：
+
+| ARCHITECTURE.md 第 12 节要求 | 本设计文档的对应章节 |
+|------------------------------|---------------------|
+| 身份模型（agent 身份边界清晰） | 第 2 节（身份模型设计） |
+| 配置模型（agent 配置与 group 上下文解耦） | 第 3 节（配置模型设计） |
+| 运行模型（agent 拥有独立运行容器与独立模型配置能力） | 第 4 节（运行模型设计） |
+| 后续记忆、进化、社会能力都能绑定到明确 agent | 第 8 节（预期结果）、第 10 节（后续阶段展望） |
+
+### 1.2 设计目标
 
 根据 `ARCHITECTURE.md`，阶段 1 的目标是把 "agent 作为独立主体" 正式立住。具体包括：
 
@@ -55,6 +66,7 @@ CREATE TABLE IF NOT EXISTS agents (
   type TEXT NOT NULL DEFAULT 'user',
   status TEXT NOT NULL DEFAULT 'active',
   description TEXT,
+  system_prompt TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -279,6 +291,11 @@ async function processGroupMessages(groupFolder: string) {
 
 ### 4.4 边界条件处理
 
+**默认 agent 创建策略**：
+- 首次使用现有 group 时，自动创建一个默认 agent（`type: 'user'`）
+- 默认 agent 的名称与 group 名称一致，角色为 "默认协作助手"
+- 提供批量数据迁移脚本，可在阶段 1 完成后统一执行
+
 **agent 不存在时的 fallback 机制**：
 - 当指定的 agent 不存在或配置无效时，回退到现有 group 配置
 - 记录警告日志，但不阻塞消息处理
@@ -293,6 +310,10 @@ async function processGroupMessages(groupFolder: string) {
 - agent 创建时自动初始化工作区目录
 - agent 归档时保留工作区（作为历史记录）
 - agent 删除时提示确认，工作区可选保留或删除
+
+**数据目录规范**：
+- `data/agents/` 目录已包含在项目的 `.gitignore` 文件中（符合 CLAUDE.md 数据隔离原则）
+- 每个 agent 的数据和工作区完全隔离，不进入版本控制
 
 ---
 
@@ -420,6 +441,33 @@ interface RunAgentInput {
 | 技术债务 | 兼容性逻辑明确标注 `// [CUSTOM]` 标记，在阶段 2 记忆系统完成后清除 |
 | 开发效率 | 代码复用更多，开发更快 |
 | 与 upstream 同步 | 代码边界清晰，防冲突标记明确 |
+
+**技术债务清除清单（阶段 2 后执行）**：
+
+| 文件 | 位置 | 标记内容 | 说明 |
+|------|------|----------|------|
+| `src/container-runner.ts` | `// [CUSTOM: agent-support]` 开始 / 结束 | `agentId?` 和 `agentConfig?` 字段、`getAgentConfig()` 函数、`buildContainerOptionsForAgent()` 函数 | 重构为第一公民实现 |
+| `src/index.ts` | `// [CUSTOM: agent-support]` 开始 / 结束 | `getPrimaryAgentByGroup()` 函数、`formatPromptWithAgentContext()` 函数 | 重构为第一公民实现 |
+| `src/db.ts` | 待定 | `registered_groups` 表的 `container_config` 字段 | 迁移到 agent 配置 |
+
+### 9.6 分层边界与 API 设计
+
+**API 分层归属**：
+
+| API | 分层 | 说明 |
+|-----|------|------|
+| `create_agent` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
+| `list_agents` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
+| `update_agent` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
+| `delete_agent` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
+| `run_agent` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
+| `bind_agent_to_group` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
+| `/setup-agent`（待定） | skill | 在阶段 1 完成后作为 skill 实现，用于用户友好的 agent 创建和配置 |
+
+**核心原则**：
+- 核心 API 放在 `src/custom/agent/` 目录（custom module 层）
+- 用户友好的界面和命令作为 skill 实现（skill 层）
+- core 层仅通过 `// [CUSTOM]` 标记进行最小化改造
 
 ### 9.2 为什么容器与 agent 一对一
 
