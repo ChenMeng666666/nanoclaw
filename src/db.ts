@@ -84,6 +84,36 @@ function createSchema(database: Database.Database): void {
     );
   `);
 
+  // [CUSTOM: agent-tables] 开始
+  // Agent 相关表
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS agents (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      role TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'user',
+      status TEXT NOT NULL DEFAULT 'active',
+      description TEXT,
+      system_prompt TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status);
+    CREATE INDEX IF NOT EXISTS idx_agents_type ON agents(type);
+
+    CREATE TABLE IF NOT EXISTS agent_group_associations (
+      id TEXT PRIMARY KEY,
+      agent_id TEXT NOT NULL,
+      group_folder TEXT NOT NULL,
+      is_primary INTEGER DEFAULT 0,
+      FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE,
+      UNIQUE(agent_id, group_folder)
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_group_agent ON agent_group_associations(agent_id);
+    CREATE INDEX IF NOT EXISTS idx_agent_group_group ON agent_group_associations(group_folder);
+  `);
+  // [CUSTOM] 结束
+
   // Add context_mode column if it doesn't exist (migration for existing DBs)
   try {
     database.exec(
@@ -695,3 +725,12 @@ function migrateJsonState(): void {
     }
   }
 }
+// [CUSTOM: agent-db-access] 开始
+/**
+ * 获取内部数据库实例 - 仅供自定义模块使用
+ * @internal
+ */
+export function getDb(): Database.Database {
+  return db;
+}
+// [CUSTOM] 结束
