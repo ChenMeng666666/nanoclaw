@@ -105,3 +105,8 @@ export type OnChatMetadata = (
   channel?: string,
   isGroup?: boolean,
 ) => void;
+
+// [CUSTOM: agent-support] 开始
+// Agent 类型定义 - 从 src/custom/agent/types.ts 重新导出
+export * from './custom/agent/types.js';
+// [CUSTOM] 结束
