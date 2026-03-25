@@ -1,3 +1,7 @@
+// [CUSTOM: Agent Types] 开始 - 从 src/custom/agent/types.ts 导出
+export * from './custom/agent/types';
+// [CUSTOM] 结束
+
 export interface AdditionalMount {
   hostPath: string; // Absolute path on host (supports ~ for home)
   containerPath?: string; // Optional — defaults to basename of hostPath. Mounted at /workspace/extra/{value}
