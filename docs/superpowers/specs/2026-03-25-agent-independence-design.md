@@ -450,25 +450,6 @@ interface RunAgentInput {
 | `src/index.ts` | `// [CUSTOM: agent-support]` 开始 / 结束 | `getPrimaryAgentByGroup()` 函数、`formatPromptWithAgentContext()` 函数 | 重构为第一公民实现 |
 | `src/db.ts` | 待定 | `registered_groups` 表的 `container_config` 字段 | 迁移到 agent 配置 |
 
-### 9.6 分层边界与 API 设计
-
-**API 分层归属**：
-
-| API | 分层 | 说明 |
-|-----|------|------|
-| `create_agent` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
-| `list_agents` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
-| `update_agent` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
-| `delete_agent` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
-| `run_agent` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
-| `bind_agent_to_group` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
-| `/setup-agent`（待定） | skill | 在阶段 1 完成后作为 skill 实现，用于用户友好的 agent 创建和配置 |
-
-**核心原则**：
-- 核心 API 放在 `src/custom/agent/` 目录（custom module 层）
-- 用户友好的界面和命令作为 skill 实现（skill 层）
-- core 层仅通过 `// [CUSTOM]` 标记进行最小化改造
-
 ### 9.2 为什么容器与 agent 一对一
 
 符合 `ARCHITECTURE.md` 原则：
@@ -487,6 +468,25 @@ interface RunAgentInput {
 严格控制阶段 1 范围：
 - 避免功能过度膨胀
 - 确保阶段 1 专注于核心目标（agent 独立运行单元）
+
+### 9.5 分层边界与 API 设计
+
+**API 分层归属**：
+
+| API | 分层 | 说明 |
+|-----|------|------|
+| `create_agent` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
+| `list_agents` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
+| `update_agent` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
+| `delete_agent` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
+| `run_agent` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
+| `bind_agent_to_group` | custom module | 在 `src/custom/agent/api.ts` 中实现 |
+| `/setup-agent`（待定） | skill | 在阶段 1 完成后作为 skill 实现，用于用户友好的 agent 创建和配置 |
+
+**核心原则**：
+- 核心 API 放在 `src/custom/agent/` 目录（custom module 层）
+- 用户友好的界面和命令作为 skill 实现（skill 层）
+- core 层仅通过 `// [CUSTOM]` 标记进行最小化改造
 - 减少风险，提高可执行性
 
 ---
