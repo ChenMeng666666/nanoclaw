@@ -60,6 +60,15 @@ import {
 import { startSchedulerLoop } from './task-scheduler.js';
 import { Channel, NewMessage, RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
+// [CUSTOM: agent-support] 开始
+import {
+  getPrimaryAgentForGroup,
+  createAgent,
+  bindAgentToGroup,
+} from './custom/agent/db.js';
+import { getAgentConfig } from './custom/agent/config.js';
+import type { Agent, AgentConfig as CustomAgentConfig } from './custom/agent/types.js';
+// [CUSTOM] 结束
 
 // Re-export for backwards compatibility during refactor
 export { escapeXml, formatMessages } from './router.js';
@@ -144,6 +153,68 @@ export function _setRegisteredGroups(
   registeredGroups = groups;
 }
 
+// [CUSTOM: agent-support] 开始
+
+/**
+ * 获取 group 的默认 agent
+ */
+async function getPrimaryAgentByGroup(groupFolder: string): Promise<Agent | null> {
+  const agent = getPrimaryAgentForGroup(groupFolder);
+  if (agent) {
+    return agent;
+  }
+
+  // 如果没有找到 primary agent，创建一个默认 agent 并绑定到该 group
+  logger.debug({ groupFolder }, 'No primary agent found, creating default');
+
+  const group = Object.values(registeredGroups).find(g => g.folder === groupFolder);
+  if (!group) {
+    logger.warn({ groupFolder }, 'Group not found for folder');
+    return null;
+  }
+
+  const defaultAgent = createAgent({
+    name: group.name || '默认助手',
+    role: '默认协作助手',
+    type: 'user',
+    identity: {
+      system_prompt: '你是一个协作助手，帮助用户处理各种任务。',
+      role: '默认协作助手'
+    }
+  });
+
+  bindAgentToGroup({
+    agentId: defaultAgent.id,
+    groupFolder: groupFolder,
+    isPrimary: true
+  });
+
+  return defaultAgent;
+}
+
+/**
+ * 使用 agent 上下文格式化 prompt
+ */
+function formatPromptWithAgentContext(
+  messages: any[],
+  agent: Agent | null,
+): string {
+  let prompt = '';
+
+  if (agent && agent.system_prompt) {
+    prompt += `<system>${agent.system_prompt}</system>\n\n`;
+  }
+
+  // 保留原有的消息格式化逻辑
+  for (const msg of messages) {
+    prompt += `${msg.sender}: ${msg.content}\n`;
+  }
+
+  return prompt;
+}
+
+// [CUSTOM] 结束
+
 /**
  * Process all pending messages for a group.
  * Called by the GroupQueue when it's this group's turn.
@@ -180,7 +251,28 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     if (!hasTrigger) return true;
   }
 
-  const prompt = formatMessages(missedMessages, TIMEZONE);
+  // [CUSTOM: agent-support] 开始
+  // 获取 group 的默认 agent
+  const primaryAgent = await getPrimaryAgentByGroup(group.folder);
+  let agentConfig: CustomAgentConfig | null = null;
+  if (primaryAgent) {
+    // 尝试从文件获取 agent 配置
+    try {
+      const agentConfigFromFile = await getAgentConfig(primaryAgent.id);
+      if (agentConfigFromFile) {
+        agentConfig = agentConfigFromFile as unknown as CustomAgentConfig;
+      }
+    } catch (err) {
+      logger.warn({ agentId: primaryAgent.id, err }, 'Failed to load agent config');
+    }
+  }
+  // 格式化 prompt 并添加 agent 上下文
+  let prompt = formatMessages(missedMessages, TIMEZONE);
+  if (primaryAgent && primaryAgent.system_prompt) {
+    // 在 prompt 前添加 agent 的 system prompt
+    prompt = `<system>${primaryAgent.system_prompt}</system>\n\n` + prompt;
+  }
+  // [CUSTOM] 结束
 
   // Advance cursor so the piping path in startMessageLoop won't re-fetch
   // these messages. Save the old cursor so we can roll back on error.
@@ -237,7 +329,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     if (result.status === 'error') {
       hadError = true;
     }
-  });
+  }, primaryAgent, agentConfig);
 
   await channel.setTyping?.(chatJid, false);
   if (idleTimer) clearTimeout(idleTimer);
@@ -270,6 +362,8 @@ async function runAgent(
   prompt: string,
   chatJid: string,
   onOutput?: (output: ContainerOutput) => Promise<void>,
+  agent?: Agent | null,
+  agentConfig?: CustomAgentConfig | null,
 ): Promise<'success' | 'error'> {
   const isMain = group.isMain === true;
   const sessionId = sessions[group.folder];
@@ -320,6 +414,10 @@ async function runAgent(
         chatJid,
         isMain,
         assistantName: ASSISTANT_NAME,
+        // [CUSTOM: agent-support] 开始
+        agentId: agent?.id,
+        agentConfig: agentConfig || undefined,
+        // [CUSTOM] 结束
       },
       (proc, containerName) =>
         queue.registerProcess(chatJid, proc, containerName, group.folder),

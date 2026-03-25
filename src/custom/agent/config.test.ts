@@ -1,19 +1,30 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { AgentConfig, getAgentConfig, setAgentConfig, validateAgentConfig } from './config';
+import {
+  getAgentConfig,
+  setAgentConfig,
+  validateAgentConfig,
+  deleteAgentConfig,
+  hasAgentConfig,
+  getAllAgentIds,
+  clearAllConfigs,
+} from './config.js';
+import type { AgentConfig } from './types.js';
 
 describe('Agent Configuration', () => {
   describe('validateAgentConfig', () => {
     it('should validate valid config', () => {
       const config: AgentConfig = {
-        name: 'test-agent',
-        model: 'claude-3-sonnet-20250219',
-        temperature: 0.7,
-        maxTokens: 4000,
-        timeout: 60000,
-        memorySize: 100,
-        reflectionEnabled: true,
-        autoSave: true,
-        logLevel: 'info'
+        model_config: {
+          model: 'claude-3-sonnet-20250219',
+          base_url: 'https://api.anthropic.com',
+          auth_mode: 'proxy',
+        },
+        runtime_config: {
+          container_timeout: 1800000,
+          memory_limit: '4g',
+          mount_strategy: 'group_inherit',
+          additional_mounts: [],
+        },
       };
 
       const result = validateAgentConfig(config);
@@ -21,210 +32,198 @@ describe('Agent Configuration', () => {
       expect(result.errors).toEqual([]);
     });
 
-    it('should validate config with default values', () => {
-      const config: AgentConfig = {
-        name: 'test-agent',
-        model: 'claude-3-sonnet-20250219'
-      };
-
-      const result = validateAgentConfig(config);
-      expect(result.valid).toBe(true);
-    });
-
-    it('should reject config without name', () => {
-      const config: any = {
-        model: 'claude-3-sonnet-20250219'
-      };
-
-      const result = validateAgentConfig(config);
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContain('name');
-    });
-
     it('should reject config without model', () => {
       const config: any = {
-        name: 'test-agent'
+        model_config: {
+          base_url: 'https://api.anthropic.com',
+          auth_mode: 'proxy',
+        },
+        runtime_config: {
+          container_timeout: 1800000,
+          memory_limit: '4g',
+          mount_strategy: 'group_inherit',
+          additional_mounts: [],
+        },
       };
 
       const result = validateAgentConfig(config);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('model');
+      expect(result.errors).toContain('model_config.model');
     });
 
-    it('should reject config with invalid temperature', () => {
+    it('should reject config without base_url', () => {
       const config: any = {
-        name: 'test-agent',
-        model: 'claude-3-sonnet-20250219',
-        temperature: 2.0
+        model_config: {
+          model: 'claude-3-sonnet-20250219',
+          auth_mode: 'proxy',
+        },
+        runtime_config: {
+          container_timeout: 1800000,
+          memory_limit: '4g',
+          mount_strategy: 'group_inherit',
+          additional_mounts: [],
+        },
       };
 
       const result = validateAgentConfig(config);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('temperature');
+      expect(result.errors).toContain('model_config.base_url');
     });
 
-    it('should reject config with invalid maxTokens', () => {
+    it('should reject config with invalid auth_mode', () => {
       const config: any = {
-        name: 'test-agent',
-        model: 'claude-3-sonnet-20250219',
-        maxTokens: 0
+        model_config: {
+          model: 'claude-3-sonnet-20250219',
+          base_url: 'https://api.anthropic.com',
+          auth_mode: 'invalid',
+        },
+        runtime_config: {
+          container_timeout: 1800000,
+          memory_limit: '4g',
+          mount_strategy: 'group_inherit',
+          additional_mounts: [],
+        },
       };
 
       const result = validateAgentConfig(config);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('maxTokens');
-    });
-
-    it('should reject config with invalid timeout', () => {
-      const config: any = {
-        name: 'test-agent',
-        model: 'claude-3-sonnet-20250219',
-        timeout: -1000
-      };
-
-      const result = validateAgentConfig(config);
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContain('timeout');
-    });
-
-    it('should reject config with invalid logLevel', () => {
-      const config: any = {
-        name: 'test-agent',
-        model: 'claude-3-sonnet-20250219',
-        logLevel: 'invalid'
-      };
-
-      const result = validateAgentConfig(config);
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContain('logLevel');
-    });
-  });
-
-  describe('AgentConfig methods', () => {
-    let config: AgentConfig;
-
-    beforeEach(() => {
-      config = {
-        name: 'test-agent',
-        model: 'claude-3-sonnet-20250219'
-      };
-    });
-
-    it('should create config instance', () => {
-      const agentConfig = new AgentConfig(config);
-      expect(agentConfig).toBeInstanceOf(AgentConfig);
-      expect(agentConfig.get('name')).toBe(config.name);
-      expect(agentConfig.get('model')).toBe(config.model);
-    });
-
-    it('should get config values', () => {
-      const agentConfig = new AgentConfig(config);
-      expect(agentConfig.get('name')).toBe(config.name);
-      expect(agentConfig.get('model')).toBe(config.model);
-      expect(agentConfig.get('temperature')).toBe(0.7); // default
-    });
-
-    it('should set config values', () => {
-      const agentConfig = new AgentConfig(config);
-      agentConfig.set('temperature', 0.5);
-      expect(agentConfig.get('temperature')).toBe(0.5);
-    });
-
-    it('should set multiple config values', () => {
-      const agentConfig = new AgentConfig(config);
-      agentConfig.setAll({
-        temperature: 0.5,
-        maxTokens: 5000,
-        logLevel: 'debug'
-      });
-
-      expect(agentConfig.get('temperature')).toBe(0.5);
-      expect(agentConfig.get('maxTokens')).toBe(5000);
-      expect(agentConfig.get('logLevel')).toBe('debug');
-    });
-
-    it('should get all config values', () => {
-      const agentConfig = new AgentConfig(config);
-      const allConfig = agentConfig.getAll();
-      expect(allConfig).toEqual(expect.objectContaining({
-        name: config.name,
-        model: config.model
-      }));
-    });
-
-    it('should validate config instance', () => {
-      const agentConfig = new AgentConfig(config);
-      const validation = agentConfig.validate();
-      expect(validation.valid).toBe(true);
-    });
-
-    it('should convert to JSON', () => {
-      const agentConfig = new AgentConfig(config);
-      const json = agentConfig.toJSON();
-      expect(json).toEqual(expect.objectContaining({
-        name: config.name,
-        model: config.model
-      }));
+      expect(result.errors).toContain('model_config.auth_mode');
     });
   });
 
   describe('Global config management', () => {
-    it('should get agent config', () => {
-      // First set config before getting
-      const initialConfig: AgentConfig = {
-        name: 'test-agent',
-        model: 'claude-3-sonnet-20250219'
-      };
-      setAgentConfig('test-agent', initialConfig);
-
-      const config = getAgentConfig('test-agent');
-      expect(config).toBeDefined();
+    beforeEach(() => {
+      clearAllConfigs();
     });
 
-    it('should set agent config', () => {
+    it('should set and get agent config', () => {
       const config: AgentConfig = {
-        name: 'new-agent',
-        model: 'claude-3-sonnet-20250219',
-        temperature: 0.8
+        model_config: {
+          model: 'claude-3-sonnet-20250219',
+          base_url: 'https://api.anthropic.com',
+          auth_mode: 'proxy',
+        },
+        runtime_config: {
+          container_timeout: 1800000,
+          memory_limit: '4g',
+          mount_strategy: 'group_inherit',
+          additional_mounts: [],
+        },
       };
 
-      const result = setAgentConfig('new-agent', config);
+      const result = setAgentConfig('test-agent', config);
       expect(result).toBe(true);
 
-      const retrieved = getAgentConfig('new-agent');
-      expect(retrieved).toEqual(expect.objectContaining({
-        name: 'new-agent',
-        model: 'claude-3-sonnet-20250219',
-        temperature: 0.8
-      }));
+      const retrieved = getAgentConfig('test-agent');
+      expect(retrieved).toEqual(config);
     });
 
-    it('should set config with defaults', () => {
-      const config: Partial<AgentConfig> = {
-        name: 'agent-with-defaults',
-        model: 'claude-3-sonnet-20250219'
+    it('should check if config exists', () => {
+      const config: AgentConfig = {
+        model_config: {
+          model: 'claude-3-sonnet-20250219',
+          base_url: 'https://api.anthropic.com',
+          auth_mode: 'proxy',
+        },
+        runtime_config: {
+          container_timeout: 1800000,
+          memory_limit: '4g',
+          mount_strategy: 'group_inherit',
+          additional_mounts: [],
+        },
       };
 
-      setAgentConfig('agent-with-defaults', config as AgentConfig);
-      const retrieved = getAgentConfig('agent-with-defaults');
+      setAgentConfig('test-agent', config);
+      expect(hasAgentConfig('test-agent')).toBe(true);
+      expect(hasAgentConfig('nonexistent')).toBe(false);
+    });
 
-      expect(retrieved.temperature).toBe(0.7);
-      expect(retrieved.maxTokens).toBe(4000);
-      expect(retrieved.timeout).toBe(60000);
+    it('should delete agent config', () => {
+      const config: AgentConfig = {
+        model_config: {
+          model: 'claude-3-sonnet-20250219',
+          base_url: 'https://api.anthropic.com',
+          auth_mode: 'proxy',
+        },
+        runtime_config: {
+          container_timeout: 1800000,
+          memory_limit: '4g',
+          mount_strategy: 'group_inherit',
+          additional_mounts: [],
+        },
+      };
+
+      setAgentConfig('test-agent', config);
+      expect(hasAgentConfig('test-agent')).toBe(true);
+
+      const deleted = deleteAgentConfig('test-agent');
+      expect(deleted).toBe(true);
+      expect(hasAgentConfig('test-agent')).toBe(false);
+    });
+
+    it('should get all agent IDs', () => {
+      const config: AgentConfig = {
+        model_config: {
+          model: 'claude-3-sonnet-20250219',
+          base_url: 'https://api.anthropic.com',
+          auth_mode: 'proxy',
+        },
+        runtime_config: {
+          container_timeout: 1800000,
+          memory_limit: '4g',
+          mount_strategy: 'group_inherit',
+          additional_mounts: [],
+        },
+      };
+
+      setAgentConfig('agent-1', config);
+      setAgentConfig('agent-2', config);
+
+      const ids = getAllAgentIds();
+      expect(ids).toContain('agent-1');
+      expect(ids).toContain('agent-2');
+      expect(ids.length).toBe(2);
+    });
+
+    it('should clear all configs', () => {
+      const config: AgentConfig = {
+        model_config: {
+          model: 'claude-3-sonnet-20250219',
+          base_url: 'https://api.anthropic.com',
+          auth_mode: 'proxy',
+        },
+        runtime_config: {
+          container_timeout: 1800000,
+          memory_limit: '4g',
+          mount_strategy: 'group_inherit',
+          additional_mounts: [],
+        },
+      };
+
+      setAgentConfig('agent-1', config);
+      setAgentConfig('agent-2', config);
+
+      clearAllConfigs();
+      expect(getAllAgentIds().length).toBe(0);
     });
 
     it('should validate config before setting', () => {
       const invalidConfig: any = {
-        name: 'invalid-agent',
-        model: 'claude-3-sonnet-20250219',
-        temperature: 2.0
+        model_config: {
+          base_url: 'https://api.anthropic.com',
+          auth_mode: 'proxy',
+        },
+        runtime_config: {
+          container_timeout: 1800000,
+          memory_limit: '4g',
+          mount_strategy: 'group_inherit',
+          additional_mounts: [],
+        },
       };
 
       const result = setAgentConfig('invalid-agent', invalidConfig);
       expect(result).toBe(false);
-
-      const retrieved = getAgentConfig('invalid-agent');
-      expect(retrieved).toBeUndefined();
+      expect(hasAgentConfig('invalid-agent')).toBe(false);
     });
   });
 });

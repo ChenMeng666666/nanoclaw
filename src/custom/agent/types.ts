@@ -51,7 +51,7 @@ export interface AgentGroupAssociation {
   id: string;
   agent_id: string;
   group_folder: string;
-  is_primary: boolean;
+  is_primary: number; // SQLite 使用 0/1 存储布尔值
 }
 
 // Zod schemas for validation
@@ -65,11 +65,15 @@ export const AgentRuntimeConfigSchema = z.object({
   container_timeout: z.number().int().positive().default(1800000),
   memory_limit: z.string().default('4g'),
   mount_strategy: z.enum(['group_inherit', 'custom']).default('group_inherit'),
-  additional_mounts: z.array(z.object({
-    hostPath: z.string(),
-    containerPath: z.string().optional(),
-    readonly: z.boolean().optional(),
-  })).default([]),
+  additional_mounts: z
+    .array(
+      z.object({
+        hostPath: z.string(),
+        containerPath: z.string().optional(),
+        readonly: z.boolean().optional(),
+      }),
+    )
+    .default([]),
 });
 
 export const AgentConfigSchema = z.object({
