@@ -59,7 +59,10 @@ export function getAgentConfig(agentId: string): CustomAgentConfig | undefined {
 /**
  * Set agent configuration
  */
-export function setAgentConfig(agentId: string, config: CustomAgentConfig): boolean {
+export function setAgentConfig(
+  agentId: string,
+  config: CustomAgentConfig,
+): boolean {
   const validation = validateAgentConfig(config);
   if (!validation.valid) {
     return false;

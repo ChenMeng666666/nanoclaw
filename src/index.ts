@@ -67,7 +67,10 @@ import {
   bindAgentToGroup,
 } from './custom/agent/db.js';
 import { getAgentConfig } from './custom/agent/config.js';
-import type { Agent, AgentConfig as CustomAgentConfig } from './custom/agent/types.js';
+import type {
+  Agent,
+  AgentConfig as CustomAgentConfig,
+} from './custom/agent/types.js';
 // [CUSTOM] 结束
 
 // Re-export for backwards compatibility during refactor
@@ -158,7 +161,9 @@ export function _setRegisteredGroups(
 /**
  * 获取 group 的默认 agent
  */
-async function getPrimaryAgentByGroup(groupFolder: string): Promise<Agent | null> {
+async function getPrimaryAgentByGroup(
+  groupFolder: string,
+): Promise<Agent | null> {
   const agent = getPrimaryAgentForGroup(groupFolder);
   if (agent) {
     return agent;
@@ -167,7 +172,9 @@ async function getPrimaryAgentByGroup(groupFolder: string): Promise<Agent | null
   // 如果没有找到 primary agent，创建一个默认 agent 并绑定到该 group
   logger.debug({ groupFolder }, 'No primary agent found, creating default');
 
-  const group = Object.values(registeredGroups).find(g => g.folder === groupFolder);
+  const group = Object.values(registeredGroups).find(
+    (g) => g.folder === groupFolder,
+  );
   if (!group) {
     logger.warn({ groupFolder }, 'Group not found for folder');
     return null;
@@ -179,14 +186,14 @@ async function getPrimaryAgentByGroup(groupFolder: string): Promise<Agent | null
     type: 'user',
     identity: {
       system_prompt: '你是一个协作助手，帮助用户处理各种任务。',
-      role: '默认协作助手'
-    }
+      role: '默认协作助手',
+    },
   });
 
   bindAgentToGroup({
     agentId: defaultAgent.id,
     groupFolder: groupFolder,
-    isPrimary: true
+    isPrimary: true,
   });
 
   return defaultAgent;
@@ -263,7 +270,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
         agentConfig = agentConfigFromFile as unknown as CustomAgentConfig;
       }
     } catch (err) {
-      logger.warn({ agentId: primaryAgent.id, err }, 'Failed to load agent config');
+      logger.warn(
+        { agentId: primaryAgent.id, err },
+        'Failed to load agent config',
+      );
     }
   }
   // 格式化 prompt 并添加 agent 上下文
@@ -304,32 +314,42 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   let hadError = false;
   let outputSentToUser = false;
 
-  const output = await runAgent(group, prompt, chatJid, async (result) => {
-    // Streaming output callback — called for each agent result
-    if (result.result) {
-      const raw =
-        typeof result.result === 'string'
-          ? result.result
-          : JSON.stringify(result.result);
-      // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
-      const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
-      logger.info({ group: group.name }, `Agent output: ${raw.slice(0, 200)}`);
-      if (text) {
-        await channel.sendMessage(chatJid, text);
-        outputSentToUser = true;
+  const output = await runAgent(
+    group,
+    prompt,
+    chatJid,
+    async (result) => {
+      // Streaming output callback — called for each agent result
+      if (result.result) {
+        const raw =
+          typeof result.result === 'string'
+            ? result.result
+            : JSON.stringify(result.result);
+        // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
+        const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
+        logger.info(
+          { group: group.name },
+          `Agent output: ${raw.slice(0, 200)}`,
+        );
+        if (text) {
+          await channel.sendMessage(chatJid, text);
+          outputSentToUser = true;
+        }
+        // Only reset idle timer on actual results, not session-update markers (result: null)
+        resetIdleTimer();
       }
-      // Only reset idle timer on actual results, not session-update markers (result: null)
-      resetIdleTimer();
-    }
 
-    if (result.status === 'success') {
-      queue.notifyIdle(chatJid);
-    }
+      if (result.status === 'success') {
+        queue.notifyIdle(chatJid);
+      }
 
-    if (result.status === 'error') {
-      hadError = true;
-    }
-  }, primaryAgent, agentConfig);
+      if (result.status === 'error') {
+        hadError = true;
+      }
+    },
+    primaryAgent,
+    agentConfig,
+  );
 
   await channel.setTyping?.(chatJid, false);
   if (idleTimer) clearTimeout(idleTimer);

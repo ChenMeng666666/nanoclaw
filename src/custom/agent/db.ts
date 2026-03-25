@@ -35,11 +35,13 @@ export function createAgent(input: CreateAgentInput): Agent {
     updated_at: now,
   };
 
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO agents (
       id, name, role, type, status, description, system_prompt, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
+  `,
+  ).run(
     agent.id,
     agent.name,
     agent.role,
@@ -88,11 +90,14 @@ export function updateAgent(input: UpdateAgentInput): Agent | undefined {
     ...(updates.identity?.system_prompt !== undefined
       ? { system_prompt: updates.identity.system_prompt }
       : {}),
-    ...(updates.identity?.role !== undefined ? { role: updates.identity.role } : {}),
+    ...(updates.identity?.role !== undefined
+      ? { role: updates.identity.role }
+      : {}),
     updated_at: now,
   };
 
-  db.prepare(`
+  db.prepare(
+    `
     UPDATE agents SET
       name = ?,
       role = ?,
@@ -102,7 +107,8 @@ export function updateAgent(input: UpdateAgentInput): Agent | undefined {
       system_prompt = ?,
       updated_at = ?
     WHERE id = ?
-  `).run(
+  `,
+  ).run(
     updatedAgent.name,
     updatedAgent.role,
     updatedAgent.type,
@@ -170,7 +176,9 @@ export function listAgents(input: ListAgentsInput = {}): Agent[] {
 /**
  * 绑定 agent 到 group
  */
-export function bindAgentToGroup(input: BindAgentToGroupInput): AgentGroupAssociation {
+export function bindAgentToGroup(
+  input: BindAgentToGroupInput,
+): AgentGroupAssociation {
   const db = getDb();
   const association: AgentGroupAssociation = {
     id: generateId(),
@@ -179,11 +187,13 @@ export function bindAgentToGroup(input: BindAgentToGroupInput): AgentGroupAssoci
     is_primary: input.isPrimary ? 1 : 0,
   };
 
-  db.prepare(`
+  db.prepare(
+    `
     INSERT OR REPLACE INTO agent_group_associations (
       id, agent_id, group_folder, is_primary
     ) VALUES (?, ?, ?, ?)
-  `).run(
+  `,
+  ).run(
     association.id,
     association.agent_id,
     association.group_folder,
@@ -192,11 +202,13 @@ export function bindAgentToGroup(input: BindAgentToGroupInput): AgentGroupAssoci
 
   // 如果设置为 primary，确保同一 group 的其他 association 不是 primary
   if (input.isPrimary) {
-    db.prepare(`
+    db.prepare(
+      `
       UPDATE agent_group_associations
       SET is_primary = 0
       WHERE group_folder = ? AND agent_id != ?
-    `).run(input.groupFolder, input.agentId);
+    `,
+    ).run(input.groupFolder, input.agentId);
   }
 
   return association;
@@ -205,12 +217,19 @@ export function bindAgentToGroup(input: BindAgentToGroupInput): AgentGroupAssoci
 /**
  * 取消绑定 agent 从 group
  */
-export function unbindAgentFromGroup(agentId: string, groupFolder: string): boolean {
+export function unbindAgentFromGroup(
+  agentId: string,
+  groupFolder: string,
+): boolean {
   const db = getDb();
-  const result = db.prepare(`
+  const result = db
+    .prepare(
+      `
     DELETE FROM agent_group_associations
     WHERE agent_id = ? AND group_folder = ?
-  `).run(agentId, groupFolder);
+  `,
+    )
+    .run(agentId, groupFolder);
 
   return result.changes > 0;
 }
@@ -220,12 +239,16 @@ export function unbindAgentFromGroup(agentId: string, groupFolder: string): bool
  */
 export function getAgentGroups(agentId: string): string[] {
   const db = getDb();
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     SELECT group_folder FROM agent_group_associations
     WHERE agent_id = ?
-  `).all(agentId) as Array<{ group_folder: string }>;
+  `,
+    )
+    .all(agentId) as Array<{ group_folder: string }>;
 
-  return rows.map(row => row.group_folder);
+  return rows.map((row) => row.group_folder);
 }
 
 /**
@@ -233,11 +256,15 @@ export function getAgentGroups(agentId: string): string[] {
  */
 export function getGroupAgents(groupFolder: string): Agent[] {
   const db = getDb();
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     SELECT a.* FROM agents a
     JOIN agent_group_associations aga ON a.id = aga.agent_id
     WHERE aga.group_folder = ?
-  `).all(groupFolder) as Agent[];
+  `,
+    )
+    .all(groupFolder) as Agent[];
 
   return rows;
 }
@@ -245,13 +272,19 @@ export function getGroupAgents(groupFolder: string): Agent[] {
 /**
  * 获取 group 的主要 agent
  */
-export function getPrimaryAgentForGroup(groupFolder: string): Agent | undefined {
+export function getPrimaryAgentForGroup(
+  groupFolder: string,
+): Agent | undefined {
   const db = getDb();
-  const row = db.prepare(`
+  const row = db
+    .prepare(
+      `
     SELECT a.* FROM agents a
     JOIN agent_group_associations aga ON a.id = aga.agent_id
     WHERE aga.group_folder = ? AND aga.is_primary = 1
-  `).get(groupFolder) as Agent | undefined;
+  `,
+    )
+    .get(groupFolder) as Agent | undefined;
 
   return row;
 }

@@ -43,7 +43,9 @@ export class AgentAPI {
     if (input.config) {
       const validation = validateAgentConfig(input.config);
       if (!validation.valid) {
-        throw new Error(`Invalid agent config: ${validation.errors.join(', ')}`);
+        throw new Error(
+          `Invalid agent config: ${validation.errors.join(', ')}`,
+        );
       }
     }
 
@@ -71,7 +73,9 @@ export class AgentAPI {
     if (input.updates.config) {
       const validation = validateAgentConfig(input.updates.config);
       if (!validation.valid) {
-        throw new Error(`Invalid agent config: ${validation.errors.join(', ')}`);
+        throw new Error(
+          `Invalid agent config: ${validation.errors.join(', ')}`,
+        );
       }
     }
 

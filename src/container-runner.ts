@@ -369,7 +369,9 @@ export async function runContainerAgent(
   // [CUSTOM: agent-support] 开始
   let config: AgentConfig | null = null;
   if (input.agentId || input.agentConfig) {
-    config = input.agentConfig || (await getAgentConfig(input.agentId, input.groupFolder));
+    config =
+      input.agentConfig ||
+      (await getAgentConfig(input.agentId, input.groupFolder));
   }
 
   let containerArgs = buildContainerArgs(mounts, containerName);

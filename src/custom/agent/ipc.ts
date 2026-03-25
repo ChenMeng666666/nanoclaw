@@ -71,9 +71,10 @@ export function isAgentIpcMessage(message: { type: string }): boolean {
 /**
  * Validate agent IPC message payload
  */
-export function validateAgentIpcMessage(
-  message: AgentIpcMessage,
-): { valid: boolean; errors: string[] } {
+export function validateAgentIpcMessage(message: AgentIpcMessage): {
+  valid: boolean;
+  errors: string[];
+} {
   const errors: string[] = [];
 
   switch (message.type) {
@@ -97,7 +98,8 @@ export function validateAgentIpcMessage(
 
     case 'bind_agent_to_group':
       if (!message.payload.agentId) errors.push('payload.agentId is required');
-      if (!message.payload.groupFolder) errors.push('payload.groupFolder is required');
+      if (!message.payload.groupFolder)
+        errors.push('payload.groupFolder is required');
       break;
 
     case 'get_agent':
@@ -105,11 +107,13 @@ export function validateAgentIpcMessage(
       break;
 
     case 'get_primary_agent':
-      if (!message.payload.groupFolder) errors.push('payload.groupFolder is required');
+      if (!message.payload.groupFolder)
+        errors.push('payload.groupFolder is required');
       break;
 
     case 'get_group_agents':
-      if (!message.payload.groupFolder) errors.push('payload.groupFolder is required');
+      if (!message.payload.groupFolder)
+        errors.push('payload.groupFolder is required');
       break;
 
     case 'list_agents':
@@ -132,10 +136,16 @@ export async function processAgentIpcMessage(
   handlers: {
     createAgent: (input: CreateAgentInput) => Agent | Promise<Agent>;
     listAgents: (input?: ListAgentsInput) => Agent[] | Promise<Agent[]>;
-    updateAgent: (input: UpdateAgentInput) => Agent | undefined | Promise<Agent | undefined>;
+    updateAgent: (
+      input: UpdateAgentInput,
+    ) => Agent | undefined | Promise<Agent | undefined>;
     deleteAgent: (input: DeleteAgentInput) => boolean | Promise<boolean>;
-    getAgent: (agentId: string) => Agent | undefined | Promise<Agent | undefined>;
-    getPrimaryAgentForGroup: (groupFolder: string) => Agent | undefined | Promise<Agent | undefined>;
+    getAgent: (
+      agentId: string,
+    ) => Agent | undefined | Promise<Agent | undefined>;
+    getPrimaryAgentForGroup: (
+      groupFolder: string,
+    ) => Agent | undefined | Promise<Agent | undefined>;
     getGroupAgents: (groupFolder: string) => Agent[] | Promise<Agent[]>;
     bindAgentToGroup: (input: BindAgentToGroupInput) => any | Promise<any>;
     runAgent?: (input: RunAgentInput) => any | Promise<any>;
@@ -179,12 +189,16 @@ export async function processAgentIpcMessage(
       }
 
       case 'get_primary_agent': {
-        const agent = await handlers.getPrimaryAgentForGroup(message.payload.groupFolder);
+        const agent = await handlers.getPrimaryAgentForGroup(
+          message.payload.groupFolder,
+        );
         return { success: true, data: agent || null };
       }
 
       case 'get_group_agents': {
-        const agents = await handlers.getGroupAgents(message.payload.groupFolder);
+        const agents = await handlers.getGroupAgents(
+          message.payload.groupFolder,
+        );
         return { success: true, data: agents };
       }
 
@@ -208,7 +222,10 @@ export async function processAgentIpcMessage(
         };
     }
   } catch (err) {
-    logger.error({ err, type: message.type }, 'Error processing agent IPC message');
+    logger.error(
+      { err, type: message.type },
+      'Error processing agent IPC message',
+    );
     return {
       success: false,
       error: err instanceof Error ? err.message : 'Unknown error',

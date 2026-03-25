@@ -1,10 +1,7 @@
 // src/custom/agent/db.test.ts
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 import Database from 'better-sqlite3';
-import {
-  _initTestDatabase as initCoreTestDatabase,
-  getDb,
-} from '../../db.js';
+import { _initTestDatabase as initCoreTestDatabase, getDb } from '../../db.js';
 import {
   createAgent,
   getAgentById,
@@ -97,7 +94,9 @@ describe('Agent Database', () => {
       expect(updated?.name).toBe('New Name');
       expect(updated?.role).toBe('new-role');
       // 时间戳可能相同（同一毫秒内执行），所以我们检查它是有效的 ISO 字符串
-      expect(updated?.updated_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+      expect(updated?.updated_at).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
+      );
     });
 
     it('should delete an agent successfully', () => {
@@ -170,8 +169,8 @@ describe('Agent Database', () => {
 
       const agents = getGroupAgents('shared-group');
       expect(agents.length).toBe(2);
-      expect(agents.some(a => a.id === agent1.id)).toBe(true);
-      expect(agents.some(a => a.id === agent2.id)).toBe(true);
+      expect(agents.some((a) => a.id === agent1.id)).toBe(true);
+      expect(agents.some((a) => a.id === agent2.id)).toBe(true);
     });
 
     it('should get primary agent for a group', () => {
