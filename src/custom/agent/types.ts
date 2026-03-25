@@ -230,10 +230,12 @@ export const AgentIdentitySchema = z.object({
   role: z.string().min(1),
   systemPrompt: z.string().optional(),
   description: z.string().optional(),
-  appearance: z.object({
-    avatar: z.string().optional(),
-    quotes: z.array(z.string()).optional(),
-  }).optional(),
+  appearance: z
+    .object({
+      avatar: z.string().optional(),
+      quotes: z.array(z.string()).optional(),
+    })
+    .optional(),
 });
 
 export const AgentSchema = z.object({
@@ -292,7 +294,10 @@ function toSnakeCase(str: string): string {
   if (str === 'readOnly') {
     return 'read_only';
   }
-  return str.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
+  return str
+    .replace(/([A-Z])/g, '_$1')
+    .toLowerCase()
+    .replace(/^_/, '');
 }
 
 /**
@@ -353,7 +358,9 @@ export function validateAgentIdentity(identity: any): AgentIdentity {
 /**
  * 合并默认配置与用户配置
  */
-export function mergeAgentConfig(userConfig?: Partial<AgentConfig>): AgentConfig {
+export function mergeAgentConfig(
+  userConfig?: Partial<AgentConfig>,
+): AgentConfig {
   const defaultConfig = AgentConfigSchema.parse({});
   return {
     ...defaultConfig,
@@ -365,7 +372,9 @@ export function mergeAgentConfig(userConfig?: Partial<AgentConfig>): AgentConfig
     runtimeConfig: {
       ...defaultConfig.runtimeConfig,
       ...(userConfig?.runtimeConfig || {}),
-      additionalMounts: userConfig?.runtimeConfig?.additionalMounts || defaultConfig.runtimeConfig.additionalMounts,
+      additionalMounts:
+        userConfig?.runtimeConfig?.additionalMounts ||
+        defaultConfig.runtimeConfig.additionalMounts,
     },
   };
 }

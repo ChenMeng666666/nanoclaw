@@ -54,7 +54,11 @@ describe('Agent Types - Schema Validation', () => {
         memoryLimit: '4GB',
         mountStrategy: 'custom',
         additionalMounts: [
-          { hostPath: '/home/user/docs', containerPath: '/docs', readOnly: true },
+          {
+            hostPath: '/home/user/docs',
+            containerPath: '/docs',
+            readOnly: true,
+          },
         ],
       });
       expect(config).toEqual({
@@ -62,7 +66,11 @@ describe('Agent Types - Schema Validation', () => {
         memoryLimit: '4GB',
         mountStrategy: 'custom',
         additionalMounts: [
-          { hostPath: '/home/user/docs', containerPath: '/docs', readOnly: true },
+          {
+            hostPath: '/home/user/docs',
+            containerPath: '/docs',
+            readOnly: true,
+          },
         ],
       });
     });
