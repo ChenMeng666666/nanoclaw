@@ -1,197 +1,120 @@
-// 阶段 1: Agent 独立运行单元 - 类型定义
-// 来源: docs/superpowers/specs/2026-03-25-agent-independence-design.md
+// src/custom/agent/types.ts
+import { z } from 'zod';
 
-// === 基础类型 ===
-
-export type AgentType = 'system' | 'user';
-export type AgentStatus = 'active' | 'paused' | 'archived';
-export type AuthMode = 'proxy' | 'direct';
-export type MountStrategy = 'group_inherit' | 'custom';
-
-// === 身份模型 ===
-
-/**
- * Agent 身份信息
- */
-export interface AgentIdentity {
-  name: string;
-  role: string;
-  systemPrompt?: string;
-  description?: string;
-  appearance?: {
-    avatar?: string;
-    quotes?: string[];
-  };
-}
-
-/**
- * Agent 实体类型
- */
+// Agent 核心类型
 export interface Agent {
   id: string;
   name: string;
   role: string;
-  type: AgentType;
-  status: AgentStatus;
+  type: 'system' | 'user';
+  status: 'active' | 'paused' | 'archived';
   description?: string;
-  systemPrompt?: string;
-  createdAt: string;
-  updatedAt: string;
+  system_prompt?: string;
+  created_at: string;
+  updated_at: string;
 }
 
-// === 配置模型 ===
+// Agent 身份信息（存储在 identity.json）
+export interface AgentIdentity {
+  name: string;
+  role: string;
+  system_prompt?: string;
+}
 
-/**
- * 模型配置
- */
-export interface ModelConfig {
+// Agent 模型配置
+export interface AgentModelConfig {
   model: string;
-  baseUrl: string;
-  authMode: AuthMode;
+  base_url: string;
+  auth_mode: 'proxy' | 'direct';
 }
 
-/**
- * 运行时配置
- */
-export interface RuntimeConfig {
-  containerTimeout: number; // 容器超时时间（毫秒）
-  memoryLimit: string; // 内存限制
-  mountStrategy: MountStrategy; // 挂载策略
-  additionalMounts: Array<{
+// Agent 运行配置
+export interface AgentRuntimeConfig {
+  container_timeout: number;
+  memory_limit: string;
+  mount_strategy: 'group_inherit' | 'custom';
+  additional_mounts: Array<{
     hostPath: string;
     containerPath?: string;
-    readonly: boolean;
-  }>; // 额外挂载
+    readonly?: boolean;
+  }>;
 }
 
-/**
- * Agent 完整配置
- */
+// Agent 完整配置（存储在 config.json）
 export interface AgentConfig {
-  modelConfig: ModelConfig;
-  runtimeConfig: RuntimeConfig;
+  model_config: AgentModelConfig;
+  runtime_config: AgentRuntimeConfig;
 }
 
-// === 关联模型 ===
-
-/**
- * Agent 与 Group 的关联关系
- */
+// Agent 与 Group 关联
 export interface AgentGroupAssociation {
   id: string;
-  agentId: string;
-  groupFolder: string;
-  isPrimary: boolean;
+  agent_id: string;
+  group_folder: string;
+  is_primary: boolean;
 }
 
-// === API 接口类型 ===
+// Zod schemas for validation
+export const AgentModelConfigSchema = z.object({
+  model: z.string().default('claude-3-sonnet-20250219'),
+  base_url: z.string().url().default('https://api.anthropic.com'),
+  auth_mode: z.enum(['proxy', 'direct']).default('proxy'),
+});
 
-/**
- * 创建 Agent 输入类型
- */
+export const AgentRuntimeConfigSchema = z.object({
+  container_timeout: z.number().int().positive().default(1800000),
+  memory_limit: z.string().default('4g'),
+  mount_strategy: z.enum(['group_inherit', 'custom']).default('group_inherit'),
+  additional_mounts: z.array(z.object({
+    hostPath: z.string(),
+    containerPath: z.string().optional(),
+    readonly: z.boolean().optional(),
+  })).default([]),
+});
+
+export const AgentConfigSchema = z.object({
+  model_config: AgentModelConfigSchema,
+  runtime_config: AgentRuntimeConfigSchema,
+});
+
+export const AgentIdentitySchema = z.object({
+  name: z.string(),
+  role: z.string(),
+  system_prompt: z.string().optional(),
+});
+
+// API 输入类型
 export interface CreateAgentInput {
   name: string;
   role: string;
   type?: 'system' | 'user';
-  identity: Partial<AgentIdentity>;
-  config: Partial<AgentConfig>;
+  identity?: Partial<AgentIdentity>;
+  config?: Partial<AgentConfig>;
 }
 
-/**
- * 查询 Agent 列表输入类型
- */
 export interface ListAgentsInput {
   status?: 'active' | 'paused' | 'archived';
   type?: 'system' | 'user';
 }
 
-/**
- * 更新 Agent 输入类型
- */
 export interface UpdateAgentInput {
   agentId: string;
   updates: Partial<CreateAgentInput>;
 }
 
-/**
- * 删除 Agent 输入类型
- */
 export interface DeleteAgentInput {
   agentId: string;
   keepWorkspace?: boolean;
 }
 
-/**
- * 运行 Agent 输入类型
- */
 export interface RunAgentInput {
   agentId: string;
   prompt: string;
   contextMode?: 'isolated' | 'group';
 }
 
-// === 数据存储结构 ===
-
-/**
- * Agent 配置文件内容 (data/agents/<id>/config.json)
- */
-export interface AgentConfigFile {
-  model_config: ModelConfig;
-  runtime_config: RuntimeConfig;
-}
-
-/**
- * Agent 身份文件内容 (data/agents/<id>/identity.json)
- */
-export interface AgentIdentityFile {
-  name: string;
-  role: string;
-  system_prompt?: string;
-  description?: string;
-  appearance?: {
-    avatar?: string;
-    quotes?: string[];
-  };
-}
-
-// === 运行时接口 ===
-
-/**
- * 容器运行输入
- */
-export interface ContainerInput {
-  prompt: string;
-  sessionId?: string;
+export interface BindAgentToGroupInput {
+  agentId: string;
   groupFolder: string;
-  chatJid: string;
-  isMain: boolean;
-  agentId?: string;
-  agentConfig?: AgentConfig;
-}
-
-/**
- * 容器运行选项
- */
-export interface ContainerOptions {
-  image?: string;
-  command?: string[];
-  env?: Record<string, string>;
-  mounts?: Array<{
-    source: string;
-    target: string;
-    type: 'bind';
-    readOnly: boolean;
-  }>;
-  workingDir?: string;
-  network?: string;
-}
-
-/**
- * 容器运行结果
- */
-export interface ContainerResult {
-  success: boolean;
-  output?: string;
-  error?: string;
-  durationMs?: number;
+  isPrimary?: boolean;
 }
