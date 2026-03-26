@@ -109,3 +109,23 @@ export type OnChatMetadata = (
   channel?: string,
   isGroup?: boolean,
 ) => void;
+
+// [CUSTOM: agent-types] 开始
+
+// Agent types
+export type {
+  Agent,
+  AgentIdentity,
+  AgentModelConfig,
+  AgentRuntimeConfig,
+  AgentConfig,
+  AgentGroupAssociation,
+  CreateAgentInput,
+  ListAgentsInput,
+  UpdateAgentInput,
+  DeleteAgentInput,
+  RunAgentInput,
+  BindAgentToGroupInput,
+} from './custom/agent/types.js';
+
+// [CUSTOM] 结束

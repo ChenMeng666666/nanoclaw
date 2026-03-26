@@ -9,6 +9,23 @@ import { createTask, deleteTask, getTaskById, updateTask } from './db.js';
 import { isValidGroupFolder } from './group-folder.js';
 import { logger } from './logger.js';
 import { RegisteredGroup } from './types.js';
+// [CUSTOM: agent-ipc] 开始
+import {
+  processAgentIpcMessage,
+  isAgentIpcMessage,
+  type AgentIpcMessage,
+} from './custom/agent/ipc.js';
+import {
+  createAgent,
+  listAgents,
+  updateAgent,
+  deleteAgent,
+  getAgentById,
+  getPrimaryAgentForGroup,
+  getGroupAgents,
+  bindAgentToGroup,
+} from './custom/agent/db.js';
+// [CUSTOM] 结束
 
 export interface IpcDeps {
   sendMessage: (jid: string, text: string) => Promise<void>;
@@ -171,11 +188,39 @@ export async function processTaskIpc(
     trigger?: string;
     requiresTrigger?: boolean;
     containerConfig?: RegisteredGroup['containerConfig'];
+    // For agent operations
+    payload?: any;
   },
   sourceGroup: string, // Verified identity from IPC directory
   isMain: boolean, // Verified from directory path
   deps: IpcDeps,
 ): Promise<void> {
+  // [CUSTOM: agent-ipc] 开始
+  // Handle agent IPC messages
+  if (isAgentIpcMessage(data as any)) {
+    logger.info(
+      { type: data.type, sourceGroup },
+      'Processing agent IPC message',
+    );
+
+    const response = await processAgentIpcMessage(data as AgentIpcMessage, {
+      createAgent,
+      listAgents,
+      updateAgent,
+      deleteAgent,
+      getAgent: getAgentById,
+      getPrimaryAgentForGroup,
+      getGroupAgents,
+      bindAgentToGroup,
+      // runAgent handler will be implemented in future phases
+    });
+
+    // TODO: Handle response (send back to source via IPC)
+    logger.debug({ response }, 'Agent IPC response');
+    return;
+  }
+  // [CUSTOM] 结束
+
   const registeredGroups = deps.registeredGroups();
 
   switch (data.type) {

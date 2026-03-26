@@ -2,6 +2,11 @@
  * Container Runner for NanoClaw
  * Spawns agent execution in containers and handles IPC
  */
+// [CUSTOM: agent-support] 开始
+import { getAgentById } from './custom/agent/db.js';
+import type { AgentConfig } from './custom/agent/types.js';
+// [CUSTOM] 结束
+
 import { ChildProcess, exec, spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -41,6 +46,10 @@ export interface ContainerInput {
   isMain: boolean;
   isScheduledTask?: boolean;
   assistantName?: string;
+  // [CUSTOM: agent-support] 开始
+  agentId?: string;
+  agentConfig?: AgentConfig;
+  // [CUSTOM] 结束
 }
 
 export interface ContainerOutput {
@@ -49,6 +58,84 @@ export interface ContainerOutput {
   newSessionId?: string;
   error?: string;
 }
+
+// [CUSTOM: agent-support] 开始
+/**
+ * 获取 agent 配置
+ */
+async function getAgentConfig(
+  agentId?: string,
+  groupFolder?: string,
+): Promise<AgentConfig | null> {
+  if (!agentId) {
+    return null;
+  }
+
+  try {
+    const agent = getAgentById(agentId);
+    if (!agent) {
+      logger.warn({ agentId }, 'Agent not found');
+      return null;
+    }
+
+    // 这里可以扩展为从文件或其他数据源获取配置
+    // 目前先返回默认配置
+    const agentDir = path.join(DATA_DIR, 'agents', agentId);
+    const configFile = path.join(agentDir, 'config.json');
+
+    if (fs.existsSync(configFile)) {
+      const configContent = fs.readFileSync(configFile, 'utf8');
+      return JSON.parse(configContent) as AgentConfig;
+    }
+
+    logger.debug({ agentId }, 'Agent config file not found, using default');
+    return null;
+  } catch (error) {
+    logger.error({ agentId, error }, 'Failed to get agent config');
+    return null;
+  }
+}
+
+/**
+ * 使用 agent 配置构建容器挂载选项
+ */
+function buildContainerOptionsForAgent(
+  input: ContainerInput,
+  config: AgentConfig,
+  mounts: VolumeMount[],
+): string[] {
+  const options: string[] = [];
+
+  // 设置 agent 特定的环境变量
+  if (config.model_config) {
+    options.push('-e', `ANTHROPIC_MODEL=${config.model_config.model}`);
+    if (config.model_config.base_url) {
+      options.push('-e', `ANTHROPIC_BASE_URL=${config.model_config.base_url}`);
+    }
+  }
+
+  // 设置内存限制
+  if (config.runtime_config?.memory_limit) {
+    options.push('--memory', config.runtime_config.memory_limit);
+  }
+
+  // 处理 agent 的自定义挂载策略
+  if (config.runtime_config?.mount_strategy === 'custom') {
+    if (config.runtime_config.additional_mounts) {
+      for (const mount of config.runtime_config.additional_mounts) {
+        const containerPath = mount.containerPath || mount.hostPath;
+        if (mount.readonly) {
+          options.push(...readonlyMountArgs(mount.hostPath, containerPath));
+        } else {
+          options.push('-v', `${mount.hostPath}:${containerPath}`);
+        }
+      }
+    }
+  }
+
+  return options;
+}
+// [CUSTOM] 结束
 
 interface VolumeMount {
   hostPath: string;
@@ -278,7 +365,31 @@ export async function runContainerAgent(
   const mounts = buildVolumeMounts(group, input.isMain);
   const safeName = group.folder.replace(/[^a-zA-Z0-9-]/g, '-');
   const containerName = `nanoclaw-${safeName}-${Date.now()}`;
-  const containerArgs = buildContainerArgs(mounts, containerName);
+
+  // [CUSTOM: agent-support] 开始
+  let config: AgentConfig | null = null;
+  if (input.agentId || input.agentConfig) {
+    config =
+      input.agentConfig ||
+      (await getAgentConfig(input.agentId, input.groupFolder));
+  }
+
+  let containerArgs = buildContainerArgs(mounts, containerName);
+
+  // 如果有 agent 配置，使用 agent 特定的选项
+  if (config) {
+    const agentOptions = buildContainerOptionsForAgent(input, config, mounts);
+    // 注入 agent 选项到容器参数中，在镜像名称之前
+    const imageIndex = containerArgs.indexOf(CONTAINER_IMAGE);
+    if (imageIndex !== -1) {
+      containerArgs = [
+        ...containerArgs.slice(0, imageIndex),
+        ...agentOptions,
+        ...containerArgs.slice(imageIndex),
+      ];
+    }
+  }
+  // [CUSTOM] 结束
 
   logger.debug(
     {
