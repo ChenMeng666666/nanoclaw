@@ -86,7 +86,13 @@ export class TelegramChannel implements Channel {
       const jid = `tg:${chatId}`;
 
       // Notify chat metadata
-      this.onChatMetadata(jid, timestamp, ctx.chat?.title, 'telegram', ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup');
+      this.onChatMetadata(
+        jid,
+        timestamp,
+        ctx.chat?.title,
+        'telegram',
+        ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup',
+      );
 
       // Create message object
       const msg: NewMessage = {
